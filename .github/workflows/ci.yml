@@ -1,0 +1,95 @@
+---
+name: CI
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+jobs:
+  hooks:
+    name: Run prek hooks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version-file: ".python-version"
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - run: uv run --locked prek run --all-files --show-diff-on-failure
+  ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    name: Run Tests on ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - name: System Info
+        shell: bash
+        run: |
+          if [[ ${{ matrix.os }} == "ubuntu-latest" ]]; then
+              echo "The system is Linux."
+              uname -a || true
+              lsb_release -a || true
+              gcc --version || true
+          elif [[ ${{ matrix.os }} == "macos-latest" ]]; then
+              echo "The system is macOS."
+              sw_vers || true
+              uname -a || true
+              gcc --version || true
+          elif [[ ${{ matrix.os }} == "windows-latest" ]]; then
+              echo "The system is Windows (using a Unix-like environment)."
+              systeminfo || true
+          else
+              echo "Unknown OS: $OS_TYPE"
+              exit 1
+          fi
+      - name: Environment Info
+        run: |
+          env || true
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version-file: ".python-version"
+      - name: Setup uv
+        id: setup-uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - name: Restore cache
+        if: steps.setup-uv.outputs.cache-hit == 'true'
+        run: echo "Cache was restored"
+      - name: Install headless X server (Linux)
+        # pynput imports its Xlib backend at import time; without a display the
+        # test/lint collection fails before anything runs. Xvfb provides one.
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      - name: Run the tests
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            xvfb-run -a uv run --locked tox run
+          else
+            uv run --locked tox run
+          fi
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v6.0.2
+        with:
+          files: ./coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}

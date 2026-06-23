@@ -1,0 +1,338 @@
+[project]
+name = "keycast"
+description = "Keycast is a cross-platform keystroke and mouse click visualizer built in Python."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Hasan Sezer Taşan", email = "hasansezertasan@gmail.com" }]
+maintainers = [
+  { name = "Hasan Sezer Taşan", email = "hasansezertasan@gmail.com" },
+]
+# Version is derived from git tags by hatch-vcs (see [tool.hatch.version]),
+# so there is no static version literal for release-please to bump.
+dynamic = ["version"]
+keywords = []
+classifiers = []
+requires-python = ">=3.14"
+dependencies = [
+  "pydantic-extra-types==2.11.1",
+  "pydantic-settings==2.14.2",
+  "pynput==1.8.2",
+  "typer==0.26.7",
+]
+
+
+[project.scripts]
+# Single coherent entry point: `keycast` launches the overlay, while
+# `keycast version` / `keycast info` expose the CLI subcommands.
+keycast = "keycast.cli:app"
+
+
+[dependency-groups]
+dev = [
+  "keycast",
+  "tox==4.55.1",
+  "tox-uv==1.35.2",
+  { include-group = "lint" },
+  { include-group = "test" },
+  { include-group = "tool" },
+]
+lint = [
+  "mypy==2.1.0",
+  "pyright==1.1.410",
+  "ty==0.0.51",
+  "pyrefly==1.1.1",
+  "ruff==0.15.18",
+  "taplo==0.9.3",
+  "typos==1.47.2",
+  "validate-pyproject[all]==0.25",
+  "vulture==2.16",
+  "slotscheck==0.20.0",
+  # "shellcheck-py==0.11.0.1",
+  # "shellcheck-makefile==1.27.3",
+  # "yamllint==1.37.1",
+  # "yamlfix==1.18.0",
+  # "yamlfmt==1.1.1",
+  "types-pynput==1.8.1.20250809",
+  "types-pyinstaller==6.16.0.20250918",
+]
+test = [
+  # "coverage-enable-subprocess==1.0",
+  "coverage[toml]~=7.4",
+  "pytest==9.1.0",
+  "pytest-cov==7.0.0",
+  # "pytest-asyncio==1.2.0",
+  # "pytest-sugar",
+  # "pytest-dependency>=0.6.0",
+  # "pytest-mock~=3.12",
+  # "pytest-rerunfailures~=14.0",
+  # "pytest-xdist[psutil]~=3.5",
+]
+tool = [
+  "prek==0.4.5", # git hook runner used by the `hooks` CI job and locally
+  # "marimo==0.17.0",
+  # "pyinstaller==6.16.0",
+]
+
+
+[build-system]
+requires = [
+  "hatchling==1.30.1",
+  "hatch-vcs==0.5.0",
+  # "hatch-babel==0.1.2",
+  # "setuptools-scm==9.2.1",
+  # "hatch-autorun==1.1.0",
+]
+build-backend = "hatchling.build"
+
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+
+[tool.hatch.version]
+# Single source of truth for the version is the git tag. On a clean checkout
+# of a release tag (the `publish` job uses fetch-depth: 0) this resolves to the
+# exact `X.Y.Z`; with `only-version` below and no tag yet, it falls back to
+# `fallback-version`.
+source = "vcs"
+# A source tree with no tags/history (e.g. a shallow checkout) would otherwise
+# fail the version computation; fall back to 0.0.0 instead of erroring.
+fallback-version = "0.0.0"
+
+
+[tool.hatch.version.raw-options]
+# Use the tag version exactly rather than guessing the next release, and drop
+# the PEP 440 local segment (+g<hash>): PyPI rejects local versions, so this
+# keeps non-tag builds uploadable.
+version_scheme = "only-version"
+local_scheme = "no-local-version"
+
+
+[tool.hatch.build]
+# Write the computed version to a generated, git-ignored module so the package
+# exposes `keycast.__version__` without an importlib.metadata lookup.
+hooks.vcs.version-file = "src/keycast/_version.py"
+
+
+[tool.uv]
+add-bounds = "exact"
+cache-keys = [
+  { file = "pyproject.toml" },
+  { git = { commit = true, tags = true } },
+]
+trusted-publishing = "always"
+
+
+[tool.coverage.run]
+branch = true
+parallel = true # tox runs tests in an installed-wheel env; keep per-run data files
+source_pkgs = ["keycast"]
+omit = [
+  "*/keycast/__main__.py", # entry-point shim, exercised by running the module
+]
+
+# Map the installed-wheel location measured under tox back onto the source tree
+# so `coverage combine`/`report` attribute lines to src/keycast, not site-packages.
+[tool.coverage.paths]
+keycast = ["src/keycast", "*/site-packages/keycast"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+  "\\.\\.\\.",
+  "if __name__ == .__main__.:",
+]
+
+
+[tool.pytest.ini_options]
+addopts = "--tb=short"
+testpaths = ["tests"]
+
+
+# Type checkers are scoped to `src` only: the test suite intentionally passes
+# plain dicts where the runtime accepts read-only mappings, which the checkers
+# would (correctly) reject. Production code must stay clean; tests need not.
+[tool.mypy]
+files = ["src"]
+python_version = "3.14"
+pretty = true
+show_error_codes = true
+
+[tool.pyright]
+include = ["src"]
+
+[tool.pyrefly]
+python-version = "3.14"
+project-includes = ["src"]
+
+[tool.ty.src]
+include = ["src"]
+
+[tool.ty.environment]
+python-version = "3.14"
+
+[tool.typos.default]
+# release-please writes commit links like `[00ba092]` into CHANGELOG.md; the
+# abbreviated SHA can read as a word fragment (e.g. `ba`). Ignore the bracketed
+# hash token wholesale. `{7,40}` covers git extending the abbreviation past 7
+# chars on collision, up to the full 40-char hash.
+extend-ignore-re = ["\\[[0-9a-f]{7,40}\\]"]
+
+[tool.typos.default.extend-identifiers]
+# `plain_serializer_function_ser_schema` is a real pydantic-core API name; the
+# `ser` fragment is not a misspelling of `set`.
+plain_serializer_function_ser_schema = "plain_serializer_function_ser_schema"
+
+[tool.vulture]
+# Callables registered via these decorators are invoked by the framework, not by
+# our code, so vulture cannot see the call site. Suppress by decorator (precise)
+# rather than naming each validator.
+ignore_decorators = ["@app.command", "@field_validator", "@model_validator"]
+# Names that are intentionally unused but required by a framework/library
+# signature, so vulture cannot see why they exist.
+ignore_names = [
+  # pydantic protocol hooks: required positional/keyword names we don't consume
+  "source",                     # __get_pydantic_core_schema__(cls, source, handler)
+  "settings_customise_sources",
+  "init_settings",              # settings_customise_sources(...): keycast loads JSON only
+  "env_settings",
+  "dotenv_settings",
+  "file_secret_settings",
+  # unittest.mock attributes assigned in tests
+  "side_effect",
+  "__str__",
+  # params of local monkeypatch stub functions, kept for signature parity
+  "target",
+  "src",
+  "dst",
+]
+min_confidence = 60
+paths = ["src", "tests"] # add "examples" here if/when that directory exists
+
+# NOTE: taplo only discovers config from .taplo.toml/taplo.toml — it does NOT read
+# [tool.taplo] here. So instead of a config file with an exclude list, the style env
+# below passes taplo the exact files we own; it never descends into .venv/.tox.
+
+
+[tool.tox]
+env_list = ["style", "run", "3.14", "cov"]
+requires = ["tox>=4"]
+
+[tool.tox.env_run_base]
+# Test the built wheel (not the source tree) so coverage exercises the same
+# artifact that ships to PyPI; coverage.paths maps it back to src for reporting.
+commands = [
+  [
+    "coverage",
+    "run",
+    "-m",
+    "pytest",
+    "-v",
+    "--tb=short",
+    "--basetemp={env_tmp_dir}",
+    { replace = "posargs", default = [
+    ], extend = true },
+  ],
+]
+constrain_package_deps = true
+dependency_groups = ["test"]
+description = "Run the tests under {base_python}"
+env_tmp_dir = "{toxworkdir}/tmp/{envname}"
+package = "wheel"
+# tox scrubs the environment; importing keycast pulls in pynput, whose X backend
+# needs DISPLAY (provided by xvfb-run on Linux CI). Forward it into the commands.
+pass_env = ["DISPLAY", "XAUTHORITY"]
+runner = "uv-venv-runner"
+use_frozen_constraints = true
+wheel_build_env = ".pkg"
+
+[tool.tox.env.style]
+base_python = ["3.14"]
+dependency_groups = ["lint"]
+runner = "uv-venv-runner"
+description = "Run linters and formatters"
+pass_env = [
+  "DISPLAY",
+  "XAUTHORITY",
+] # slotscheck imports keycast -> pynput (needs DISPLAY)
+commands = [
+  [
+    "ruff",
+    "check",
+  ],
+  [
+    "ruff",
+    "format",
+    "--check",
+  ],
+  [
+    "mypy",
+  ],
+  [
+    "pyright",
+  ],
+  [
+    "ty",
+    "check",
+  ],
+  [
+    "pyrefly",
+    "check",
+  ],
+  [
+    "vulture",
+  ],
+  [
+    "slotscheck",
+    "-m",
+    "keycast",
+  ],
+  [
+    "taplo",
+    "lint",
+    "pyproject.toml",
+    "prek.toml",
+  ],
+  [
+    "taplo",
+    "format",
+    "--check",
+    "pyproject.toml",
+    "prek.toml",
+  ],
+  [
+    "validate-pyproject",
+    "pyproject.toml",
+  ],
+  [
+    "typos",
+  ],
+]
+
+[tool.tox.env.run]
+commands = [["keycast", "version", { replace = "posargs", extend = true }]]
+description = "Run the application"
+
+[tool.tox.env.cov]
+base_python = ["3.14"]
+dependency_groups = ["test"]
+depends = ["3.14"]
+description = "Combine coverage data and emit XML/report"
+runner = "uv-venv-runner"
+skip_install = true
+commands = [
+  [
+    "coverage",
+    "combine",
+  ],
+  [
+    "coverage",
+    "xml",
+  ],
+  [
+    "coverage",
+    "report",
+  ],
+]
