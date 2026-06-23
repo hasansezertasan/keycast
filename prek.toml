@@ -1,0 +1,31 @@
+# Configuration file for `prek`, a git hook framework written in Rust.
+# See https://prek.j178.dev for more information.
+#:schema https://www.schemastore.org/prek.json
+default_install_hook_types = ["pre-commit", "commit-msg"]
+[[repos]]
+repo = "https://github.com/pre-commit/pre-commit-hooks"
+rev = "v6.0.0"
+hooks = [
+  { id = "check-added-large-files" },
+  { id = "check-toml" },
+  { id = "check-yaml", args = [
+    "--unsafe",
+  ] },
+  { id = "check-json", exclude = '^\.vscode/launch\.json$' },
+  { id = "check-merge-conflict" },
+  { id = "end-of-file-fixer" },
+  { id = "trailing-whitespace" },
+  { id = "debug-statements" },
+]
+[[repos]]
+repo = "https://github.com/astral-sh/uv-pre-commit"
+rev = "0.11.23"
+hooks = [{ id = "uv-lock" }]
+[[repos]]
+repo = "https://github.com/astral-sh/ruff-pre-commit"
+rev = "v0.15.18"
+hooks = [{ id = "ruff-check" }, { id = "ruff-format" }]
+[[repos]]
+repo = "https://github.com/crate-ci/typos"
+rev = "v1.47.2"
+hooks = [{ id = "typos" }]
