@@ -84,8 +84,12 @@ pyinstaller --noconfirm --windowed --name keycast \
 
 The spec wires a platform-specific app **icon**: the Windows `EXE` embeds
 `packaging/keycast.ico` and the macOS `BUNDLE` wraps `packaging/keycast.icns`
-(the unused format per platform is left `None`). Both are generated from one
-programmatic source — regenerate on macOS with
+(the unused format per platform is left `None`). The same generator also emits
+`src/keycast/assets/keycast.png`, a runtime icon shipped *inside* the package so
+keycast run from source (`uv run keycast`, no bundle) can still brand its taskbar
+(Tk `iconphoto`) and macOS dock (AppKit) icon — see
+`DisplayWindow._apply_window_icon`. All three are generated from one programmatic
+source — regenerate on macOS with
 `uv run --with pillow packaging/make_icons.py` (Pillow is pulled in only for that
 run; it is not a project dependency).
 

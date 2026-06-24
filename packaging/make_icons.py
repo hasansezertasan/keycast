@@ -11,11 +11,14 @@ glyph) whenever the icon needs regenerating:
 
     uv run --with pillow packaging/make_icons.py
 
-Outputs ``packaging/keycast.icns`` (macOS BUNDLE) and ``packaging/keycast.ico``
-(Windows EXE). Pillow is pulled in only for this run via ``--with``; it is not a
-project dependency. The committed .icns/.ico mean CI never needs Pillow or the
-font. Rendering is done at 4x and downsampled with LANCZOS so the edges stay
-clean at every embedded size.
+Outputs ``packaging/keycast.icns`` (macOS BUNDLE), ``packaging/keycast.ico``
+(Windows EXE), and ``src/keycast/assets/keycast.png`` -- a runtime icon shipped
+*inside* the package so ``keycast`` run from source (``uv run keycast``, no
+PyInstaller bundle) can brand its Tk taskbar / macOS dock icon (see
+``DisplayWindow._apply_window_icon``). Pillow is pulled in only for this run via
+``--with``; it is not a project dependency. The committed assets mean CI never
+needs Pillow or the font. Rendering is done at 4x and downsampled with LANCZOS so
+the edges stay clean at every embedded size.
 """
 
 from __future__ import annotations
@@ -124,12 +127,24 @@ def render_master() -> Image.Image:
     return img.resize((BASE, BASE), Image.LANCZOS)
 
 
+# Runtime PNG size. 512px is ample for the macOS dock (1024 is overkill for a
+# live-set icon) and for Tk's taskbar PhotoImage, while staying a small asset.
+RUNTIME_PNG = 512
+
+
 def write_assets(here: Path) -> None:
     master = render_master()
 
     ico_path = here / "keycast.ico"
     master.save(ico_path, sizes=[(n, n) for n in ICO_SIZES])
     print(f"wrote {ico_path.relative_to(here.parent)}")
+
+    # Runtime icon shipped in the package (PhotoImage/AppKit read PNG, not the
+    # .ico/.icns above, which are build-time only). here.parent is the repo root.
+    png_path = here.parent / "src" / "keycast" / "assets" / "keycast.png"
+    png_path.parent.mkdir(parents=True, exist_ok=True)
+    master.resize((RUNTIME_PNG, RUNTIME_PNG), Image.LANCZOS).save(png_path)
+    print(f"wrote {png_path.relative_to(here.parent)}")
 
     if shutil.which("iconutil") is None:
         print("iconutil not found (macOS only); skipped keycast.icns")
