@@ -83,6 +83,11 @@ class DisplayWindow:
         # Configure window properties
         self.root.configure(bg=str(self.settings.background_color))
         self.root.overrideredirect(boolean=True)  # Remove window decorations
+        # Lock the size independently of decorations. overrideredirect is meant to
+        # strip the frame (and with it the resize grips), but on macOS Aqua Tk 9
+        # it is unreliable, leaving the window resizable; resizable(False, False)
+        # disables resize/zoom regardless of whether the frame is actually gone.
+        self.root.resizable(width=False, height=False)
         self.root.attributes("-alpha", self.settings.alpha)
 
         if self.settings.always_on_top:
@@ -138,8 +143,40 @@ class DisplayWindow:
         # path uniform.
         self.root.protocol("WM_DELETE_WINDOW", self.request_stop)
 
+        # On macOS Aqua (Tk 9) the overrideredirect(True) above is frequently
+        # ignored when set before the window is first mapped, so the overlay comes
+        # up with a title bar and a draggable resize frame. Re-assert it here.
+        self._force_frameless()
+
         # Start fade timer
         self._fade_timer()
+
+    def _force_frameless(self) -> None:
+        """Re-assert borderless state on macOS, where Tk 9 ignores it at creation.
+
+        ``overrideredirect(True)`` in :meth:`_setup_window` is supposed to strip
+        the title bar and frame, but Aqua Tk 9.0 honours it only once the window
+        has been mapped. Force the window through a layout pass and toggle the
+        flag off/on so Aqua reprocesses it and actually drops the decorations.
+
+        macOS-only and best-effort: other platforms remove the frame correctly on
+        the first call, and a transient ``TclError`` (e.g. window mid-teardown)
+        must never stop the overlay from starting — it is logged and skipped.
+        """
+        import tkinter as tk  # noqa: PLC0415  # lazy: see the import note at module top
+
+        if sys.platform != "darwin" or self.root is None:
+            return
+
+        try:
+            # update_idletasks runs the pending geometry/map work so the toggle
+            # below acts on a realized window; the off/on flip is what makes Aqua
+            # re-evaluate the decorations.
+            self.root.update_idletasks()
+            self.root.overrideredirect(boolean=False)
+            self.root.overrideredirect(boolean=True)
+        except tk.TclError as exc:
+            self.logger.debug("could not force frameless window: %s", exc)
 
     def _apply_window_icon(self) -> None:
         """Brand the taskbar / dock icon when keycast runs from source.

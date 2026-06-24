@@ -96,7 +96,7 @@ account is in use yet.
 
 - **Zero rewrite.** PyInstaller bundles the existing Tk + pynput code as-is. Tk
   is the *right* toolkit for a borderless, semi-transparent, always-on-top
-  overlay (`overrideredirect` / `-alpha` / `-topmost` in `display.py:80-84`);
+  overlay (`overrideredirect` / `-alpha` / `-topmost` in `display.py:85-94`);
   the "nicer" toolkits hide exactly those window-manager primitives.
 - **Briefcase / Toga are disqualified, not merely worse.** Briefcase ships no Tk
   (proven); Toga's API cannot express an overlay (proven). Neither is a tuning
