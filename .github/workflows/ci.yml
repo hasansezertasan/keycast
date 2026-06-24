@@ -109,6 +109,11 @@ jobs:
     # survives intact (same reason release.yml ships a .dmg). It is NOT the release
     # artifact; release.yml produces that.
     name: Build macOS app (check)
+    # Deliberately PINNED to match release.yml's build-macos (NOT `macos-latest`):
+    # the build runner sets the bundle's minimum-macOS floor, so the PR check must
+    # exercise the same OS the release artifact is built on, not silently follow the
+    # `macos-latest` -> macOS 26 migration (runner-images#14167). The test matrix
+    # above intentionally stays on `macos-latest`.
     runs-on: macos-15
     timeout-minutes: 15
     steps:

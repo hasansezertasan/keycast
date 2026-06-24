@@ -69,6 +69,10 @@ jobs:
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     # Apple Silicon runner: Astral's standalone CPython is single-arch, so an
     # arm64 runner yields an arm64-only .app (see packaging/keycast.spec).
+    # Deliberately PINNED, not `macos-latest`: the build runner sets the released
+    # bundle's effective minimum-macOS floor, so it must not silently follow the
+    # `macos-latest` -> macOS 26 migration (runner-images#14167). Bump this pin
+    # consciously when raising the supported-OS floor.
     runs-on: macos-15
     name: Build macOS app
     timeout-minutes: 20
