@@ -96,12 +96,14 @@ jobs:
           files: ./coverage.xml
           token: ${{ secrets.CODECOV_TOKEN }}
   build-macos:
-    # Build-only regression guard: bundle keycast into a .app on every PR/push so a
-    # dependency or Python bump that breaks PyInstaller bundling fails HERE, against
-    # the offending diff, instead of during a release. The test suite runs against
-    # the source tree and never against the frozen bundle, so this is the only
-    # check that exercises packaging. It does NOT package a .dmg or upload anything
-    # — that is the release job in release.yml.
+    # Build-only regression guard + preview: bundle keycast into a .app on every
+    # PR/push so a dependency or Python bump that breaks PyInstaller bundling fails
+    # HERE, against the offending diff, instead of during a release. The test suite
+    # runs against the source tree and never against the frozen bundle, so this is
+    # the only check that exercises packaging. The built .app is uploaded as an
+    # unsigned, version-0.0.0 preview artifact (7-day retention) so a reviewer can
+    # launch-test the overlay on a real Mac — the live path CI cannot exercise. It
+    # is NOT the release artifact; release.yml produces that.
     name: Build macOS app (check)
     runs-on: macos-15
     timeout-minutes: 15
@@ -134,3 +136,54 @@ jobs:
           test -x dist/keycast.app/Contents/MacOS/keycast
           find dist/keycast.app -name '_tkinter*.so' | grep -q . \
             || { echo "::error::_tkinter missing from the bundle"; exit 1; }
+      - name: Upload the .app as a preview build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: keycast-macos-preview
+          path: dist/keycast.app
+          retention-days: 7
+  build-windows:
+    # Windows counterpart of build-macos: a build-only guard + preview for the
+    # bundle that is otherwise unverified locally. Same single spec — PyInstaller's
+    # macOS BUNDLE is a no-op off macOS, so the build yields dist/keycast/
+    # (keycast.exe + deps). Uploads an unsigned, version-0.0.0 preview (7-day
+    # retention); the release artifact comes from release.yml.
+    name: Build Windows app (check)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - name: Setup uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - name: Install Astral CPython 3.14.6
+        run: uv python install 3.14.6
+      - name: Build the .exe with PyInstaller
+        shell: pwsh
+        run: |
+          uv venv --python 3.14.6 .venv-pkg
+          uv pip install --python .venv-pkg/Scripts/python.exe . pyinstaller==6.16.0
+          .venv-pkg/Scripts/pyinstaller.exe --noconfirm packaging/keycast.spec
+      - name: Verify the bundle is well-formed and contains Tk
+        # Windows analogue of the macOS check: the folder must have the launcher
+        # and the _tkinter extension (a .pyd on Windows). A Tk-less bundle builds
+        # clean but crashes on launch.
+        shell: pwsh
+        run: |
+          if (-not (Test-Path dist/keycast/keycast.exe)) {
+            Write-Host "::error::keycast.exe missing from the bundle"; exit 1
+          }
+          if (-not (Get-ChildItem -Recurse dist/keycast -Filter '_tkinter*.pyd' -ErrorAction SilentlyContinue)) {
+            Write-Host "::error::_tkinter missing from the bundle"; exit 1
+          }
+      - name: Upload the folder as a preview build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: keycast-windows-preview
+          path: dist/keycast
+          retention-days: 7
