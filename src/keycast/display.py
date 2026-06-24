@@ -83,6 +83,11 @@ class DisplayWindow:
         # Configure window properties
         self.root.configure(bg=str(self.settings.background_color))
         self.root.overrideredirect(boolean=True)  # Remove window decorations
+        # Lock the size independently of decorations. overrideredirect is meant to
+        # strip the frame (and with it the resize grips), but on macOS Aqua Tk 9
+        # it is unreliable, leaving the window resizable; resizable(False, False)
+        # disables resize/zoom regardless of whether the frame is actually gone.
+        self.root.resizable(width=False, height=False)
         self.root.attributes("-alpha", self.settings.alpha)
 
         if self.settings.always_on_top:
@@ -140,6 +145,56 @@ class DisplayWindow:
 
         # Start fade timer
         self._fade_timer()
+
+    def _force_frameless(self) -> None:
+        """Re-assert borderless state on macOS, where Tk 9 ignores it at creation.
+
+        ``overrideredirect(True)`` in :meth:`_setup_window` is supposed to strip
+        the title bar and frame, but Aqua Tk 9.0 honours it only once the window
+        has been mapped. Force the window through a layout pass and toggle the
+        flag off/on so Aqua reprocesses it and actually drops the decorations.
+
+        Called from :meth:`start` (after any ``start_minimized`` withdrawal, so
+        the ``update_idletasks`` realize-pass can never flash a window that is
+        meant to start hidden) and again from :meth:`_restore_from_minimized`
+        (a minimized overlay is first mapped at deiconify, so the frame must be
+        re-asserted there too).
+
+        macOS-only: only the platform check lives here so the actual widget work
+        — and the only ``root`` access — sits in :meth:`_reassert_overrideredirect`,
+        a method with no platform guard. On non-macOS the early ``return`` makes
+        any following statements statically unreachable, and the type checker does
+        not narrow ``self.root`` inside unreachable code; keeping the ``root``
+        access in a separate, always-reachable method sidesteps that entirely.
+        """
+        if sys.platform != "darwin":
+            return
+        self._reassert_overrideredirect()
+
+    def _reassert_overrideredirect(self) -> None:
+        """Toggle ``overrideredirect`` off/on so the window manager re-evaluates it.
+
+        Split out from :meth:`_force_frameless` so the ``root`` access is never
+        behind a platform guard (see that method's note). Best-effort: a transient
+        ``TclError`` (e.g. window mid-teardown) must never stop the overlay from
+        starting — it is logged and skipped. The local ``root`` binding lets the
+        type checker prove non-None, mirroring :meth:`stop`.
+        """
+        import tkinter as tk  # noqa: PLC0415  # lazy: see the import note at module top
+
+        root = self.root
+        if root is None:
+            return
+
+        try:
+            # update_idletasks runs the pending geometry/map work so the toggle
+            # below acts on a realized window; the off/on flip is what makes Aqua
+            # re-evaluate the decorations.
+            root.update_idletasks()
+            root.overrideredirect(boolean=False)
+            root.overrideredirect(boolean=True)
+        except tk.TclError as exc:
+            self.logger.debug("could not force frameless window: %s", exc)
 
     def _apply_window_icon(self) -> None:
         """Brand the taskbar / dock icon when keycast runs from source.
@@ -368,6 +423,10 @@ class DisplayWindow:
             return
         try:
             self.root.deiconify()
+            # The overlay is mapped for the first time here, so (like the initial
+            # show in start) macOS needs the frame re-asserted now or the
+            # deiconified window comes back decorated.
+            self._force_frameless()
         except Exception as exc:
             # _minimized stays set (cleared only after a successful deiconify), so
             # a persistent failure leaves the overlay hidden for the whole
@@ -394,6 +453,11 @@ class DisplayWindow:
                     self._minimized = True
                 self.root.withdraw()
                 self.logger.info("display_starting_minimized")
+            # After any withdrawal: on macOS the window comes up decorated unless
+            # overrideredirect is re-asserted once it is realized (see
+            # _force_frameless). Doing it post-withdraw means a minimized start
+            # stays hidden — the realize-pass cannot flash a withdrawn window.
+            self._force_frameless()
             self.logger.info("display_mainloop_starting")
             self.root.mainloop()
 
