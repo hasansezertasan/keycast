@@ -82,9 +82,15 @@ pyinstaller --noconfirm --windowed --name keycast \
   --osx-bundle-identifier com.hasansezertasan.keycast packaging/entry.py
 ```
 
-Open items (tracked, not yet decided): an app **icon** (`--icon keycast.icns`)
-once one exists; whether to expose the CLI subcommands from inside the bundle
-(default: no — the formula owns the CLI).
+The spec wires a platform-specific app **icon**: the Windows `EXE` embeds
+`packaging/keycast.ico` and the macOS `BUNDLE` wraps `packaging/keycast.icns`
+(the unused format per platform is left `None`). Both are generated from one
+programmatic source — regenerate on macOS with
+`uv run --with pillow packaging/make_icons.py` (Pillow is pulled in only for that
+run; it is not a project dependency).
+
+Open items (tracked, not yet decided): whether to expose the CLI subcommands from
+inside the bundle (default: no — the formula owns the CLI).
 
 ## Package the bundle
 
