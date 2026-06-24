@@ -18,7 +18,14 @@ def mock_tk() -> Iterator[tuple[Mock, Mock]]:
     Yields:
         A tuple of (mock root, mock label instance).
     """
-    with patch("tkinter.Tk") as tk_cls, patch("tkinter.Label") as label_cls:
+    # _apply_window_icon needs a real Tk root (PhotoImage) and, on macOS, sets the
+    # process dock icon via AppKit — both unwanted side effects here. It is an
+    # independent concern covered directly by TestWindowIcon, so stub it out.
+    with (
+        patch("tkinter.Tk") as tk_cls,
+        patch("tkinter.Label") as label_cls,
+        patch.object(DisplayWindow, "_apply_window_icon"),
+    ):
         mock_root = Mock()
         tk_cls.return_value = mock_root
         mock_root.winfo_screenwidth.return_value = 1920
@@ -779,3 +786,135 @@ class TestStartMinimized:
         event, exc = window._error_throttler.log.call_args.args
         assert event == "restore_minimized_error"
         assert isinstance(exc, RuntimeError)
+
+
+class TestWindowIcon:
+    """Tests for the runtime taskbar/dock icon set by _apply_window_icon.
+
+    These build their own window with ``_apply_window_icon`` stubbed only during
+    construction, then invoke the real method under controlled patches — the
+    shared ``mock_tk`` fixture stubs the method out entirely.
+    """
+
+    def _build_window(self) -> tuple[DisplayWindow, Mock]:
+        """Build a DisplayWindow with tkinter mocked but the icon method live.
+
+        Returns:
+            The window and its mock root.
+        """
+        with (
+            patch("tkinter.Tk") as tk_cls,
+            patch("tkinter.Label"),
+            patch.object(DisplayWindow, "_apply_window_icon"),
+        ):
+            root = Mock()
+            tk_cls.return_value = root
+            root.winfo_screenwidth.return_value = 1920
+            root.winfo_screenheight.return_value = 1080
+            window = DisplayWindow(DisplaySettings())
+        window.root = root
+        return window, root
+
+    def test_sets_taskbar_icon_via_iconphoto(self) -> None:
+        """The shipped PNG is loaded and handed to iconphoto, and kept referenced."""
+        window, root = self._build_window()
+        photo = Mock()
+        with (
+            patch("tkinter.PhotoImage", return_value=photo) as photo_cls,
+            patch("keycast.display.sys.platform", "linux"),
+        ):
+            window._apply_window_icon()
+
+        photo_cls.assert_called_once()
+        root.iconphoto.assert_called_once_with(True, photo)
+        # Held on the instance so Tk's GC doesn't blank the icon.
+        assert window._icon_image is photo
+
+    def test_missing_asset_is_noop(self) -> None:
+        """A missing icon asset is skipped, never raised, and sets no icon."""
+        window, root = self._build_window()
+        with (
+            patch("keycast.display.Path.exists", return_value=False),
+            patch("tkinter.PhotoImage") as photo_cls,
+        ):
+            window._apply_window_icon()
+
+        photo_cls.assert_not_called()
+        root.iconphoto.assert_not_called()
+
+    def test_tk_error_is_swallowed(self) -> None:
+        """A PhotoImage/iconphoto failure is logged and skipped, not raised."""
+        import tkinter as tk
+
+        window, root = self._build_window()
+        with (
+            patch("tkinter.PhotoImage", side_effect=tk.TclError("bad image")),
+            patch("keycast.display.sys.platform", "linux"),
+        ):
+            window._apply_window_icon()  # must not raise
+
+        root.iconphoto.assert_not_called()
+        assert window._icon_image is None
+
+    def test_macos_sets_dock_icon_via_appkit(self) -> None:
+        """On macOS the dock icon is set through AppKit's NSApplication."""
+        window, _ = self._build_window()
+        ns_image = Mock()
+        fake_appkit = Mock()
+        loader = fake_appkit.NSImage.alloc.return_value.initWithContentsOfFile_
+        loader.return_value = ns_image
+        with (
+            patch("keycast.display.sys.platform", "darwin"),
+            patch("tkinter.PhotoImage"),
+            patch.dict("sys.modules", {"AppKit": fake_appkit}),
+        ):
+            window._apply_window_icon()
+
+        app = fake_appkit.NSApplication.sharedApplication.return_value
+        app.setApplicationIconImage_.assert_called_once_with(ns_image)
+
+    def test_macos_unreadable_image_is_skipped(self) -> None:
+        """If AppKit can't decode the file, no icon is set and nothing raises."""
+        window, _ = self._build_window()
+        fake_appkit = Mock()
+        fake_appkit.NSImage.alloc.return_value.initWithContentsOfFile_.return_value = (
+            None
+        )
+        with (
+            patch("keycast.display.sys.platform", "darwin"),
+            patch("tkinter.PhotoImage"),
+            patch.dict("sys.modules", {"AppKit": fake_appkit}),
+        ):
+            window._apply_window_icon()  # must not raise
+
+        app = fake_appkit.NSApplication.sharedApplication.return_value
+        app.setApplicationIconImage_.assert_not_called()
+
+    def test_macos_appkit_error_is_swallowed(self) -> None:
+        """An AppKit failure is logged and skipped, not raised."""
+        window, _ = self._build_window()
+        window.logger = Mock()
+        with (
+            patch("keycast.display.sys.platform", "darwin"),
+            patch("tkinter.PhotoImage"),
+            patch(
+                "keycast.display.importlib.import_module",
+                side_effect=ImportError("no AppKit"),
+            ),
+        ):
+            window._apply_window_icon()  # must not raise
+
+        window.logger.debug.assert_called()
+
+    def test_non_darwin_skips_appkit(self) -> None:
+        """Off macOS the AppKit dock path is not touched at all."""
+        window, _ = self._build_window()
+        fake_appkit = Mock()
+        with (
+            patch("keycast.display.sys.platform", "win32"),
+            patch("tkinter.PhotoImage"),
+            patch.dict("sys.modules", {"AppKit": fake_appkit}),
+        ):
+            window._apply_window_icon()
+
+        fake_appkit.NSApplication.sharedApplication.assert_not_called()
