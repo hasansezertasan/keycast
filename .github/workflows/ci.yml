@@ -6,6 +6,12 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+    # `edited` is NOT in the default activity set (opened/synchronize/reopened),
+    # but a PR *title* change fires only `edited`. Without it, fixing an invalid
+    # title would rerun check-pr-title.yml (which lists `edited`) but not this
+    # workflow, leaving the title-gated jobs below stuck skipped until the next
+    # push. Listing it lets a title fix re-trigger the gate and unblock CI.
+    types: [opened, edited, synchronize, reopened]
 jobs:
   pr-title:
     # Fast gate: every other job `needs:` this, so a PR with a non-Conventional
