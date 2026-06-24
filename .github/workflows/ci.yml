@@ -100,10 +100,14 @@ jobs:
     # PR/push so a dependency or Python bump that breaks PyInstaller bundling fails
     # HERE, against the offending diff, instead of during a release. The test suite
     # runs against the source tree and never against the frozen bundle, so this is
-    # the only check that exercises packaging. The built .app is uploaded as an
-    # unsigned, version-0.0.0 preview artifact (7-day retention) so a reviewer can
-    # launch-test the overlay on a real Mac — the live path CI cannot exercise. It
-    # is NOT the release artifact; release.yml produces that.
+    # the only check that exercises packaging. The .app is wrapped in a .dmg and
+    # uploaded as an unsigned, version-0.0.0 preview artifact (7-day retention) so a
+    # reviewer can launch-test the overlay on a real Mac — the live path CI cannot
+    # exercise. The .dmg wrapper is load-bearing: actions/upload-artifact re-zips
+    # its input and drops the POSIX exec bit + symlinks a .app relies on, so a raw
+    # .app would download "damaged"; the .dmg carries its own filesystem and
+    # survives intact (same reason release.yml ships a .dmg). It is NOT the release
+    # artifact; release.yml produces that.
     name: Build macOS app (check)
     runs-on: macos-15
     timeout-minutes: 15
@@ -140,11 +144,17 @@ jobs:
           test -x dist/keycast.app/Contents/MacOS/keycast
           find dist/keycast.app -name '_tkinter*.so' | grep -q . \
             || { echo "::error::_tkinter missing from the bundle"; exit 1; }
-      - name: Upload the .app as a preview build
+      - name: Package the .app into a .dmg
+        # Wrap before upload so the bundle survives artifact zipping intact (see the
+        # job comment) — mirrors release.yml's macOS packaging step.
+        run: |
+          hdiutil create -volname keycast \
+            -srcfolder dist/keycast.app -ov -format UDZO keycast.dmg
+      - name: Upload the .dmg as a preview build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: keycast-macos-preview
-          path: dist/keycast.app
+          path: keycast.dmg
           retention-days: 7
   build-windows:
     # Windows counterpart of build-macos: a build-only guard + preview for the

@@ -132,8 +132,10 @@ account is in use yet.
   PyPI release too (chosen so a version never ships with a missing artifact). The
   macOS/Windows builds **must** pin Astral `3.14.6` — Homebrew's `python@3.14`
   lacks `_tkinter` and Astral `3.14.3` has broken Tk, so an unpinned Python
-  silently produces a Tk-less or crashing bundle. A `build-macos` build-only check
-  also runs on every PR in `ci.yml`.
+  silently produces a Tk-less or crashing bundle. `build-macos` **and**
+  `build-windows` build-only checks also run on every PR in `ci.yml` (each asserts
+  the bundle contains `_tkinter`); these PR checks — not the release jobs — are
+  what verify the packaging on each platform.
 - **Tap (new cask):** `cask "keycast"` → release `.dmg` URL + `sha256`. Because
   the app is unsigned, the cask must document the Gatekeeper right-click→Open
   step (or an equivalent note); Homebrew discourages `quarantine` workarounds.

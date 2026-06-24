@@ -147,11 +147,15 @@ chosen so a published version never ships with a missing artifact.
 `ci.yml` runs **build-only checks** on every PR — `build-macos` and
 `build-windows` — that bundle from the same spec and assert the result contains
 the launcher and `_tkinter`, so packaging regressions fail on the PR, not at
-release. Each also uploads its bundle as an **unsigned, version-0.0.0 preview
-artifact** (7-day retention: `keycast-macos-preview`, `keycast-windows-preview`)
-so a reviewer can download and launch-test it — the live path CI cannot exercise
-(see the verification checklist below). These previews are **not** release
-artifacts; `release.yml` produces those.
+release. Each also uploads an **unsigned, version-0.0.0 preview artifact** (7-day
+retention: `keycast-macos-preview`, `keycast-windows-preview`) so a reviewer can
+download and launch-test it — the live path CI cannot exercise (see the
+verification checklist below). The macOS preview is wrapped in a `.dmg` before
+upload: `actions/upload-artifact` re-zips its input and drops the exec bit and
+symlinks a `.app` depends on, so a raw `.app` would download "damaged"; the
+`.dmg` carries its own filesystem and survives intact (the Windows preview is the
+plain `dist/keycast/` folder, which needs neither). These previews are **not**
+release artifacts; `release.yml` produces those.
 
 ## Cask (in the tap)
 

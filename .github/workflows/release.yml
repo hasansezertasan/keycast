@@ -119,10 +119,11 @@ jobs:
   build-windows:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
-    # NOTE: unverified locally (built from a macOS dev machine); first real
-    # validation is this CI run. Reuses the committed spec — PyInstaller's macOS
-    # BUNDLE step is a no-op on Windows, so the spec yields the dist/keycast/ folder
-    # (keycast.exe + deps), which is zipped for a direct GitHub-release download.
+    # NOTE: developed on a macOS dev machine and never built locally; the Windows
+    # bundle is exercised by the build-only `build-windows` check in ci.yml (green
+    # since PR #3). Reuses the committed spec — PyInstaller's macOS BUNDLE step is a
+    # no-op on Windows, so the spec yields the dist/keycast/ folder (keycast.exe +
+    # deps), which is zipped for a direct GitHub-release download.
     runs-on: windows-latest
     name: Build Windows app
     timeout-minutes: 20
@@ -206,6 +207,11 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           mapfile -t files < <(find artifacts -type f)
+          # Defensive: the three required builders gate this job, so files should
+          # always exist — but fail loudly rather than un-draft an empty release.
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::error::no artifacts found to attach to the release"; exit 1
+          fi
           gh release upload "${{ needs.release-please.outputs.tag_name }}" "${files[@]}" --clobber
           gh release edit "${{ needs.release-please.outputs.tag_name }}" --draft=false
 
@@ -237,12 +243,15 @@ jobs:
           # No checkout in this job, so gh needs the repo set explicitly
           # (gh reads GH_REPO, not GITHUB_REPOSITORY).
           GH_REPO: ${{ github.repository }}
+          # Route through env and quote in-shell rather than interpolating the
+          # expansion bare into the command (robust against unusual ref names).
+          REF_NAME: ${{ github.ref_name }}
         run: |
           pr="$(gh pr list --state open \
-            --head release-please--branches--${{ github.ref_name }} \
+            --head "release-please--branches--${REF_NAME}" \
             --json number --jq '.[0].number // empty')"
           if [ -n "$pr" ]; then
             echo "Closing phantom release PR #$pr"
             gh pr close "$pr" --delete-branch
           fi
-          gh workflow run "${{ github.workflow }}" --ref "${{ github.ref_name }}"
+          gh workflow run "${{ github.workflow }}" --ref "$REF_NAME"
