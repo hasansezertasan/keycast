@@ -18,6 +18,19 @@
 # Tk/Tcl and the platform input backend (pynput: pyobjc-Quartz on macOS, win32 on
 # Windows) are picked up automatically; no hidden imports as of keycast 0.1.0.
 # Builds for the host architecture only (Astral standalone builds are single-arch).
+#
+# Icons are platform-specific: the Windows EXE embeds keycast.ico, the macOS
+# BUNDLE wraps keycast.icns. Both live next to this spec (regenerate via
+# `uv run --with pillow packaging/make_icons.py`). The unused icon per platform is
+# left None so PyInstaller doesn't warn about the wrong format -- BUNDLE is a no-op
+# off macOS and the EXE icon is meaningless on macOS.
+
+import sys
+from pathlib import Path
+
+_ICON_DIR = Path(SPECPATH)  # noqa: F821 -- PyInstaller injects SPECPATH into the spec namespace
+_EXE_ICON = str(_ICON_DIR / "keycast.ico") if sys.platform == "win32" else None
+_BUNDLE_ICON = str(_ICON_DIR / "keycast.icns")
 
 a = Analysis(
     ['entry.py'],
@@ -50,6 +63,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=_EXE_ICON,  # Windows .exe icon; None on macOS (see header)
 )
 coll = COLLECT(
     exe,
@@ -63,6 +77,6 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='keycast.app',
-    icon=None,
+    icon=_BUNDLE_ICON,  # macOS .app icon; ignored by BUNDLE off macOS
     bundle_identifier='com.hasansezertasan.keycast',
 )
