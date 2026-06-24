@@ -788,6 +788,70 @@ class TestStartMinimized:
         assert isinstance(exc, RuntimeError)
 
 
+class TestForceFrameless:
+    """macOS borderless re-assertion: Tk 9 ignores overrideredirect at creation."""
+
+    def test_delegates_to_reassert_on_macos(self, mock_tk: tuple[Mock, Mock]) -> None:
+        """On macOS the platform gate passes through to the toggle."""
+        window = DisplayWindow(DisplaySettings())
+        with (
+            patch("keycast.display.sys.platform", "darwin"),
+            patch.object(window, "_reassert_overrideredirect") as reassert,
+        ):
+            window._force_frameless()
+
+        reassert.assert_called_once_with()
+
+    def test_skips_reassert_off_macos(self, mock_tk: tuple[Mock, Mock]) -> None:
+        """Other platforms strip the frame on the first call, so the toggle is skipped."""
+        window = DisplayWindow(DisplaySettings())
+        with (
+            patch("keycast.display.sys.platform", "win32"),
+            patch.object(window, "_reassert_overrideredirect") as reassert,
+        ):
+            window._force_frameless()
+
+        reassert.assert_not_called()
+
+    def test_reassert_toggles_overrideredirect_off_then_on(
+        self, mock_tk: tuple[Mock, Mock]
+    ) -> None:
+        """The off/on flip after a layout pass is what makes Aqua re-evaluate the frame."""
+        mock_root, _ = mock_tk
+        window = DisplayWindow(DisplaySettings())
+        # _setup_window already called overrideredirect once; isolate the toggle.
+        mock_root.overrideredirect.reset_mock()
+        mock_root.update_idletasks.reset_mock()
+
+        window._reassert_overrideredirect()
+
+        mock_root.update_idletasks.assert_called_once()
+        assert mock_root.overrideredirect.call_args_list == [
+            call(boolean=False),
+            call(boolean=True),
+        ]
+
+    def test_reassert_without_root_is_noop(self, mock_tk: tuple[Mock, Mock]) -> None:
+        """After teardown nulls root the toggle is skipped, never raised."""
+        window = DisplayWindow(DisplaySettings())
+        window.root = None
+
+        window._reassert_overrideredirect()  # must not raise
+
+    def test_reassert_swallows_tclerror(self, mock_tk: tuple[Mock, Mock]) -> None:
+        """A TclError (e.g. window mid-teardown) is logged and skipped, not raised."""
+        import tkinter as tk
+
+        mock_root, _ = mock_tk
+        window = DisplayWindow(DisplaySettings())
+        window.logger = Mock()
+        mock_root.update_idletasks.side_effect = tk.TclError("mid-teardown")
+
+        window._reassert_overrideredirect()  # must not raise
+
+        window.logger.debug.assert_called()
+
+
 class TestWindowIcon:
     """Tests for the runtime taskbar/dock icon set by _apply_window_icon.
 
