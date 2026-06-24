@@ -890,6 +890,22 @@ class TestWindowIcon:
         app = fake_appkit.NSApplication.sharedApplication.return_value
         app.setApplicationIconImage_.assert_not_called()
 
+    def test_macos_appkit_error_is_swallowed(self) -> None:
+        """An AppKit failure is logged and skipped, not raised."""
+        window, _ = self._build_window()
+        window.logger = Mock()
+        with (
+            patch("keycast.display.sys.platform", "darwin"),
+            patch("tkinter.PhotoImage"),
+            patch(
+                "keycast.display.importlib.import_module",
+                side_effect=ImportError("no AppKit"),
+            ),
+        ):
+            window._apply_window_icon()  # must not raise
+
+        window.logger.debug.assert_called()
+
     def test_non_darwin_skips_appkit(self) -> None:
         """Off macOS the AppKit dock path is not touched at all."""
         window, _ = self._build_window()
