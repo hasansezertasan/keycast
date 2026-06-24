@@ -143,11 +143,6 @@ class DisplayWindow:
         # path uniform.
         self.root.protocol("WM_DELETE_WINDOW", self.request_stop)
 
-        # On macOS Aqua (Tk 9) the overrideredirect(True) above is frequently
-        # ignored when set before the window is first mapped, so the overlay comes
-        # up with a title bar and a draggable resize frame. Re-assert it here.
-        self._force_frameless()
-
         # Start fade timer
         self._fade_timer()
 
@@ -159,22 +154,32 @@ class DisplayWindow:
         has been mapped. Force the window through a layout pass and toggle the
         flag off/on so Aqua reprocesses it and actually drops the decorations.
 
+        Called from :meth:`start` (after any ``start_minimized`` withdrawal, so
+        the ``update_idletasks`` realize-pass can never flash a window that is
+        meant to start hidden) and again from :meth:`_restore_from_minimized`
+        (a minimized overlay is first mapped at deiconify, so the frame must be
+        re-asserted there too).
+
         macOS-only and best-effort: other platforms remove the frame correctly on
         the first call, and a transient ``TclError`` (e.g. window mid-teardown)
-        must never stop the overlay from starting — it is logged and skipped.
+        must never stop the overlay from starting — it is logged and skipped. The
+        local ``root`` binding lets the type checker prove non-None across the
+        calls (``self.root`` is mutated from other threads), mirroring
+        :meth:`stop`.
         """
         import tkinter as tk  # noqa: PLC0415  # lazy: see the import note at module top
 
-        if sys.platform != "darwin" or self.root is None:
+        root = self.root
+        if sys.platform != "darwin" or root is None:
             return
 
         try:
             # update_idletasks runs the pending geometry/map work so the toggle
             # below acts on a realized window; the off/on flip is what makes Aqua
             # re-evaluate the decorations.
-            self.root.update_idletasks()
-            self.root.overrideredirect(boolean=False)
-            self.root.overrideredirect(boolean=True)
+            root.update_idletasks()
+            root.overrideredirect(boolean=False)
+            root.overrideredirect(boolean=True)
         except tk.TclError as exc:
             self.logger.debug("could not force frameless window: %s", exc)
 
@@ -405,6 +410,10 @@ class DisplayWindow:
             return
         try:
             self.root.deiconify()
+            # The overlay is mapped for the first time here, so (like the initial
+            # show in start) macOS needs the frame re-asserted now or the
+            # deiconified window comes back decorated.
+            self._force_frameless()
         except Exception as exc:
             # _minimized stays set (cleared only after a successful deiconify), so
             # a persistent failure leaves the overlay hidden for the whole
@@ -431,6 +440,11 @@ class DisplayWindow:
                     self._minimized = True
                 self.root.withdraw()
                 self.logger.info("display_starting_minimized")
+            # After any withdrawal: on macOS the window comes up decorated unless
+            # overrideredirect is re-asserted once it is realized (see
+            # _force_frameless). Doing it post-withdraw means a minimized start
+            # stays hidden — the realize-pass cannot flash a withdrawn window.
+            self._force_frameless()
             self.logger.info("display_mainloop_starting")
             self.root.mainloop()
 
