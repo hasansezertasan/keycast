@@ -84,6 +84,10 @@ jobs:
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           enable-cache: true
+          # cache-python: enable-cache only caches the uv package cache, NOT the
+          # managed interpreter. Without this the ~30MB Astral CPython below is
+          # re-downloaded every release run.
+          cache-python: true
           cache-dependency-glob: |
             pyproject.toml
             uv.lock
@@ -133,6 +137,9 @@ jobs:
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           enable-cache: true
+          # cache-python: see build-macos — caches the managed interpreter so the
+          # Astral CPython below is restored instead of re-downloaded.
+          cache-python: true
           cache-dependency-glob: |
             pyproject.toml
             uv.lock
