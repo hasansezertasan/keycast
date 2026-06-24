@@ -1,49 +1,47 @@
 #!/usr/bin/env python3
 """Generate keycast's application icons from a single programmatic source.
 
-The design is a light keycap (the "key" in keycast) on a dark slate squircle,
-with a bold accent-colored "K" on the cap. The look mirrors the overlay itself:
-crisp glyphs on a dark surface.
+The design is a command-palette HUD: the keyboard ``⌘K`` shortcut in white on a
+dark gradient squircle. It mirrors what keycast actually draws -- light key text
+on a dark overlay -- rather than depicting a physical key.
 
-This is a *build-time* helper, not part of the shipped package -- run it
-on macOS (it shells out to ``iconutil``) whenever the icon needs regenerating:
+This is a *build-time* helper, not part of the shipped package -- run it on macOS
+(it shells out to ``iconutil`` and uses the system San Francisco font for the ⌘
+glyph) whenever the icon needs regenerating:
 
-    uv run --with pillow packaging/make_icons.py            # write .icns + .ico
-    uv run --with pillow packaging/make_icons.py preview    # write a contact sheet
+    uv run --with pillow packaging/make_icons.py
 
 Outputs ``packaging/keycast.icns`` (macOS BUNDLE) and ``packaging/keycast.ico``
 (Windows EXE). Pillow is pulled in only for this run via ``--with``; it is not a
-project dependency. Rendering is done at 4x and downsampled with LANCZOS so the
-edges stay clean at every embedded size.
+project dependency. The committed .icns/.ico mean CI never needs Pillow or the
+font. Rendering is done at 4x and downsampled with LANCZOS so the edges stay
+clean at every embedded size.
 """
 
 from __future__ import annotations
 
 import shutil
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
-# Palette. The K is the only colored element; everything else is neutral so the
-# icon reads at 16px. The K is two-toned after the Python logo: a blue upper half
-# and a yellow lower half, split at the point where the arms meet the stem.
+# Palette. The glyphs are a single neutral ink so the icon reads at 16px; all the
+# colour is in the dark background gradient.
 SLATE_TOP = (28, 32, 41)  # background gradient, top
 SLATE_BOT = (16, 18, 24)  # background gradient, bottom
-KEYCAP = (250, 251, 252, 255)  # keycap face
-KEYCAP_EDGE = (206, 211, 219, 255)  # keycap bottom slab (fake 3D depth)
-PY_BLUE = (55, 118, 171, 255)  # Python logo blue (#3776AB) -- K upper half
-PY_YELLOW = (255, 212, 59, 255)  # Python logo yellow (#FFD43B) -- K lower half
+INK = (244, 246, 248, 255)  # the "⌘K" glyphs
 
-# Named two-tone schemes offered by `preview` mode (label -> (top, bottom) RGBA).
-ACCENT_CHOICES = {
-    "python": (PY_BLUE, PY_YELLOW),
-    "blue": ((76, 141, 255, 255), (76, 141, 255, 255)),
-    "violet": ((139, 92, 246, 255), (139, 92, 246, 255)),
-    "green": ((52, 211, 153, 255), (52, 211, 153, 255)),
-}
+SHORTCUT = "⌘K"  # what the HUD shows -- the universal "command palette" shortcut
+
+# macOS system fonts that carry the ⌘ (U+2318) glyph; first hit wins. Generation
+# is macOS-only (needs iconutil), so San Francisco is always present.
+FONT_CANDIDATES = (
+    "/System/Library/Fonts/SFNS.ttf",
+    "/System/Library/Fonts/HelveticaNeue.ttc",
+    "/System/Library/Fonts/Helvetica.ttc",
+)
 
 SCALE = 4  # supersampling factor for antialiasing
 BASE = 1024  # logical icon size (master is BASE * SCALE)
@@ -65,87 +63,63 @@ ICONSET = [
 ICO_SIZES = [16, 32, 48, 64, 128, 256]
 
 
-def _vertical_gradient(
-    size: int, top: tuple[int, int, int], bot: tuple[int, int, int]
-) -> Image.Image:
-    """A 1px-wide vertical gradient stretched to a square -- cheap and smooth."""
-    grad = Image.new("RGB", (1, size))
-    for y in range(size):
-        t = y / (size - 1)
-        grad.putpixel(
-            (0, y),
-            tuple(round(top[c] + (bot[c] - top[c]) * t) for c in range(3)),
-        )
-    return grad.resize((size, size))
+def _load_font(px: int) -> ImageFont.FreeTypeFont:
+    """Load a bold system font that has the ⌘ glyph, at the given pixel size."""
+    for path in FONT_CANDIDATES:
+        if Path(path).exists():
+            font = ImageFont.truetype(path, px)
+            try:  # SFNS.ttf is a variable font; pin the Bold instance.
+                font.set_variation_by_name("Bold")
+            except OSError, ValueError:
+                pass
+            return font
+    msg = f"no system font with the ⌘ glyph found in {FONT_CANDIDATES}"
+    raise RuntimeError(msg)
 
 
-def render_master(
-    top_color: tuple[int, int, int, int] = PY_BLUE,
-    bot_color: tuple[int, int, int, int] = PY_YELLOW,
-) -> Image.Image:
-    """Render the icon at BASE*SCALE, then downsample to BASE for clean edges.
-
-    ``top_color``/``bot_color`` tint the K's upper and lower halves; pass the same
-    value for both to get a single-color K.
-    """
+def render_master() -> Image.Image:
+    """Render the icon at BASE*SCALE, then downsample to BASE for clean edges."""
     s = BASE * SCALE
     img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
 
     # Background squircle: a soft vertical gradient clipped to a rounded square,
     # with a small transparent margin so it reads well both full-bleed (Windows)
     # and inside macOS's own rounded mask.
-    margin = round(s * 0.06)
-    radius = round(s * 0.225)
+    grad = Image.new("RGB", (1, s))
+    for y in range(s):
+        t = y / (s - 1)
+        grad.putpixel(
+            (0, y),
+            tuple(
+                round(SLATE_TOP[c] + (SLATE_BOT[c] - SLATE_TOP[c]) * t)
+                for c in range(3)
+            ),
+        )
+    grad = grad.resize((s, s)).convert("RGBA")
     mask = Image.new("L", (s, s), 0)
+    margin = round(s * 0.06)
     ImageDraw.Draw(mask).rounded_rectangle(
-        (margin, margin, s - margin, s - margin), radius=radius, fill=255
+        (margin, margin, s - margin, s - margin), radius=round(s * 0.225), fill=255
     )
-    grad = _vertical_gradient(s, SLATE_TOP, SLATE_BOT).convert("RGBA")
     img.paste(grad, (0, 0), mask)
 
     draw = ImageDraw.Draw(img)
 
-    # Keycap: a rounded square with a darker slab peeking out the bottom to fake a
-    # 3D key edge. Centered, nudged up a touch to sit optically centered.
-    cap = s * 0.50
-    cx, cy = s / 2, s * 0.50
-    cap_r = cap * 0.22
-    depth = s * 0.030
-    draw.rounded_rectangle(
-        (cx - cap / 2, cy - cap / 2 + depth, cx + cap / 2, cy + cap / 2 + depth),
-        radius=cap_r,
-        fill=KEYCAP_EDGE,
+    # "⌘K", centred. The two glyphs have different ink heights, so place each one
+    # by its own bounding box (horizontally packed, each vertically centred) for
+    # clean optical alignment.
+    font = _load_font(round(s * 0.40))
+    cmd, key = SHORTCUT[0], SHORTCUT[1]
+    gap = s * 0.015
+    cb = draw.textbbox((0, 0), cmd, font=font)
+    kb = draw.textbbox((0, 0), key, font=font)
+    cw, kw = cb[2] - cb[0], kb[2] - kb[0]
+    x = s / 2 - (cw + gap + kw) / 2
+    cy = s / 2
+    draw.text((x - cb[0], cy - (cb[3] + cb[1]) / 2), cmd, font=font, fill=INK)
+    draw.text(
+        (x + cw + gap - kb[0], cy - (kb[3] + kb[1]) / 2), key, font=font, fill=INK
     )
-    draw.rounded_rectangle(
-        (cx - cap / 2, cy - cap / 2, cx + cap / 2, cy + cap / 2),
-        radius=cap_r,
-        fill=KEYCAP,
-    )
-
-    # The "K", drawn as three thick strokes (stem + two arms meeting mid-stem) so
-    # the joints self-intersect cleanly. No bundled font needed. The upper half
-    # (top of stem + upper arm) and lower half (bottom of stem + lower arm) are
-    # tinted separately for the Python two-tone look; the split is the junction.
-    lw = round(cap * 0.135)  # stroke width
-    sx = cx - cap * 0.22  # stem x
-    top = cy - cap * 0.30
-    bot = cy + cap * 0.30
-    tipx = cx + cap * 0.26  # arm tips x
-    junction = cy - cap * 0.04  # arms meet just above center for a balanced K
-
-    def _cap(px: float, py: float, color: tuple[int, int, int, int]) -> None:
-        draw.ellipse((px - lw / 2, py - lw / 2, px + lw / 2, py + lw / 2), fill=color)
-
-    # Lower half first, then upper, so the blue sits on top at the junction.
-    draw.line([(sx, junction), (sx, bot)], fill=bot_color, width=lw)
-    draw.line([(sx, junction), (tipx, bot)], fill=bot_color, width=lw)
-    _cap(sx, bot, bot_color)
-    _cap(tipx, bot, bot_color)
-    draw.line([(sx, top), (sx, junction)], fill=top_color, width=lw)
-    draw.line([(sx, junction), (tipx, top)], fill=top_color, width=lw)
-    _cap(sx, top, top_color)
-    _cap(tipx, top, top_color)
-    _cap(sx, junction, top_color)
 
     return img.resize((BASE, BASE), Image.LANCZOS)
 
@@ -173,30 +147,8 @@ def write_assets(here: Path) -> None:
         print(f"wrote {icns_path.relative_to(here.parent)}")
 
 
-def write_preview(path: Path) -> None:
-    """Render one tile per named accent into a single contact sheet for review."""
-    tile = 256
-    pad = 24
-    labels = list(ACCENT_CHOICES)
-    sheet = Image.new(
-        "RGBA",
-        (tile * len(labels) + pad * (len(labels) + 1), tile + pad * 2),
-        (32, 34, 38, 255),
-    )
-    for i, name in enumerate(labels):
-        top, bot = ACCENT_CHOICES[name]
-        thumb = render_master(top, bot).resize((tile, tile), Image.LANCZOS)
-        sheet.paste(thumb, (pad + i * (tile + pad), pad), thumb)
-    sheet.save(path)
-    print(f"wrote {path}  (left to right: {', '.join(labels)})")
-
-
 def main() -> None:
-    here = Path(__file__).resolve().parent
-    if len(sys.argv) > 1 and sys.argv[1] == "preview":
-        write_preview(Path(tempfile.gettempdir()) / "keycast_accents.png")
-    else:
-        write_assets(here)
+    write_assets(Path(__file__).resolve().parent)
 
 
 if __name__ == "__main__":
