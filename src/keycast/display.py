@@ -169,8 +169,16 @@ class DisplayWindow:
         """
         import tkinter as tk  # noqa: PLC0415  # lazy: see the import note at module top
 
+        # Keep the platform guard and the None guard as separate statements. A
+        # combined ``sys.platform != "darwin" or root is None`` short-circuits on
+        # non-macOS (the first operand is statically true there), so the type
+        # checker never derives the not-None fact from the second operand and
+        # still flags ``root`` as possibly-None in the body below. Two statements
+        # — mirroring _apply_window_icon — narrow cleanly on every platform.
+        if sys.platform != "darwin":
+            return
         root = self.root
-        if sys.platform != "darwin" or root is None:
+        if root is None:
             return
 
         try:
