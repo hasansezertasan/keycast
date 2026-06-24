@@ -19,11 +19,11 @@ hooks = [
 ]
 [[repos]]
 repo = "https://github.com/astral-sh/uv-pre-commit"
-rev = "0.11.23"
+rev = "0.11.24"
 hooks = [{ id = "uv-lock" }]
 [[repos]]
 repo = "https://github.com/astral-sh/ruff-pre-commit"
-rev = "v0.15.18"
+rev = "v0.15.19"
 hooks = [{ id = "ruff-check" }, { id = "ruff-format" }]
 [[repos]]
 repo = "https://github.com/crate-ci/typos"

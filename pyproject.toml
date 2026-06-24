@@ -185,6 +185,11 @@ extend-ignore-re = ["\\[[0-9a-f]{7,40}\\]"]
 # `ser` fragment is not a misspelling of `set`.
 plain_serializer_function_ser_schema = "plain_serializer_function_ser_schema"
 
+[tool.typos.default.extend-words]
+# `datas` is the real PyInstaller field name (`Analysis(datas=...)`,
+# `COLLECT(a.datas)`), not a misspelling of `data`. See packaging/keycast.spec.
+datas = "datas"
+
 [tool.vulture]
 # Callables registered via these decorators are invoked by the framework, not by
 # our code, so vulture cannot see the call site. Suppress by decorator (precise)

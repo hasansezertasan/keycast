@@ -74,7 +74,7 @@ sense as a pipeline.
 
 ## Release pipeline
 
-Releases are automated by **release-please** (`.github/workflows/release-please.yml`),
+Releases are automated by **release-please** (`.github/workflows/release.yml`),
 driven entirely by Conventional Commit messages on `main`:
 
 - The **version is dynamic**, derived from git tags by **hatch-vcs**

@@ -1,0 +1,264 @@
+---
+name: Release
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions: {}
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    name: Release Please
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+      prs_created: ${{ steps.release.outputs.prs_created }}
+      pr: ${{ steps.release.outputs.pr }}
+    steps:
+      - name: Release Please
+        id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          config-file: .github/release-please-config.json
+          manifest-file: .github/release-please-manifest.json
+
+  # Three independent builders, each fed by the drafted release+tag. They are
+  # pure producers: contents:read only, they never touch the release. Each uploads
+  # a workflow artifact; publish-release attaches them. The release is ATOMIC --
+  # publish-pypi needs ALL three, so nothing ships unless every artifact built.
+
+  build-package:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    name: Build sdist + wheel
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # hatch-vcs derives the version from the release tag (created eagerly by
+          # release-please's force-tag-creation), so the build needs full history.
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version-file: ".python-version"
+      - name: Setup uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - name: Build the package
+        run: uv build --no-sources --quiet
+      - name: Upload the distribution
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist-pypi
+          path: dist/
+
+  build-macos:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    # Apple Silicon runner: Astral's standalone CPython is single-arch, so an
+    # arm64 runner yields an arm64-only .app (see packaging/keycast.spec).
+    # Deliberately PINNED, not `macos-latest`: the build runner sets the released
+    # bundle's effective minimum-macOS floor, so it must not silently follow the
+    # `macos-latest` -> macOS 26 migration (runner-images#14167). Bump this pin
+    # consciously when raising the supported-OS floor.
+    runs-on: macos-15
+    name: Build macOS app
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # hatch-vcs needs the tag for __version__ (`uv pip install .` builds it).
+          fetch-depth: 0
+      - name: Setup uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+          # cache-python: enable-cache only caches the uv package cache, NOT the
+          # managed interpreter. Without this the ~30MB Astral CPython below is
+          # re-downloaded every release run.
+          cache-python: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - name: Install Astral CPython 3.14.6
+        # Pinned to a verified-good Astral build (see docs/adr/001), not the
+        # proven minimum: 3.14.6 ships working Tk 9.0. Astral 3.14.3 tested broken
+        # (Tcl init fails) and Homebrew python@3.14 has no _tkinter, so bump this
+        # deliberately — an unpinned Python could silently produce a Tk-less or
+        # crashing bundle.
+        run: uv python install 3.14.6
+      - name: Build the .app with PyInstaller
+        # pyinstaller pinned to match the types-pyinstaller dev dependency.
+        run: |
+          uv venv --python 3.14.6 .venv-pkg
+          uv pip install --python .venv-pkg/bin/python . pyinstaller==6.16.0
+          .venv-pkg/bin/pyinstaller --noconfirm packaging/keycast.spec
+      - name: Package the .app into a .dmg
+        run: |
+          hdiutil create -volname keycast \
+            -srcfolder dist/keycast.app -ov -format UDZO keycast.dmg
+          echo "sha256 (for the Homebrew cask):"
+          shasum -a 256 keycast.dmg
+      - name: Upload the .dmg
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist-macos
+          path: keycast.dmg
+
+  build-windows:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    # NOTE: developed on a macOS dev machine and never built locally; the Windows
+    # bundle is exercised by the build-only `build-windows` check in ci.yml (green
+    # since PR #3). Reuses the committed spec — PyInstaller's macOS BUNDLE step is a
+    # no-op on Windows, so the spec yields the dist/keycast/ folder (keycast.exe +
+    # deps), which is zipped for a direct GitHub-release download.
+    runs-on: windows-latest
+    name: Build Windows app
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      - name: Setup uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+          # NB: no cache-python on Windows. uv creates a minor-version *junction*
+          # (cpython-3.14-windows-... -> the patch dir) that GitHub's tar-based
+          # cache cannot round-trip; a restored cache leaves a broken reparse point
+          # and `uv python install` then fails with "directory name is invalid"
+          # (os error 267). Re-downloading the ~30MB interpreter is the reliable
+          # trade. macOS caches it fine (tar preserves symlinks there).
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - name: Install Astral CPython 3.14.6
+        run: uv python install 3.14.6
+      - name: Build the .exe with PyInstaller
+        shell: pwsh
+        run: |
+          uv venv --python 3.14.6 .venv-pkg
+          uv pip install --python .venv-pkg/Scripts/python.exe . pyinstaller==6.16.0
+          .venv-pkg/Scripts/pyinstaller.exe --noconfirm packaging/keycast.spec
+      - name: Package the app folder into a .zip
+        shell: pwsh
+        run: Compress-Archive -Path dist/keycast -DestinationPath keycast-windows.zip
+      - name: Upload the .zip
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist-windows
+          path: keycast-windows.zip
+
+  publish-pypi:
+    # Atomic gate: requires ALL builds. A failed .app/.exe build blocks the PyPI
+    # release too — nothing ships unless every artifact built.
+    needs: [release-please, build-package, build-macos, build-windows]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    name: Publish to PyPI
+    permissions:
+      id-token: write # IMPORTANT: Mandatory for PyPI Trusted Publishing (OIDC)
+    environment:
+      name: publish
+      url: https://pypi.org/project/keycast/${{ needs.release-please.outputs.version }}
+    steps:
+      - name: Setup uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      - name: Download the distribution
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist-pypi
+          path: dist
+      - name: Publish to PyPI
+        run: uv publish --quiet --trusted-publishing always
+
+  publish-release:
+    # Runs only after PyPI succeeds (which in turn required all builds). Collects
+    # every artifact, attaches them to the release, and un-drafts it.
+    needs: [release-please, publish-pypi]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    name: Publish GitHub release
+    permissions:
+      contents: write # IMPORTANT: Mandatory to upload assets and un-draft the release
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: artifacts
+      - name: Attach artifacts and publish the release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # This job has no checkout, so gh has no git remote to infer the repo
+          # from. gh reads --repo / GH_REPO (NOT GITHUB_REPOSITORY), so set it
+          # explicitly or gh release upload/edit cannot resolve the repository.
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mapfile -t files < <(find artifacts -type f)
+          # Defensive: the three required builders gate this job, so files should
+          # always exist — but fail loudly rather than un-draft an empty release.
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::error::no artifacts found to attach to the release"; exit 1
+          fi
+          gh release upload "${{ needs.release-please.outputs.tag_name }}" "${files[@]}" --clobber
+          gh release edit "${{ needs.release-please.outputs.tag_name }}" --draft=false
+
+  reconcile:
+    # release-please derives its commit range from the latest *published* GitHub
+    # Release and ignores drafts. The release-please job above opened the next
+    # release PR in this same run, while this release was still a draft, so that PR
+    # was computed with no baseline and re-lists every already-shipped commit as a
+    # phantom version bump. release-please will NOT clean that up on its own: when a
+    # later run finds no new commits it just skips, leaving the orphan PR open. So
+    # close it here now that the release is published, then re-dispatch the
+    # workflow. The re-dispatch sees the published release and recreates a CORRECT
+    # next PR only if real unreleased commits exist; otherwise it finds nothing and
+    # stops without reaching this job again, so the re-trigger is bounded to one
+    # run. (workflow_dispatch is the documented exception to GITHUB_TOKEN
+    # loop-prevention, so no PAT is required.)
+    needs: [release-please, publish-release]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    name: Reconcile next release PR
+    permissions:
+      contents: write # IMPORTANT: Mandatory for `gh pr close --delete-branch` (deletes the ref)
+      pull-requests: write # IMPORTANT: Mandatory to close the phantom release PR
+      actions: write # IMPORTANT: Mandatory to re-dispatch this workflow
+    steps:
+      - name: Close the phantom PR and re-dispatch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No checkout in this job, so gh needs the repo set explicitly
+          # (gh reads GH_REPO, not GITHUB_REPOSITORY).
+          GH_REPO: ${{ github.repository }}
+          # Route through env and quote in-shell rather than interpolating the
+          # expansion bare into the command (robust against unusual ref names).
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          pr="$(gh pr list --state open \
+            --head "release-please--branches--${REF_NAME}" \
+            --json number --jq '.[0].number // empty')"
+          if [ -n "$pr" ]; then
+            echo "Closing phantom release PR #$pr"
+            gh pr close "$pr" --delete-branch
+          fi
+          gh workflow run "${{ github.workflow }}" --ref "$REF_NAME"

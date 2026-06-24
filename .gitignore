@@ -525,3 +525,7 @@ __marimo__/
 src/**/_version.py
 mise.local.toml
 tmp
+
+# committed: PyInstaller build recipe (see docs/PACKAGING.md). Negation must stay
+# after the `*.spec` rule above; at end-of-file it also wins over any later rule.
+!packaging/keycast.spec
