@@ -65,7 +65,9 @@ ICONSET = [
 ICO_SIZES = [16, 32, 48, 64, 128, 256]
 
 
-def _vertical_gradient(size: int, top: tuple[int, int, int], bot: tuple[int, int, int]) -> Image.Image:
+def _vertical_gradient(
+    size: int, top: tuple[int, int, int], bot: tuple[int, int, int]
+) -> Image.Image:
     """A 1px-wide vertical gradient stretched to a square -- cheap and smooth."""
     grad = Image.new("RGB", (1, size))
     for y in range(size):
@@ -176,7 +178,11 @@ def write_preview(path: Path) -> None:
     tile = 256
     pad = 24
     labels = list(ACCENT_CHOICES)
-    sheet = Image.new("RGBA", (tile * len(labels) + pad * (len(labels) + 1), tile + pad * 2), (32, 34, 38, 255))
+    sheet = Image.new(
+        "RGBA",
+        (tile * len(labels) + pad * (len(labels) + 1), tile + pad * 2),
+        (32, 34, 38, 255),
+    )
     for i, name in enumerate(labels):
         top, bot = ACCENT_CHOICES[name]
         thumb = render_master(top, bot).resize((tile, tile), Image.LANCZOS)

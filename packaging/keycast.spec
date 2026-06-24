@@ -33,7 +33,7 @@ _EXE_ICON = str(_ICON_DIR / "keycast.ico") if sys.platform == "win32" else None
 _BUNDLE_ICON = str(_ICON_DIR / "keycast.icns")
 
 a = Analysis(
-    ['entry.py'],
+    ["entry.py"],
     pathex=[],
     binaries=[],
     datas=[],
@@ -52,7 +52,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='keycast',
+    name="keycast",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -72,11 +72,11 @@ coll = COLLECT(
     strip=False,
     upx=False,  # UPX can corrupt Mach-O binaries and breaks code signing/notarization on macOS
     upx_exclude=[],
-    name='keycast',
+    name="keycast",
 )
 app = BUNDLE(
     coll,
-    name='keycast.app',
+    name="keycast.app",
     icon=_BUNDLE_ICON,  # macOS .app icon; ignored by BUNDLE off macOS
-    bundle_identifier='com.hasansezertasan.keycast',
+    bundle_identifier="com.hasansezertasan.keycast",
 )
