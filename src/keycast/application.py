@@ -95,6 +95,14 @@ class Keycast:
             self.logger.warning(
                 format_event("start_minimized_ignored", reason="no_active_input_source")
             )
+        # Briefly show the running version on launch so a user can confirm which
+        # build is active at a glance; it fades like any other event. Routed
+        # through the same show_text sink the listeners use, so it shares the fade
+        # timer and needs no special rendering path. Skipped on a minimized start,
+        # whose whole purpose is to stay hidden until the first real input — a
+        # splash would defeat that.
+        if not start_minimized:
+            self.display_window.show_text(f"keycast {__version__}")
         # Start the display window last to avoid race conditions.
         self.display_window.start(start_minimized=start_minimized)
 

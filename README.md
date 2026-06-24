@@ -15,6 +15,24 @@ A cross-platform keystroke and mouse click visualizer built in Python.
 
 ## Installation
 
+### Desktop app (recommended)
+
+Pre-built, double-click applications are attached to each
+[GitHub release](https://github.com/hasansezertasan/keycast/releases/latest):
+
+- **macOS** — download `keycast.dmg`, open it, and drag **keycast** to your
+  Applications folder. The build is not yet code-signed or notarized, so the
+  first launch is blocked by Gatekeeper: right-click the app and choose **Open**,
+  then confirm once. You will also be prompted to grant Accessibility and Input
+  Monitoring permission (see [macOS](#macos) below).
+- **Windows** — download `keycast-windows.zip`, extract it anywhere, and run
+  `keycast.exe` from the extracted folder. The build is unsigned, so Windows
+  SmartScreen may warn on first run: click **More info → Run anyway**.
+
+### From PyPI
+
+If you already have Python 3.14+ and [uv](https://docs.astral.sh/uv/):
+
 ```bash
 uvx keycast
 ```

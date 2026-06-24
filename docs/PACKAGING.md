@@ -159,34 +159,75 @@ release artifacts; `release.yml` produces those.
 
 ## Cask (in the tap)
 
-In [hasansezertasan/homebrew-tap](https://github.com/hasansezertasan/homebrew-tap),
-alongside the existing formula:
+The cask lives in
+[hasansezertasan/homebrew-tap](https://github.com/hasansezertasan/homebrew-tap),
+alongside the existing formula, and is **bumped automatically on every release**.
+`brew bump-cask-pr` owns the cask in the tap after the one-time bootstrap below,
+so this repo deliberately keeps **no** copy of `keycast.rb` (it would only drift
+behind the live file).
 
-```ruby
-cask "keycast" do
-  version "X.Y.Z"
-  sha256 "<sha256 of keycast.dmg>"
+### How it bumps (first-party tool, PR-based)
 
-  url "https://github.com/hasansezertasan/keycast/releases/download/v#{version}/keycast.dmg"
-  name "keycast"
-  desc "Cross-platform keystroke and mouse-click visualizer"
-  homepage "https://github.com/hasansezertasan/keycast"
+`release.yml`'s `bump-cask` job runs after the release is published and calls
+Homebrew's own **`brew bump-cask-pr`**, which downloads the released
+`keycast.dmg`, computes its sha256, rewrites the cask, and opens a **PR** on the
+tap (so `brew style`/`audit` run on the change). `--no-fork` pushes the PR branch
+straight to the tap you own. The dedicated wrapper actions
+(`macauley/action-homebrew-bump-cask`) are abandoned, so the first-party tool is
+called directly.
 
-  app "keycast.app"
+The job is **best-effort and outside the atomic release gate**: it runs after the
+release is published, so a tap hiccup cannot block or unwind a shipped release.
 
-  caveats <<~EOS
-    keycast needs Accessibility and Input Monitoring permission:
-      System Settings > Privacy & Security > Accessibility / Input Monitoring
-    On first launch, macOS Gatekeeper will block the unsigned app — right-click
-    the app and choose Open once to approve it.
-  EOS
-end
-```
+> **Why a PAT, not `GITHUB_TOKEN`:** the automatic token is scoped to the repo
+> whose workflow runs and cannot push to / open a PR on another repo.
+> `bump-cask-pr` is inherently cross-repo, so it needs a fine-grained PAT
+> (Contents + Pull requests: write on the tap) in the `TAP_TOKEN` secret. When
+> that secret is absent the `bump-cask` step warns and exits 0.
 
 > The app is **unsigned** (ad-hoc only) until an Apple Developer account is
-> available; hence the Gatekeeper caveat. Adopting Developer-ID signing +
-> notarization later removes that step and supersedes ADR-001's "unsigned"
-> stance.
+> available; hence the Gatekeeper caveat in the cask. Adopting Developer-ID
+> signing + notarization later removes that step and supersedes ADR-001's
+> "unsigned" stance.
+
+### One-time setup
+
+1. **Seed the cask in the tap.** Commit this file to the tap as
+   `Casks/keycast.rb` (placeholder `version`/`sha256` — the first `bump-cask-pr`
+   PR replaces both; hand-edit to the current release first if you want
+   `brew audit` to pass before then):
+
+   ```ruby
+   cask "keycast" do
+     version "0.0.0"
+     sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+
+     url "https://github.com/hasansezertasan/keycast/releases/download/v#{version}/keycast.dmg"
+     name "keycast"
+     desc "Cross-platform keystroke and mouse-click visualizer"
+     homepage "https://github.com/hasansezertasan/keycast"
+
+     app "keycast.app"
+
+     caveats <<~EOS
+       keycast needs Accessibility and Input Monitoring permission:
+         System Settings > Privacy & Security > Accessibility / Input Monitoring
+       On first launch, macOS Gatekeeper will block the unsigned app — right-click
+       the app and choose Open once to approve it.
+     EOS
+   end
+   ```
+
+2. **Create a fine-grained PAT** scoped to **only** `hasansezertasan/homebrew-tap`
+   with **Contents: Read and write** (push the PR branch) and **Pull requests:
+   Read and write** (open the PR).
+
+3. **Store it** on the keycast repo as the `TAP_TOKEN` secret (Settings → Secrets
+   and variables → Actions). Without it, the `bump-cask` job warns and skips —
+   releases still succeed.
+
+After this, the cask is edited only by `bump-cask-pr` in the tap; if a static
+stanza ever changes (caveats, signing later), edit it in the tap directly.
 
 ## Local reproduction
 

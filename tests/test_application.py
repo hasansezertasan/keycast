@@ -152,6 +152,35 @@ class TestStart:
         keycast.mouse_listener.start.assert_called_once()
         keycast.key_listener.start.assert_called_once()
 
+    def test_version_splash_shown_before_display_starts(self, keycast: Keycast) -> None:
+        """A non-minimized start flashes the version through show_text, pre-loop."""
+        keycast.settings.auto_start = True
+        keycast.settings.start_minimized = False
+        manager = Mock()
+        manager.attach_mock(keycast.display_window.show_text, "show_text")
+        manager.attach_mock(keycast.display_window.start, "start")
+
+        with patch("keycast.application.__version__", "9.9.9"):
+            keycast.start()
+
+        # The splash is enqueued before the main loop starts, and carries the
+        # running version verbatim.
+        assert manager.mock_calls == [
+            call.show_text("keycast 9.9.9"),
+            call.start(start_minimized=False),
+        ]
+
+    def test_no_version_splash_on_minimized_start(self, keycast: Keycast) -> None:
+        """A minimized start stays fully hidden: no splash to defeat the point."""
+        keycast.settings.auto_start = True
+        keycast.settings.start_minimized = True
+        keycast.mouse_listener.settings.enabled = True
+        keycast.key_listener.settings.enabled = True
+
+        keycast.start()
+
+        keycast.display_window.show_text.assert_not_called()
+
     def test_start_minimized_is_forwarded_to_display(self, keycast: Keycast) -> None:
         keycast.settings.auto_start = True
         keycast.settings.start_minimized = True
