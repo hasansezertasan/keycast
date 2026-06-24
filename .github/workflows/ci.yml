@@ -172,9 +172,12 @@ jobs:
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
         with:
           enable-cache: true
-          # cache-python: see build-macos — caches the managed interpreter so the
-          # Astral CPython below is restored instead of re-downloaded.
-          cache-python: true
+          # NB: no cache-python on Windows. uv creates a minor-version *junction*
+          # (cpython-3.14-windows-... -> the patch dir) that GitHub's tar-based
+          # cache cannot round-trip; a restored cache leaves a broken reparse point
+          # and `uv python install` then fails with "directory name is invalid"
+          # (os error 267). Re-downloading the ~30MB interpreter is the reliable
+          # trade. macOS caches it fine (tar preserves symlinks there).
           cache-dependency-glob: |
             pyproject.toml
             uv.lock
