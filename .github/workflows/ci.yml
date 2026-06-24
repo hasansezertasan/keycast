@@ -7,8 +7,28 @@ on:
   pull_request:
     branches: [main, master]
 jobs:
+  pr-title:
+    # Fast gate: every other job `needs:` this, so a PR with a non-Conventional
+    # title fails here in seconds and the expensive test/build matrix never runs
+    # against it. This is a *second*, comment-less copy of the check in
+    # check-pr-title.yml — that workflow keeps the friendly "fix your title"
+    # sticky comment because it runs under `pull_request_target` (a write token);
+    # this one runs under `pull_request` alongside the jobs it gates. Only fires
+    # on PRs; on push it is skipped (see the `if:` on each gated job).
+    name: Validate PR title (gate)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   hooks:
     name: Run prek hooks
+    needs: [pr-title]
+    # Run when the gate passed (PR with a valid title) or was skipped (push to
+    # main/master, workflow_dispatch). Skip only when the gate actually failed.
+    if: ${{ !cancelled() && (needs.pr-title.result == 'success' || needs.pr-title.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -26,6 +46,8 @@ jobs:
             uv.lock
       - run: uv run --locked prek run --all-files --show-diff-on-failure
   ci:
+    needs: [pr-title]
+    if: ${{ !cancelled() && (needs.pr-title.result == 'success' || needs.pr-title.result == 'skipped') }}
     strategy:
       fail-fast: false
       matrix:
@@ -109,6 +131,8 @@ jobs:
     # survives intact (same reason release.yml ships a .dmg). It is NOT the release
     # artifact; release.yml produces that.
     name: Build macOS app (check)
+    needs: [pr-title]
+    if: ${{ !cancelled() && (needs.pr-title.result == 'success' || needs.pr-title.result == 'skipped') }}
     # Deliberately PINNED to match release.yml's build-macos (NOT `macos-latest`):
     # the build runner sets the bundle's minimum-macOS floor, so the PR check must
     # exercise the same OS the release artifact is built on, not silently follow the
@@ -168,6 +192,8 @@ jobs:
     # (keycast.exe + deps). Uploads an unsigned, version-0.0.0 preview (7-day
     # retention); the release artifact comes from release.yml.
     name: Build Windows app (check)
+    needs: [pr-title]
+    if: ${{ !cancelled() && (needs.pr-title.result == 'success' || needs.pr-title.result == 'skipped') }}
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
