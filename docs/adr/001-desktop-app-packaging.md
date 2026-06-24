@@ -4,8 +4,8 @@
 
 Accepted — 2026-06-24. Build recipe (`packaging/keycast.spec`, `entry.py`) and
 release pipeline (`release.yml` + `ci.yml` check) implemented and validated
-against a real build; the **cask** (in the tap) and a verified **Windows** build
-(first proven by CI) remain.
+against a real build; the **Windows** build is verified green by CI (PR #3). The
+**cask** (in the tap) remains.
 
 Supersedes nothing. May be **superseded** if code signing + notarization are
 adopted (see [Consequences](#consequences)) or if Briefcase ships Tk in its
@@ -87,8 +87,7 @@ existing PyPI/formula CLI path:
 
 The bundler decision below was reached by **macOS-only empirical evaluation**; the
 chosen recipe extends to Windows because PyInstaller's macOS `BUNDLE` step is a
-no-op there (verified), though the Windows build itself is unproven until its
-first CI run.
+no-op there (verified), and the Windows build was confirmed green by CI (PR #3).
 
 Initial macOS releases are **unsigned** (ad-hoc signed only); no Apple Developer
 account is in use yet.
@@ -145,8 +144,8 @@ account is in use yet.
 - **Scope:** the **cask** is macOS-only, but the pipeline also produces a Windows
   `.zip` (PyInstaller) as a GitHub Release asset; Linux users install from PyPI.
   The cross-platform Python app and the PyPI/formula path are unaffected. macOS
-  bundle is ~41 MB. (The Windows build is unverified locally — first validated by
-  CI.)
+  bundle is ~41 MB. (The Windows build, unverifiable locally, was validated green
+  by CI in PR #3.)
 - **Future / supersede triggers:** acquiring an Apple Developer account would add
   Developer-ID signing + notarization (removing the Gatekeeper friction) and
   should be recorded as a follow-up ADR superseding this one's "unsigned" stance.

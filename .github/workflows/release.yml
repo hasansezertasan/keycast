@@ -193,6 +193,10 @@ jobs:
       - name: Attach artifacts and publish the release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # This job has no checkout, so gh has no git remote to infer the repo
+          # from. gh reads --repo / GH_REPO (NOT GITHUB_REPOSITORY), so set it
+          # explicitly or gh release upload/edit cannot resolve the repository.
+          GH_REPO: ${{ github.repository }}
         run: |
           mapfile -t files < <(find artifacts -type f)
           gh release upload "${{ needs.release-please.outputs.tag_name }}" "${files[@]}" --clobber
@@ -216,12 +220,16 @@ jobs:
     runs-on: ubuntu-latest
     name: Reconcile next release PR
     permissions:
+      contents: write # IMPORTANT: Mandatory for `gh pr close --delete-branch` (deletes the ref)
       pull-requests: write # IMPORTANT: Mandatory to close the phantom release PR
       actions: write # IMPORTANT: Mandatory to re-dispatch this workflow
     steps:
       - name: Close the phantom PR and re-dispatch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No checkout in this job, so gh needs the repo set explicitly
+          # (gh reads GH_REPO, not GITHUB_REPOSITORY).
+          GH_REPO: ${{ github.repository }}
         run: |
           pr="$(gh pr list --state open \
             --head release-please--branches--${{ github.ref_name }} \

@@ -334,8 +334,6 @@ MANIFEST
 #   before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
-# committed: PyInstaller recipe for the macOS .app (see docs/PACKAGING.md)
-!packaging/keycast.spec
 
 # Installer logs
 pip-log.txt
@@ -527,3 +525,7 @@ __marimo__/
 src/**/_version.py
 mise.local.toml
 tmp
+
+# committed: PyInstaller build recipe (see docs/PACKAGING.md). Negation must stay
+# after the `*.spec` rule above; at end-of-file it also wins over any later rule.
+!packaging/keycast.spec

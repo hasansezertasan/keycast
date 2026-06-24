@@ -4,8 +4,8 @@
 > `packaging/entry.py`) and the release pipeline (`.github/workflows/release.yml`,
 > plus the PR-time check in `ci.yml`) are implemented and validated against a real
 > build (PyInstaller, Astral Python 3.14.6, Tk 9.0). The **cask** in the tap is
-> the remaining piece; the Windows build is implemented but unverified until its
-> first CI run. This file is the operational contract (the **how**); the **why**
+> the remaining piece; the Windows build is implemented and verified green by CI
+> (PR #3). This file is the operational contract (the **how**); the **why**
 > behind every choice lives in [ADR-001](adr/001-desktop-app-packaging.md).
 
 ## Two distribution channels
@@ -30,7 +30,8 @@ pin **uv-managed Astral CPython `3.14.6`**. On **macOS** this is verified-good
 (tested: Tk 9.0 / Tcl 9.0.3; see [ADR-001](adr/001-desktop-app-packaging.md)) —
 verified-good, not a proven minimum, since the fix landed in
 `python-build-standalone` release `20250808`. On **Windows** the same pin is used
-but its Tk is **unverified until the first CI run**. Bump the pin deliberately:
+and was **verified green by CI** (PR #3 builds a working `_tkinter` bundle). Bump
+the pin deliberately:
 
 ```bash
 uv python install 3.14.6
