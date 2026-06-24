@@ -160,23 +160,28 @@ class DisplayWindow:
         (a minimized overlay is first mapped at deiconify, so the frame must be
         re-asserted there too).
 
-        macOS-only and best-effort: other platforms remove the frame correctly on
-        the first call, and a transient ``TclError`` (e.g. window mid-teardown)
-        must never stop the overlay from starting — it is logged and skipped. The
-        local ``root`` binding lets the type checker prove non-None across the
-        calls (``self.root`` is mutated from other threads), mirroring
-        :meth:`stop`.
+        macOS-only: only the platform check lives here so the actual widget work
+        — and the only ``root`` access — sits in :meth:`_reassert_overrideredirect`,
+        a method with no platform guard. On non-macOS the early ``return`` makes
+        any following statements statically unreachable, and the type checker does
+        not narrow ``self.root`` inside unreachable code; keeping the ``root``
+        access in a separate, always-reachable method sidesteps that entirely.
+        """
+        if sys.platform != "darwin":
+            return
+        self._reassert_overrideredirect()
+
+    def _reassert_overrideredirect(self) -> None:
+        """Toggle ``overrideredirect`` off/on so the window manager re-evaluates it.
+
+        Split out from :meth:`_force_frameless` so the ``root`` access is never
+        behind a platform guard (see that method's note). Best-effort: a transient
+        ``TclError`` (e.g. window mid-teardown) must never stop the overlay from
+        starting — it is logged and skipped. The local ``root`` binding lets the
+        type checker prove non-None, mirroring :meth:`stop`.
         """
         import tkinter as tk  # noqa: PLC0415  # lazy: see the import note at module top
 
-        # Keep the platform guard and the None guard as separate statements. A
-        # combined ``sys.platform != "darwin" or root is None`` short-circuits on
-        # non-macOS (the first operand is statically true there), so the type
-        # checker never derives the not-None fact from the second operand and
-        # still flags ``root`` as possibly-None in the body below. Two statements
-        # — mirroring _apply_window_icon — narrow cleanly on every platform.
-        if sys.platform != "darwin":
-            return
         root = self.root
         if root is None:
             return
