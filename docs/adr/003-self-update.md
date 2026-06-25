@@ -5,9 +5,11 @@
 **Proposed — deferred.** Captures the design space for **Phase 2** of the update
 mechanism (issue [#19](https://github.com/hasansezertasan/keycast/issues/19);
 parent [#9](https://github.com/hasansezertasan/keycast/issues/9)). **Phase 1**
-(install-source-aware *notify*) is specified and implemented per
-[ADR-002](002-update-check.md); this ADR is the contract for the *self-update*
-that Phase 1 deliberately left out.
+(install-source-aware *notify*) is specified in [ADR-002](002-update-check.md)
+and implemented in PR #18 (in review at the time of writing); this ADR is the
+contract for the *self-update* that Phase 1 deliberately leaves out. **Phase 2
+depends on Phase 1 landing first** — it reuses Phase 1's `GITHUB_RELEASE`
+detection gate (`keycast.updates`), which only exists once #18 merges.
 
 This ADR is intentionally **not yet Accepted**: its macOS path is blocked on a
 prerequisite (code signing) and its central build-vs-buy decision (Sparkle vs
@@ -30,10 +32,10 @@ row is a self-update candidate:
 
 Self-updating a package-manager-owned install would desync that manager's
 receipts, so self-update is offered **only** for `GITHUB_RELEASE` — a manually
-downloaded `.dmg`/`.zip` that nothing else manages. Phase 1 already isolates this
-case (frozen, and *not* under a Homebrew Caskroom receipt), so the gate is in
-place; what is missing is the act of replacing the bundle, which is the genuinely
-hard, platform-specific, signing-sensitive part.
+downloaded `.dmg`/`.zip` that nothing else manages. Phase 1 isolates this case
+(frozen, and *not* under a Homebrew Caskroom receipt), so once it lands the gate
+is already in place; what Phase 2 adds is the act of replacing the bundle, which
+is the genuinely hard, platform-specific, signing-sensitive part.
 
 ## Decision (proposed)
 
