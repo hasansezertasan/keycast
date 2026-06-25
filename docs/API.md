@@ -401,6 +401,7 @@ def create_settings_file(cls) -> Settings
 - `debug` (bool): Enable debug mode for verbose diagnostics (default: `false`). A top-level flag, not a section; see `effective_logging` for how it combines with `logging.level`.
 - `start_minimized` (bool): Start with the overlay hidden; it appears the first time a key or click is captured (default: `false`). Requires `auto_start` (rejected with it off, since nothing would ever re-show the overlay). If no listener is live at startup (all disabled, or all fail to start), the overlay is kept visible instead of hidden.
 - `auto_start` (bool): Start the input listeners on launch (default: `true`). When `false`, no listeners start regardless of `keyboard.enabled` / `mouse.enabled` — an app-level master switch.
+- `check_for_updates` (bool): **Planned (not yet implemented)** — gate the passive update check (default: `true`). When `true`, keycast queries the GitHub Releases API at most once per day and shows a non-blocking overlay notice if a newer version exists; `false` disables all automatic checks. Throttle state lives in `~/.keycast/update-check.json`, not on `Settings`. See [ADR-002](adr/002-update-check.md).
 
 > The application version is exposed as `keycast.__version__`, generated at
 > build time from the git tag by hatch-vcs (into `src/keycast/_version.py`),

@@ -151,11 +151,19 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
 {
   "debug": false,
   "start_minimized": false,
-  "auto_start": true
+  "auto_start": true,
+  "check_for_updates": true
 }
 ```
 
 > These are top-level flags (not sections).
+
+> `check_for_updates` *(Planned — see [Updates](#updates) and
+> [ADR-002](docs/adr/002-update-check.md); not yet implemented)* — when `true`
+> (default), keycast checks the GitHub Releases API at most once a day and shows
+> a non-blocking notice if a newer version exists. Set it to `false` to disable
+> all automatic update checks (offline and privacy-respecting). The check fails
+> silently when offline.
 
 > `debug` — when `true`, keycast surfaces verbose diagnostics regardless of
 > `logging.level`; a quick switch for troubleshooting without editing the logging
@@ -175,6 +183,33 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
 
 > Enabling/disabling each listener is controlled per-component via
 > `keyboard.enabled` and `mouse.enabled` (see the Keyboard/Mouse settings above).
+
+## Updates
+
+> **Status: Planned (not yet implemented).** This section documents the agreed
+> design from [ADR-002](docs/adr/002-update-check.md); the behavior below ships
+> in a later release.
+
+keycast supports several install channels, and the right way to update depends
+on how you installed it. keycast detects its install source and recommends the
+matching action — it never tries to update something your package manager owns.
+
+| You installed via | keycast will… |
+|---|---|
+| `pipx` / `uv tool` / `uvx` / `pip` | suggest the matching upgrade command (e.g. `pipx upgrade keycast`) |
+| Homebrew **formula** (CLI) | suggest `brew upgrade keycast` |
+| Homebrew **cask** (the macOS app) | suggest `brew upgrade --cask keycast` |
+| a manual [GitHub Release](https://github.com/hasansezertasan/keycast/releases/latest) download | point you to the latest release (and, in a future phase, update itself in place) |
+
+- **Automatic, in the background:** keycast checks the GitHub Releases API at
+  most once per day. The check runs on its own — there is no command to run. A
+  newer version shows as a brief, non-blocking overlay notice (GUI) or a single
+  stderr line (`keycast version` / `info`). Controlled by `check_for_updates`
+  (default `true`); set it to `false` to disable.
+- **Install source:** `keycast info` shows how keycast was installed (e.g.
+  `Install source: Homebrew cask`), which determines the update advice above.
+- **Offline / privacy:** checks only contact GitHub when enabled, time out
+  quickly, and fail silently when offline. No telemetry is collected.
 
 ## Development
 

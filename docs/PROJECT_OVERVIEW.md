@@ -186,7 +186,11 @@ variables are intentionally ignored (`Settings.settings_customise_sources`).
 
 ### Privacy Protection
 - **Local Processing**: All input processing happens locally
-- **No Data Transmission**: No network communication
+- **No Input Telemetry**: Captured keystrokes and clicks never leave the machine
+- **Single, Optional Network Call**: The only outbound request is the *planned*
+  update check against the GitHub Releases API (≤ once/day, no input data sent);
+  it is opt-out via `check_for_updates` and fails silently offline. See
+  [ADR-002](adr/002-update-check.md).
 - **No Persistent Storage**: Events not saved to disk
 - **User Control**: User controls what events are displayed
 

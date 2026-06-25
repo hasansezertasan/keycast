@@ -613,6 +613,18 @@ overrides patch the JSON source.
 
 ## Future Considerations
 
+### Install-Source-Aware Update Check
+
+**Decision**: Notify users of new releases in a way that matches their install
+channel, rather than blindly self-updating. Self-update is reserved for the one
+channel no package manager owns (manually-downloaded GitHub Release builds) and
+is deferred to a second phase.
+
+**Status**: Planned. Full design and rationale in
+[ADR-002](adr/002-update-check.md) (covers source detection, the
+`check_for_updates` opt-out, GitHub Releases API check via stdlib `urllib`,
+24 h throttle in a separate state file, and the Phase 1 / Phase 2 split).
+
 ### Extensibility Design
 
 **Decision**: Design components to be easily extensible.
