@@ -112,11 +112,36 @@ def _is_under(location_posix: str, raw_dir: str) -> bool:
     return location_posix.startswith(Path(raw_dir).as_posix().lower())
 
 
+_HOMEBREW_CASK_PREFIXES = ("/opt/homebrew", "/usr/local")
+"""Default Homebrew prefixes (Apple Silicon, Intel) checked for a cask receipt."""
+
+
+def _homebrew_cask_receipt_exists() -> bool:
+    """Return whether a Homebrew **cask** receipt for keycast is on disk.
+
+    A cask moves ``keycast.app`` into ``/Applications`` — the same location a
+    manual drag-install lands — but leaves a receipt under
+    ``<brew-prefix>/Caskroom/keycast``. That receipt is the only thing that
+    distinguishes the two, so it is the signal used to recommend
+    ``brew upgrade --cask`` rather than the Releases page. ``HOMEBREW_PREFIX`` is
+    honored for non-standard prefixes.
+
+    Returns:
+        True if a Caskroom receipt directory for keycast exists.
+    """
+    prefixes = [*_HOMEBREW_CASK_PREFIXES]
+    custom = os.environ.get("HOMEBREW_PREFIX")
+    if custom:
+        prefixes.append(custom)
+    return any((Path(prefix) / "Caskroom" / "keycast").exists() for prefix in prefixes)
+
+
 def detect_install_source(
     *,
     frozen: bool | None = None,
     location: Path | None = None,
     env: dict[str, str] | None = None,
+    cask_receipt_exists: Callable[[], bool] = _homebrew_cask_receipt_exists,
 ) -> InstallSource:
     """Classify how the running keycast was installed.
 
@@ -130,6 +155,8 @@ def detect_install_source(
         location: Override for the path classified — the bundle executable when
             frozen, otherwise this package's location (defaults accordingly).
         env: Override for the process environment (defaults to ``os.environ``).
+        cask_receipt_exists: Predicate for a Homebrew cask receipt (injectable
+            for tests; defaults to a filesystem check).
 
     Returns:
         The detected :class:`InstallSource`; :attr:`InstallSource.UNKNOWN` when
@@ -141,7 +168,11 @@ def detect_install_source(
     if frozen:
         location = Path(sys.executable) if location is None else location
         posix = location.as_posix().lower()
-        if _looks_homebrew(posix):
+        # Either a Caskroom-path bundle, or the app moved to /Applications by a
+        # cask (same path as a manual drag — disambiguated by the cask receipt).
+        if _looks_homebrew(posix) or (
+            "/applications/" in posix and cask_receipt_exists()
+        ):
             return InstallSource.HOMEBREW_CASK
         return InstallSource.GITHUB_RELEASE
 

@@ -35,21 +35,77 @@ class TestLooksHomebrew:
         assert updates._looks_homebrew("/usr/lib/python3.14/site-packages") is False
 
 
+class TestHomebrewCaskReceipt:
+    """The Caskroom-receipt filesystem probe that confirms a cask install."""
+
+    def test_found_under_standard_prefix(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / "Caskroom" / "keycast").mkdir(parents=True)
+        monkeypatch.setattr(updates, "_HOMEBREW_CASK_PREFIXES", (str(tmp_path),))
+        monkeypatch.delenv("HOMEBREW_PREFIX", raising=False)
+        assert updates._homebrew_cask_receipt_exists() is True
+
+    def test_found_under_custom_prefix_env(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / "Caskroom" / "keycast").mkdir(parents=True)
+        monkeypatch.setattr(updates, "_HOMEBREW_CASK_PREFIXES", ("/nonexistent-xyz",))
+        monkeypatch.setenv("HOMEBREW_PREFIX", str(tmp_path))
+        assert updates._homebrew_cask_receipt_exists() is True
+
+    def test_absent_when_no_receipt(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(updates, "_HOMEBREW_CASK_PREFIXES", (str(tmp_path),))
+        monkeypatch.delenv("HOMEBREW_PREFIX", raising=False)
+        assert updates._homebrew_cask_receipt_exists() is False
+
+
 class TestDetectInstallSource:
     """The first-match-wins detection tree (ADR-002)."""
 
-    def test_frozen_under_homebrew_is_cask(self) -> None:
+    def test_frozen_under_caskroom_is_cask(self) -> None:
         loc = Path(
             "/opt/homebrew/Caskroom/keycast/0.5.0/keycast.app/Contents/MacOS/keycast"
         )
-        assert updates.detect_install_source(frozen=True, location=loc) == (
-            InstallSource.HOMEBREW_CASK
+        # Caskroom path matches outright; no receipt lookup needed.
+        assert (
+            updates.detect_install_source(
+                frozen=True, location=loc, cask_receipt_exists=lambda: False
+            )
+            == InstallSource.HOMEBREW_CASK
         )
 
-    def test_frozen_elsewhere_is_github_release(self) -> None:
+    def test_frozen_in_applications_with_receipt_is_cask(self) -> None:
+        # A cask moves the app to /Applications; the receipt distinguishes it
+        # from a manual drag-install at the same path (Codex review #18).
         loc = Path("/Applications/keycast.app/Contents/MacOS/keycast")
-        assert updates.detect_install_source(frozen=True, location=loc) == (
-            InstallSource.GITHUB_RELEASE
+        assert (
+            updates.detect_install_source(
+                frozen=True, location=loc, cask_receipt_exists=lambda: True
+            )
+            == InstallSource.HOMEBREW_CASK
+        )
+
+    def test_frozen_in_applications_without_receipt_is_release(self) -> None:
+        # Same /Applications path, but no cask receipt → manual download.
+        loc = Path("/Applications/keycast.app/Contents/MacOS/keycast")
+        assert (
+            updates.detect_install_source(
+                frozen=True, location=loc, cask_receipt_exists=lambda: False
+            )
+            == InstallSource.GITHUB_RELEASE
+        )
+
+    def test_frozen_outside_applications_is_release(self) -> None:
+        # A bundle nowhere near /Applications never even consults the receipt.
+        loc = Path("C:/Program Files/keycast/keycast.exe")
+        assert (
+            updates.detect_install_source(
+                frozen=True, location=loc, cask_receipt_exists=lambda: True
+            )
+            == InstallSource.GITHUB_RELEASE
         )
 
     def test_frozen_uses_sys_executable_by_default(
@@ -58,10 +114,13 @@ class TestDetectInstallSource:
         monkeypatch.setattr(
             updates.sys,
             "executable",
-            "/Applications/keycast.app/Contents/MacOS/keycast",
+            "/Users/u/Downloads/keycast.app/Contents/MacOS/keycast",
         )
         assert (
-            updates.detect_install_source(frozen=True) == InstallSource.GITHUB_RELEASE
+            updates.detect_install_source(
+                frozen=True, cask_receipt_exists=lambda: False
+            )
+            == InstallSource.GITHUB_RELEASE
         )
 
     def test_pipx_by_path(self) -> None:
