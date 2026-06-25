@@ -69,7 +69,7 @@ class TestDetectInstallSource:
             "/home/u/.local/pipx/venvs/keycast/lib/python3.14/keycast/updates.py"
         )
         assert (
-            updates.detect_install_source(frozen=False, location=loc)
+            updates.detect_install_source(frozen=False, location=loc, env={})
             == InstallSource.PIPX
         )
 
@@ -83,15 +83,15 @@ class TestDetectInstallSource:
     def test_uv_tool_by_path(self) -> None:
         loc = Path("/home/u/.local/share/uv/tools/keycast/lib/keycast/updates.py")
         assert (
-            updates.detect_install_source(frozen=False, location=loc)
+            updates.detect_install_source(frozen=False, location=loc, env={})
             == InstallSource.UV_TOOL
         )
 
-    def test_uv_tool_by_env(self) -> None:
+    def test_uv_tool_by_tools_fragment(self) -> None:
         loc = Path("/somewhere/uv/tools/keycast/keycast/updates.py")
-        # The "/uv/tools/" fragment alone matches; this also exercises that path.
+        # The "/uv/tools/" fragment alone matches, independent of any env var.
         assert (
-            updates.detect_install_source(frozen=False, location=loc)
+            updates.detect_install_source(frozen=False, location=loc, env={})
             == InstallSource.UV_TOOL
         )
 
@@ -103,12 +103,23 @@ class TestDetectInstallSource:
         assert source == InstallSource.UV_TOOL
 
     def test_homebrew_formula(self) -> None:
-        loc = Path("/opt/homebrew/lib/python3.14/site-packages/keycast/updates.py")
         # Cellar marker on a non-frozen install → formula, not cask.
         loc = Path("/opt/homebrew/Cellar/keycast/0.1.0/lib/keycast/updates.py")
-        assert updates.detect_install_source(frozen=False, location=loc) == (
+        assert updates.detect_install_source(frozen=False, location=loc, env={}) == (
             InstallSource.HOMEBREW_FORMULA
         )
+
+    def test_env_var_set_but_package_elsewhere_is_ignored(self) -> None:
+        # A set UV_TOOL_DIR/PIPX_HOME must NOT hijack classification unless the
+        # package actually lives under it: a brew/pip user who also has uv
+        # configured should still get the right advice (regression: Windows CI).
+        loc = Path("/opt/homebrew/Cellar/keycast/0.1.0/lib/keycast/updates.py")
+        source = updates.detect_install_source(
+            frozen=False,
+            location=loc,
+            env={"UV_TOOL_DIR": "/home/u/.local/share/uv/tools", "PIPX_HOME": "/x"},
+        )
+        assert source == InstallSource.HOMEBREW_FORMULA
 
     def test_plain_pip(self) -> None:
         loc = Path("/usr/lib/python3.14/site-packages/keycast/updates.py")

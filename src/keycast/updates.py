@@ -92,6 +92,26 @@ def _looks_homebrew(location_posix: str) -> bool:
     )
 
 
+def _is_under(location_posix: str, raw_dir: str) -> bool:
+    """Return whether a POSIX path lives under a (possibly native) directory.
+
+    The directory comes from an env var, so it may be a native Windows path with
+    backslashes; it is normalized to lower-cased POSIX before comparison so the
+    check works the same on every platform. An empty directory never matches —
+    an env var being *set* is not by itself evidence of where the package lives.
+
+    Args:
+        location_posix: ``location.as_posix().lower()`` of the package.
+        raw_dir: The candidate parent directory (env-supplied, any separator).
+
+    Returns:
+        True only when ``raw_dir`` is non-empty and contains ``location_posix``.
+    """
+    if not raw_dir:
+        return False
+    return location_posix.startswith(Path(raw_dir).as_posix().lower())
+
+
 def detect_install_source(
     *,
     frozen: bool | None = None,
@@ -128,10 +148,13 @@ def detect_install_source(
     location = Path(__file__) if location is None else location
     posix = location.as_posix().lower()
 
-    pipx_home = env.get("PIPX_HOME", "").lower()
-    if "/pipx/" in posix or (pipx_home and posix.startswith(pipx_home)):
+    if "/pipx/" in posix or _is_under(posix, env.get("PIPX_HOME", "")):
         return InstallSource.PIPX
-    if "/uv/tools/" in posix or "/share/uv/" in posix or env.get("UV_TOOL_DIR"):
+    if (
+        "/uv/tools/" in posix
+        or "/share/uv/" in posix
+        or _is_under(posix, env.get("UV_TOOL_DIR", ""))
+    ):
         return InstallSource.UV_TOOL
     if _looks_homebrew(posix):
         return InstallSource.HOMEBREW_FORMULA
