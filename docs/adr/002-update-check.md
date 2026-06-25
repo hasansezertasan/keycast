@@ -2,12 +2,12 @@
 
 ## Status
 
-Proposed — 2026-06-24. Documents the design contract for GitHub issue
+Accepted — 2026-06-25. Documents the design contract for GitHub issue
 [#9](https://github.com/hasansezertasan/keycast/issues/9) ("In-app update /
-version check") ahead of implementation, per the project's Document-Driven
-Development workflow. **Phase 1** (automatic background notify, no dedicated
-command) is specified for implementation; **Phase 2** (the `keycast update`
-verb + in-place self-update of the frozen executable) is specified as a
+version check"); the contract was written first, per the project's
+Document-Driven Development workflow. **Phase 1** (automatic background notify,
+no dedicated command) is **implemented** in `keycast.updates`; **Phase 2** (the
+`keycast update` verb + in-place self-update of the frozen executable) is a
 committed follow-up and is *not* built yet.
 
 Builds on [ADR-001](001-desktop-app-packaging.md), which established the three
@@ -201,10 +201,10 @@ pattern:
 - **Network behavior:** keycast makes at most one outbound request per 24 h,
   in the background. All optional and opt-out-able; fully offline-safe. Privacy
   note added to README and `docs/PROJECT_OVERVIEW.md` (Security & Privacy).
-- **Docs (DDD):** this ADR is the rationale; README gains an **Updates** section
+- **Docs (DDD):** this ADR is the rationale; README has an **Updates** section
   and the `check_for_updates` flag in the config example; `docs/API.md` documents
-  the flag. Until Phase 1 lands, those entries are marked **Planned** so the docs
-  stay truthful.
+  the flag. (These shipped as the contract before Phase 1 code, then had their
+  "Planned" markers removed once it landed.)
 - **Phase 2 triggers:** acquiring an Apple Developer ID (per ADR-001's supersede
   trigger) is a prerequisite for a safe macOS self-update; Windows self-update
   can proceed independently. Phase 2 should be recorded as its own ADR when built.

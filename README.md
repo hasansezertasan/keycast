@@ -158,11 +158,10 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
 
 > These are top-level flags (not sections).
 
-> `check_for_updates` *(Planned — see [Updates](#updates) and
-> [ADR-002](docs/adr/002-update-check.md); not yet implemented)* — when `true`
-> (default), keycast checks the GitHub Releases API at most once a day and shows
-> a non-blocking notice if a newer version exists. Set it to `false` to disable
-> all automatic update checks (offline and privacy-respecting). The check fails
+> `check_for_updates` — when `true` (default), keycast checks the GitHub
+> Releases API at most once a day and shows a non-blocking notice if a newer
+> version exists (see [Updates](#updates)). Set it to `false` to disable all
+> automatic update checks (offline and privacy-respecting). The check fails
 > silently when offline.
 
 > `debug` — when `true`, keycast surfaces verbose diagnostics regardless of
@@ -186,9 +185,9 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
 
 ## Updates
 
-> **Status: Planned (not yet implemented).** This section documents the agreed
-> design from [ADR-002](docs/adr/002-update-check.md); the behavior below ships
-> in a later release.
+> In-place self-update of the downloaded app is a **future phase**; today keycast
+> *notifies* and points you at the right update command. See
+> [ADR-002](docs/adr/002-update-check.md).
 
 keycast supports several install channels, and the right way to update depends
 on how you installed it. keycast detects its install source and recommends the

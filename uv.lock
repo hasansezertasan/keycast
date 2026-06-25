@@ -179,6 +179,7 @@ wheels = [
 name = "keycast"
 source = { editable = "." }
 dependencies = [
+    { name = "packaging" },
     { name = "pydantic-extra-types" },
     { name = "pydantic-settings" },
     { name = "pynput" },
@@ -232,6 +233,7 @@ tool = [
 
 [package.metadata]
 requires-dist = [
+    { name = "packaging", specifier = "==26.2" },
     { name = "pydantic-extra-types", specifier = "==2.11.1" },
     { name = "pydantic-settings", specifier = "==2.14.2" },
     { name = "pynput", specifier = "==1.8.2" },

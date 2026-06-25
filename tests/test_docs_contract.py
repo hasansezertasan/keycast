@@ -91,6 +91,7 @@ class TestAppLevelFlagsAreDocumented:
             "debug": False,
             "start_minimized": False,
             "auto_start": True,
+            "check_for_updates": True,
         }
         for field, default in expected_defaults.items():
             assert field in Settings.model_fields, field
@@ -101,10 +102,10 @@ class TestAppLevelFlagsAreDocumented:
         assert DisplaySettings.model_fields["draggable"].default is False
 
     def test_settings_sections_are_exactly_documented(self) -> None:
-        # The four sections every doc lists, plus the three top-level scalar flags
+        # The four sections every doc lists, plus the four top-level scalar flags
         # -- nothing more, nothing less. The scalars are flags, not sections.
         documented_sections = {"display", "keyboard", "mouse", "logging"}
-        scalar_flags = {"debug", "start_minimized", "auto_start"}
+        scalar_flags = {"debug", "start_minimized", "auto_start", "check_for_updates"}
         assert set(Settings.model_fields) == documented_sections | scalar_flags
 
 

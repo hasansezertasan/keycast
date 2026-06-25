@@ -11,6 +11,7 @@ from keycast.display import DisplayWindow
 from keycast.listeners import KeyListener, MouseListener
 from keycast.logging_setup import format_event, setup_logging
 from keycast.settings import Settings
+from keycast.updates import notify_pending_update
 
 if TYPE_CHECKING:
     import types
@@ -103,6 +104,16 @@ class Keycast:
         # splash would defeat that.
         if not start_minimized:
             self.display_window.show_text(f"keycast {__version__}")
+            # Surface a cached "update available" notice through the same sink, so
+            # it shares the fade timer and needs no special rendering path. The
+            # network refresh runs on a background daemon thread; any notice it
+            # turns up appears on a later launch (see keycast.updates). Skipped on
+            # a minimized start, like the splash, since the overlay is hidden.
+            notify_pending_update(
+                notify=self.display_window.show_text,
+                current=__version__,
+                enabled=self.settings.check_for_updates,
+            )
         # Start the display window last to avoid race conditions.
         self.display_window.start(start_minimized=start_minimized)
 
