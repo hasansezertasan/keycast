@@ -66,13 +66,19 @@ is the genuinely hard, platform-specific, signing-sensitive part.
 
 ## Open questions (must resolve before Accepted)
 
-- **Build vs buy — the central decision.** Three families:
+- **Build vs buy — the central decision.** Four families (build-vs-buy framing
+  in [ADR-004](004-update-check-build-vs-buy.md)):
+  - **[`tufup`](https://github.com/dennisvang/tufup)** — the leading "buy"
+    candidate: maintained successor to PyUpdater, built on **python-tuf** (real
+    signing/verification), **packaging-agnostic** (works with PyInstaller
+    bundles). It moves verified file bundles A→B; we'd add a TUF repo to the
+    release pipeline. **PyUpdater is archived — not an option.**
   - **Sparkle (macOS) + WinSparkle (Windows)** with a signed **appcast** feed:
-    mature, handles the relaunch/swap dance and signature checks, but adds a
-    framework + an appcast-publishing step to the release pipeline.
+    mature, native, handles the relaunch/swap dance and signature checks, but two
+    platform frameworks + an appcast-publishing step.
   - **Custom download-verify-swap** in `keycast.updates`: no new framework, full
     control, but re-implements the platform dances and signature verification
-    that Sparkle already solves.
+    that `tufup`/Sparkle already solve — discouraged for a security-critical path.
   - **OS installers** (`.pkg` / MSIX) with their own update channels: heavier
     packaging change, overlaps with ADR-001's PyInstaller decision.
 - **Auto-apply vs prompt.** Should the Phase 1 passive notice on a
