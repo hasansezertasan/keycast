@@ -162,11 +162,13 @@ pattern:
   pipx-managed install would desync the manager; recommending its command is
   both safer and what users expect. Self-update is offered only where no manager
   is in play.
-- **Honest about detection limits.** Cask-vs-manual is a path heuristic; an
-  `UNKNOWN` fallback (generic command list) is correct behavior, not a bug, and
-  the worst case is a slightly-off suggestion the user can ignore.
-- **No new runtime dependency.** stdlib `urllib.request` is sufficient for one
-  small JSON GET; this matches the project's lean-stdlib posture.
+- **Honest about detection limits.** Cask-vs-manual is a path heuristic; the
+  `UNKNOWN` fallback (point at the Releases page) is correct behavior, not a bug,
+  and the worst case is a slightly-off suggestion the user can ignore.
+- **One small, standard dependency.** The HTTP call uses stdlib
+  `urllib.request`; the only added package is `packaging`, the PEP 440 comparator
+  every Python packaging tool already relies on — keeping the stack lean while
+  not re-implementing version ordering.
 - **Architecturally minimal.** The notice is just another `TextSink` string and
   a daemon thread, consistent with the single-sink event flow; throttle state is
   isolated from the frozen `Settings`.
