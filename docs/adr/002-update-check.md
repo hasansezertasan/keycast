@@ -85,7 +85,7 @@ to `UNKNOWN`.
   packaging tool uses (pip/setuptools vendor it; hatch/pipx/pdm/poetry-core
   depend on it), and PEP 440 awareness is *required* here: hatch-vcs hands a
   source checkout a local/dev version such as `0.3.1.dev4+g1234abc`, which naive
-  string/tuple comparison mis-orders. **`packaging` is declared as an explicit
+  string/tuple comparison orders incorrectly. **`packaging` is declared as an explicit
   runtime dependency** — it is currently only a dev/transitive dep, so it is
   absent from PyInstaller bundles unless declared (it would import under
   `uv run` and then `ImportError` in the shipped `.app`/`.exe`).
