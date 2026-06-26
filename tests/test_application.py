@@ -5,6 +5,7 @@ from unittest.mock import Mock, call, patch
 
 import pytest
 
+import keycast.application as application_module
 from keycast.application import Keycast
 
 
@@ -24,6 +25,9 @@ def keycast() -> Iterator[Keycast]:
         patch("keycast.application.DisplayWindow") as window_cls,
         patch("keycast.application.MouseListener") as mouse_cls,
         patch("keycast.application.KeyListener") as key_cls,
+        # Neutralize the update check (no config read, no GitHub-bound thread);
+        # the wiring is asserted explicitly in TestUpdateCheck.
+        patch("keycast.application.notify_pending_update"),
     ):
         settings_cls.create_settings_file.return_value = Mock()
         window_cls.return_value = Mock()
@@ -237,6 +241,36 @@ class TestStart:
 
         keycast.display_window.start.assert_called_once_with(start_minimized=False)
         assert "start_minimized_ignored" in caplog.text
+
+
+class TestUpdateCheck:
+    """The update-check call wired into Keycast.start (notifies via the overlay)."""
+
+    def test_runs_on_normal_start(self, keycast: Keycast) -> None:
+        """A non-minimized start passes the overlay sink and opt-out flag through."""
+        keycast.settings.auto_start = True
+        keycast.settings.start_minimized = False
+        keycast.settings.check_for_updates = True
+
+        with patch("keycast.application.__version__", "1.2.3"):
+            keycast.start()
+
+        application_module.notify_pending_update.assert_called_once_with(
+            notify=keycast.display_window.show_text,
+            current="1.2.3",
+            enabled=True,
+        )
+
+    def test_skipped_on_minimized_start(self, keycast: Keycast) -> None:
+        """A minimized start stays hidden, so no overlay update notice fires."""
+        keycast.settings.auto_start = True
+        keycast.settings.start_minimized = True
+        keycast.mouse_listener.settings.enabled = True
+        keycast.key_listener.settings.enabled = True
+
+        keycast.start()
+
+        application_module.notify_pending_update.assert_not_called()
 
 
 class TestStartDegradesOnListenerFailure:

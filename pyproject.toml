@@ -14,6 +14,7 @@ keywords = []
 classifiers = []
 requires-python = ">=3.14"
 dependencies = [
+  "packaging==26.2",
   "pydantic-extra-types==2.11.1",
   "pydantic-settings==2.14.2",
   "pynput==1.8.2",

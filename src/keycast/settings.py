@@ -105,6 +105,14 @@ LOG_FILE_PATH: Path = ROOT_FOLDER_PATH / "main.log"
 CONFIG_FILE_PATH: Path = ROOT_FOLDER_PATH / "config.json"
 """Path to the config file."""
 
+UPDATE_CHECK_FILE_PATH: Path = ROOT_FOLDER_PATH / "update-check.json"
+"""Path to the update-check state file.
+
+Holds the throttle state for the update check (last-checked time and last-seen
+release tag). Kept *separate* from ``config.json`` on purpose: ``Settings`` is
+``frozen`` and rewritten atomically from defaults, so this mutable runtime state
+must not live in the user's config. See ``keycast.updates``."""
+
 
 class DisplaySettings(BaseModel):
     """Display window configuration settings."""
@@ -520,6 +528,13 @@ class Settings(BaseSettings):
         description="Start the input listeners on launch. When false, no listeners "
         "start regardless of keyboard.enabled / mouse.enabled — a master switch "
         "that captures nothing until re-enabled in config.",
+    )
+    check_for_updates: bool = Field(
+        default=True,
+        description="Check the GitHub Releases API for a newer version at most "
+        "once a day and show a non-blocking notice. Set false to disable all "
+        "automatic update checks (offline / privacy). Throttle state is kept in "
+        "~/.keycast/update-check.json, not in this config. See keycast.updates.",
     )
 
     # Note: per-listener enable flags live on `keyboard.enabled` / `mouse.enabled`;

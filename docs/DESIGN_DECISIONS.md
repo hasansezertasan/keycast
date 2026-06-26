@@ -620,8 +620,9 @@ channel, rather than blindly self-updating. Self-update is reserved for the one
 channel no package manager owns (manually-downloaded GitHub Release builds) and
 is deferred to a second phase.
 
-**Status**: Planned. Full design and rationale in
-[ADR-002](adr/002-update-check.md) (covers source detection, the
+**Status**: Phase 1 (notify) implemented in `keycast.updates`; Phase 2 (in-place
+self-update of a downloaded Release build) is a deferred follow-up. Full design
+and rationale in [ADR-002](adr/002-update-check.md) (covers source detection, the
 `check_for_updates` opt-out, GitHub Releases API check via stdlib `urllib`,
 24 h throttle in a separate state file, and the Phase 1 / Phase 2 split).
 

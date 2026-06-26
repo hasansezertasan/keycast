@@ -2,12 +2,12 @@
 
 ## Status
 
-Proposed — 2026-06-24. Documents the design contract for GitHub issue
+Accepted — 2026-06-25. Documents the design contract for GitHub issue
 [#9](https://github.com/hasansezertasan/keycast/issues/9) ("In-app update /
-version check") ahead of implementation, per the project's Document-Driven
-Development workflow. **Phase 1** (automatic background notify, no dedicated
-command) is specified for implementation; **Phase 2** (the `keycast update`
-verb + in-place self-update of the frozen executable) is specified as a
+version check"); the contract was written first, per the project's
+Document-Driven Development workflow. **Phase 1** (automatic background notify,
+no dedicated command) is **implemented** in `keycast.updates`; **Phase 2** (the
+`keycast update` verb + in-place self-update of the frozen executable) is a
 committed follow-up and is *not* built yet.
 
 Builds on [ADR-001](001-desktop-app-packaging.md), which established the three
@@ -187,10 +187,13 @@ pattern:
 - **New runtime dependency:** `packaging` is added to `[project.dependencies]`
   (PEP 440 comparison; see [Version comparison](#version-comparison)). It is the
   only new dependency — the HTTP call uses stdlib `urllib`.
-- **New module:** `keycast.updates` (source detection, version compare,
-  throttle-file I/O, GitHub fetch, and the check callback). No new CLI
-  subcommand in Phase 1 — the check is invoked from the existing Typer root
-  callback in `cli.py`; the `keycast update` verb is reserved for Phase 2.
+- **New package:** `keycast.updates` (source detection, version compare,
+  throttle-file I/O, GitHub fetch, and the check callback). It is split into
+  modules by concern — `sources`, `versions`, `state`, and the `__init__`
+  orchestrator — and anchors non-frozen detection on the stdlib `INSTALLER`
+  record; both decisions are recorded in [ADR-005](005-updates-package-structure.md).
+  No new CLI subcommand in Phase 1 — the check is invoked from the existing Typer
+  root callback in `cli.py`; the `keycast update` verb is reserved for Phase 2.
 - **`keycast info` change:** gains an `Install source:` line. This is additive
   output; `tests/test_docs_contract.py` does not pin `info`'s text, so no
   contract change is needed for it (only the `check_for_updates` flag triggers
@@ -201,10 +204,10 @@ pattern:
 - **Network behavior:** keycast makes at most one outbound request per 24 h,
   in the background. All optional and opt-out-able; fully offline-safe. Privacy
   note added to README and `docs/PROJECT_OVERVIEW.md` (Security & Privacy).
-- **Docs (DDD):** this ADR is the rationale; README gains an **Updates** section
+- **Docs (DDD):** this ADR is the rationale; README has an **Updates** section
   and the `check_for_updates` flag in the config example; `docs/API.md` documents
-  the flag. Until Phase 1 lands, those entries are marked **Planned** so the docs
-  stay truthful.
+  the flag. (These shipped as the contract before Phase 1 code, then had their
+  "Planned" markers removed once it landed.)
 - **Phase 2 triggers:** acquiring an Apple Developer ID (per ADR-001's supersede
   trigger) is a prerequisite for a safe macOS self-update; Windows self-update
   can proceed independently. Phase 2 should be recorded as its own ADR when built.
