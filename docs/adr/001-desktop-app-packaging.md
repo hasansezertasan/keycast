@@ -151,6 +151,12 @@ account is in use yet.
 - **Future / supersede triggers:** acquiring an Apple Developer account would add
   Developer-ID signing + notarization (removing the Gatekeeper friction) and
   should be recorded as a follow-up ADR superseding this one's "unsigned" stance.
+  As of 2026-06-26 this is **deferred** — signing/notarization (#4) and the
+  hardened-runtime entitlements file (#5) are closed as *not planned*, gated on
+  the Apple Developer Program ($99/yr); the cost, not the engineering, is the
+  blocker. This mirrors the Windows Authenticode decision (#6, also closed as
+  cost-gated). The "unsigned" stance therefore stands, and the right-click→Open
+  workaround remains the documented stopgap until a certificate is acquired.
 
 ### Validation limits
 
