@@ -73,6 +73,7 @@ class TestInstallerMarker:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         (tmp_path / sources._INSTALLER_MARKER_NAME).write_text("windows-installer")
+        monkeypatch.setattr(sources.sys, "platform", "win32")
         monkeypatch.setattr(sources.sys, "executable", str(tmp_path / "keycast.exe"))
         assert sources._installer_marker_exists() is True
 
@@ -80,7 +81,18 @@ class TestInstallerMarker:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         # A zip extraction has no marker file beside the exe.
+        monkeypatch.setattr(sources.sys, "platform", "win32")
         monkeypatch.setattr(sources.sys, "executable", str(tmp_path / "keycast.exe"))
+        assert sources._installer_marker_exists() is False
+
+    def test_absent_off_windows_even_with_marker(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A stray .install-source beside a frozen macOS/Linux build must never
+        # read as a Windows install — the probe is gated on the platform.
+        (tmp_path / sources._INSTALLER_MARKER_NAME).write_text("windows-installer")
+        monkeypatch.setattr(sources.sys, "platform", "darwin")
+        monkeypatch.setattr(sources.sys, "executable", str(tmp_path / "keycast"))
         assert sources._installer_marker_exists() is False
 
 
@@ -215,6 +227,22 @@ class TestDetectInstallSource:
             == InstallSource.GITHUB_RELEASE
         )
 
+    def test_frozen_uses_installer_marker_probe_by_default(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # With no installer_marker_exists arg, the real _installer_marker_exists
+        # probe runs: a marker dropped beside sys.executable flips the result to
+        # WINDOWS_INSTALLER. Pins the default wiring on the positive path.
+        (tmp_path / sources._INSTALLER_MARKER_NAME).write_text("windows-installer")
+        monkeypatch.setattr(sources.sys, "platform", "win32")
+        monkeypatch.setattr(sources.sys, "executable", str(tmp_path / "keycast.exe"))
+        assert (
+            sources.detect_install_source(
+                frozen=True, cask_receipt_exists=lambda: False
+            )
+            == InstallSource.WINDOWS_INSTALLER
+        )
+
     def test_pipx_by_path(self) -> None:
         loc = Path("/home/u/.local/pipx/venvs/keycast/lib/keycast/updates/sources.py")
         assert (
@@ -335,3 +363,11 @@ class TestRecommendedActionAndLabels:
     def test_labels_cover_every_source(self) -> None:
         for source in InstallSource:
             assert isinstance(sources.install_source_label(source), str)
+
+    def test_windows_installer_label_is_exact(self) -> None:
+        # User-facing string (shown by `keycast info`); pin it so a typo can't
+        # ship silently — the cover-every-source test only checks the type.
+        assert (
+            sources.install_source_label(InstallSource.WINDOWS_INSTALLER)
+            == "Windows installer"
+        )

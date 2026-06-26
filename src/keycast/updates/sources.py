@@ -122,9 +122,16 @@ def _installer_marker_exists() -> bool:
     frozen ``keycast.exe``). The zip extraction has no such file, so this is the
     signal used to recommend the installer/uninstall path over a zip re-download.
 
+    Guarded by a Windows platform check: only the Inno installer writes this
+    marker, so a stray ``.install-source`` beside a frozen macOS/Linux build must
+    never classify as :data:`InstallSource.WINDOWS_INSTALLER`.
+
     Returns:
-        True if the marker file exists alongside the running executable.
+        True if running on Windows and the marker file exists alongside the
+        running executable.
     """
+    if sys.platform != "win32":
+        return False
     return (Path(sys.executable).parent / _INSTALLER_MARKER_NAME).exists()
 
 

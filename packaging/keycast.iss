@@ -47,11 +47,14 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 ; keycast is x64-only (single-arch Astral CPython bundle); refuse to install on
-; arches that cannot run it rather than fail mysteriously at first launch. `x64`
-; is the value that compiles across all Inno 6.x (the newer `x64compatible` alias
-; needs 6.3+, not guaranteed on the runner).
-ArchitecturesAllowed=x64
-ArchitecturesInstallIn64BitMode=x64
+; arches that cannot run it rather than fail mysteriously at first launch.
+; `x64compatible` matches native x64 Windows AND Arm64 Win11 (which runs the x64
+; bundle under emulation), so Arm64 users get a working install instead of being
+; turned away — the deprecated `x64` alias would exclude them. It needs Inno 6.3+;
+; the windows-latest runner ships a newer release, and CI compiles this script on
+; every PR, so an unsupported directive fails the gate long before release.
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
 Compression=lzma2
 SolidCompression=yes
