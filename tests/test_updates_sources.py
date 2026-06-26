@@ -243,6 +243,23 @@ class TestDetectInstallSource:
             == InstallSource.WINDOWS_INSTALLER
         )
 
+    def test_installer_marker_not_probed_when_not_frozen(self) -> None:
+        # The marker branch lives entirely inside `if frozen:`. A non-frozen
+        # (pip/pipx/...) install must never be classified by the marker, even if
+        # the probe would say True — pins that the probe stays behind the frozen
+        # gate against a future refactor.
+        loc = Path("/home/u/.local/pipx/venvs/keycast/lib/keycast/updates/sources.py")
+        assert (
+            sources.detect_install_source(
+                frozen=False,
+                location=loc,
+                env={},
+                read_installer=_none,
+                installer_marker_exists=lambda: True,
+            )
+            == InstallSource.PIPX
+        )
+
     def test_pipx_by_path(self) -> None:
         loc = Path("/home/u/.local/pipx/venvs/keycast/lib/keycast/updates/sources.py")
         assert (

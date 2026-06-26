@@ -32,9 +32,10 @@ motivation: the goal is install/uninstall hygiene, not publisher trust.
 ## Decision
 
 - **Toolchain: Inno Setup.** Compile `packaging/keycast.iss` with `iscc.exe`,
-  which is **pre-installed on GitHub's `windows-latest` runners** — no
-  toolchain-install step. It wraps the existing `dist/keycast/` folder; no change
-  to `keycast.spec`.
+  which **ships in GitHub's `windows-latest` runner image** — no
+  toolchain-install step (if a future image drops InnoSetup, the CI compile gate
+  fails and an install step is added). It wraps the existing `dist/keycast/`
+  folder; no change to `keycast.spec`.
 - **Ship both.** Add `keycast-setup.exe` as a release asset and **keep**
   `keycast-windows.zip`. The installer is for normal users; the zip stays the
   portable / no-admin / locked-down option.

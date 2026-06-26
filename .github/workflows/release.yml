@@ -164,12 +164,13 @@ jobs:
         run: Compress-Archive -Path dist/keycast -DestinationPath keycast-windows.zip
       - name: Build the installer (Inno Setup)
         shell: pwsh
-        # iscc.exe is pre-installed on windows-latest runners. Inject the release
+        # iscc.exe ships in the windows-latest runner image (if a future image
+        # drops InnoSetup, add an install step here). Inject the release
         # version (the tag is the single source of truth, like hatch-vcs) so the
         # installer's version matches the bundled __version__. Both
         # keycast-setup.exe and keycast-windows.zip ship as assets — the installer
         # for normal users, the zip as the portable / no-admin option.
-        run: iscc /DMyAppVersion=${{ needs.release-please.outputs.version }} packaging\keycast.iss
+        run: iscc /DMyAppVersion=${{ needs.release-please.outputs.version }} packaging/keycast.iss
       - name: Upload the .zip and the installer
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

@@ -210,8 +210,10 @@ jobs:
         shell: pwsh
         # A broken keycast.iss would block the atomic release (release.yml's
         # publish-pypi needs build-windows), so compile it here on every PR.
-        # iscc.exe is pre-installed on windows-latest; no version flag, so the
-        # script's 0.0.0 default is used. Assert the installer actually emerged.
+        # iscc.exe ships in the windows-latest runner image (InnoSetup, verify on
+        # the runner-image readme); if a future image drops it, add an install
+        # step. No version flag here, so the script's 0.0.0 default is used.
+        # Assert the installer actually emerged.
         run: |
           iscc packaging/keycast.iss
           if (-not (Test-Path packaging/keycast-setup.exe)) {
