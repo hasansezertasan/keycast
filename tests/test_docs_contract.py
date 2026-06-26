@@ -15,7 +15,9 @@ layer: ``co_varnames`` is read directly so PEP 649 deferred annotations (and
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from keycast.application import Keycast
@@ -179,3 +181,68 @@ class TestDocumentedSettingsClasses:
             LoggingSettings,
         ):
             assert isinstance(cls, type)
+
+
+_PACKAGING = Path(__file__).resolve().parent.parent / "packaging"
+
+
+def _coord_pair(text: str, pattern: str) -> tuple[int, int]:
+    """Extract a two-int ``(x, y)`` tuple matched by ``pattern`` (two groups)."""
+    m = re.search(pattern, text)
+    assert m is not None, f"pattern not found: {pattern}"
+    return int(m.group(1)), int(m.group(2))
+
+
+class TestDmgBackgroundCoordinateContract:
+    """The .dmg background and dmgbuild layout share one coordinate system.
+
+    ``make_dmg_background.py`` hard-codes ``APP_CENTER``/``APPS_CENTER`` and the
+    window size, then draws the drag arrow into the gap between those centres;
+    ``dmg_settings.py`` independently lists ``icon_locations`` and
+    ``window_rect``. Nothing at runtime links the two -- move an icon in the
+    settings file and the committed background's arrow misaligns silently. Both
+    files carry comments asserting they MUST match; these tests are the
+    enforcement. They parse the source textually because neither module is
+    importable here (``dmg_settings.py`` needs dmgbuild's injected ``defines``;
+    ``make_dmg_background.py`` needs Pillow, not a project dependency).
+    """
+
+    def _settings_src(self) -> str:
+        return (_PACKAGING / "dmg_settings.py").read_text(encoding="utf-8")
+
+    def _background_src(self) -> str:
+        return (_PACKAGING / "make_dmg_background.py").read_text(encoding="utf-8")
+
+    def test_icon_centres_match(self) -> None:
+        settings, background = self._settings_src(), self._background_src()
+        # dmg_settings.py: appname -> (x, y); Applications -> (x, y)
+        app_loc = _coord_pair(settings, r"appname:\s*\((\d+),\s*(\d+)\)")
+        apps_loc = _coord_pair(settings, r'"Applications":\s*\((\d+),\s*(\d+)\)')
+        # make_dmg_background.py: APP_CENTER / APPS_CENTER
+        app_centre = _coord_pair(background, r"APP_CENTER\s*=\s*\((\d+),\s*(\d+)\)")
+        apps_centre = _coord_pair(background, r"APPS_CENTER\s*=\s*\((\d+),\s*(\d+)\)")
+        assert app_loc == app_centre
+        assert apps_loc == apps_centre
+
+    def test_window_size_matches(self) -> None:
+        # window_rect = ((x, y), (w, h)) in settings vs WIN_W, WIN_H in generator.
+        win = _coord_pair(
+            self._settings_src(),
+            r"window_rect\s*=\s*\(\(\d+,\s*\d+\),\s*\((\d+),\s*(\d+)\)\)",
+        )
+        gen = _coord_pair(
+            self._background_src(), r"WIN_W,\s*WIN_H\s*=\s*(\d+),\s*(\d+)"
+        )
+        assert win == gen
+
+    def test_arrow_stays_in_the_icon_gap(self) -> None:
+        # The arrow's hard-coded x-span must sit between the two icon edges, or
+        # it overlaps the icons Finder paints on top. icon_size is the full
+        # width; centres are the icon midpoints.
+        settings, background = self._settings_src(), self._background_src()
+        icon_size = int(re.search(r"icon_size\s*=\s*(\d+)", settings).group(1))  # type: ignore[union-attr]
+        app_x = _coord_pair(settings, r"appname:\s*\((\d+),\s*(\d+)\)")[0]
+        apps_x = _coord_pair(settings, r'"Applications":\s*\((\d+),\s*(\d+)\)')[0]
+        x0, x1 = _coord_pair(background, r"x0,\s*x1\s*=\s*round\((\d+).*?round\((\d+)")
+        assert app_x + icon_size // 2 <= x0, "arrow starts under the app icon"
+        assert x1 <= apps_x - icon_size // 2, "arrow ends under /Applications"

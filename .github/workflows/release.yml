@@ -109,9 +109,12 @@ jobs:
           uv pip install --python .venv-pkg/bin/python . pyinstaller==6.16.0
           .venv-pkg/bin/pyinstaller --noconfirm packaging/keycast.spec
       - name: Package the .app into a .dmg
+        # dmgbuild writes the Finder layout (.DS_Store) directly, so the
+        # drag-to-Applications styling is produced headlessly — no Finder /
+        # AppleScript, unlike create-dmg. Layout lives in packaging/dmg_settings.py.
         run: |
-          hdiutil create -volname keycast \
-            -srcfolder dist/keycast.app -ov -format UDZO keycast.dmg
+          uvx dmgbuild -s packaging/dmg_settings.py -D app=dist/keycast.app \
+            keycast keycast.dmg
           echo "sha256 (for the Homebrew cask):"
           shasum -a 256 keycast.dmg
       - name: Upload the .dmg
