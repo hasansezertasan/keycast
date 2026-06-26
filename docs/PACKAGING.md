@@ -329,11 +329,12 @@ next scheduled run still bumps the manifests.
 
 ### One-time setup
 
-1. **Create the bucket** `hasansezertasan/scoop-bucket` with the two manifests
-   under `bucket/`, the updater under `scripts/`, and the dispatch + cron + CI
-   workflows (the `update-manifest-dispatch.yml` workflow **must** listen for
-   `repository_dispatch: [update-manifest]` so the `bump-scoop` dispatch reaches
-   it). A draft of every file is generated alongside this change.
+1. **The bucket** lives at
+   [`hasansezertasan/scoop-bucket`](https://github.com/hasansezertasan/scoop-bucket):
+   the two manifests under `bucket/`, the updater under `scripts/`, and the
+   dispatch + cron + CI workflows. The `update-manifest-dispatch.yml` workflow
+   **must** listen for `repository_dispatch: [update-manifest]` so the
+   `bump-scoop` dispatch reaches it.
 2. **Create a fine-grained PAT** scoped to **only** `hasansezertasan/scoop-bucket`
    with **Contents: Read and write** (to fire the dispatch).
 3. **Store it** on the keycast repo as the `BUCKET_TOKEN` secret. Without

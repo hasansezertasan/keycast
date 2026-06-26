@@ -78,12 +78,18 @@ def _is_under(location_posix: str, raw_dir: str) -> bool:
         location_posix: ``location.as_posix().lower()`` of the package.
         raw_dir: The candidate parent directory (env-supplied, any separator).
 
+    Matching is at a path boundary, not a bare prefix: a sibling whose name
+    merely *starts with* ``raw_dir`` (``D:\\toolsX`` vs root ``D:\\tools``) is not
+    "under" it, so the location must equal the root or sit beneath its trailing
+    separator.
+
     Returns:
         True only when ``raw_dir`` is non-empty and contains ``location_posix``.
     """
     if not raw_dir:
         return False
-    return location_posix.startswith(Path(raw_dir).as_posix().lower())
+    root = Path(raw_dir).as_posix().lower().rstrip("/")
+    return location_posix == root or location_posix.startswith(root + "/")
 
 
 def _homebrew_cask_receipt_exists() -> bool:

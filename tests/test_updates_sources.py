@@ -71,6 +71,20 @@ class TestScoopSource:
             is InstallSource.SCOOP_GLOBAL
         )
 
+    def test_global_env_root_wins_over_per_user_path_marker(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A bundle under a custom SCOOP_GLOBAL root whose path *also* contains the
+        # per-user "/scoop/apps/keycast/" fragment must still classify as global —
+        # the SCOOP_GLOBAL env check runs before the per-user marker. Pins the
+        # precedence against a future reorder that would wrongly drop the `-g`.
+        monkeypatch.setattr(sources, "Path", PureWindowsPath)
+        posix = "d:/gscoop/scoop/apps/keycast/current/keycast.exe"
+        assert (
+            sources._scoop_source(posix, {"SCOOP_GLOBAL": r"D:\gscoop"})
+            is InstallSource.SCOOP_GLOBAL
+        )
+
     def test_env_set_but_package_elsewhere_is_ignored(self) -> None:
         posix = "c:/program files/keycast/keycast.exe"
         assert sources._scoop_source(posix, {"SCOOP": r"C:\Users\U\scoop"}) is None
@@ -146,6 +160,13 @@ class TestIsUnder:
 
     def test_posix_dir_contains_location(self) -> None:
         assert sources._is_under("/opt/elsewhere/keycast/x.py", "/opt/elsewhere")
+
+    def test_sibling_prefix_does_not_match(self) -> None:
+        # Boundary, not bare prefix: a sibling whose name merely starts with the
+        # root must not match (D:\toolsX is not under D:\tools).
+        assert sources._is_under("/opt/elsewhere2/keycast/x.py", "/opt/elsewhere") is (
+            False
+        )
 
     def test_normalizes_windows_backslashes(
         self, monkeypatch: pytest.MonkeyPatch
