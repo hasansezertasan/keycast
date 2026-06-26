@@ -37,6 +37,7 @@ class InstallSource(enum.Enum):
     HOMEBREW_CASK = "homebrew-cask"
     GITHUB_RELEASE = "github-release"
     WINDOWS_INSTALLER = "windows-installer"
+    SCOOP = "scoop"
     UNKNOWN = "unknown"
 
 
@@ -137,6 +138,42 @@ def _installer_marker_exists() -> bool:
     return (Path(sys.executable).parent / _INSTALLER_MARKER_NAME).exists()
 
 
+_SCOOP_PATH_MARKER = "/scoop/apps/keycast/"
+"""Lower-cased POSIX fragment marking a Scoop-managed keycast install.
+
+Scoop extracts the *same* ``keycast-windows.zip`` bundle as a manual download —
+no ``.install-source`` marker, no Caskroom-style receipt — under
+``~/scoop/apps/keycast/current/``. The Scoop signal is therefore the *location*
+itself: this path fragment for the default root, plus the ``SCOOP`` /
+``SCOOP_GLOBAL`` env vars for custom roots (see :func:`_looks_scoop`).
+"""
+
+_SCOOP_ENV_VARS = ("SCOOP", "SCOOP_GLOBAL")
+"""Env vars naming a (possibly relocated) Scoop root — per-user and global."""
+
+
+def _looks_scoop(location_posix: str, env: dict[str, str]) -> bool:
+    """Return whether a frozen bundle looks Scoop-managed.
+
+    Two signals, OR'd: the default-root path fragment
+    (:data:`_SCOOP_PATH_MARKER`), and containment under a custom root named by
+    ``SCOOP`` / ``SCOOP_GLOBAL``. The env path is reused via :func:`_is_under`,
+    so an env var being merely *set* (empty, or pointing elsewhere) never
+    matches — only a bundle that actually lives under the named root does.
+
+    Args:
+        location_posix: ``location.as_posix().lower()`` of the bundle executable.
+        env: The process environment to consult for the Scoop root vars.
+
+    Returns:
+        True if the path marker is present, or the bundle lives under a
+        configured Scoop root.
+    """
+    if _SCOOP_PATH_MARKER in location_posix:
+        return True
+    return any(_is_under(location_posix, env.get(var, "")) for var in _SCOOP_ENV_VARS)
+
+
 def _read_installer(dist_name: str = "keycast") -> str | None:
     """Return the recorded ``INSTALLER`` for the distribution, lower-cased.
 
@@ -206,6 +243,11 @@ def detect_install_source(
         # Inno drops beside the exe is the only thing that tells them apart.
         if installer_marker_exists():
             return InstallSource.WINDOWS_INSTALLER
+        # Scoop extracts the same bundle as a manual download (no marker); its
+        # location under ~/scoop/apps/keycast/ — or a custom SCOOP root — is the
+        # only signal, so it is checked before the GitHub-release fallback.
+        if _looks_scoop(posix, env):
+            return InstallSource.SCOOP
         return InstallSource.GITHUB_RELEASE
 
     location = Path(__file__) if location is None else location
@@ -234,6 +276,7 @@ _UPGRADE_COMMANDS: dict[InstallSource, str] = {
     InstallSource.UV_TOOL: "uv tool upgrade keycast",
     InstallSource.HOMEBREW_FORMULA: "brew upgrade keycast",
     InstallSource.HOMEBREW_CASK: "brew upgrade --cask keycast",
+    InstallSource.SCOOP: "scoop update keycast",
 }
 
 _SOURCE_LABELS: dict[InstallSource, str] = {
@@ -244,6 +287,7 @@ _SOURCE_LABELS: dict[InstallSource, str] = {
     InstallSource.HOMEBREW_CASK: "Homebrew cask",
     InstallSource.GITHUB_RELEASE: "GitHub release download",
     InstallSource.WINDOWS_INSTALLER: "Windows installer",
+    InstallSource.SCOOP: "Scoop",
     InstallSource.UNKNOWN: "unknown",
 }
 

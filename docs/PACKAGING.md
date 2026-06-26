@@ -144,6 +144,16 @@ rather than `GITHUB_RELEASE` (the Windows analogue of the macOS Caskroom
 receipt). The installer is **unsigned**, same as the bundle (see
 [ADR-006](adr/006-windows-installer.md) and the SmartScreen note in `README.md`).
 
+A third Windows channel reuses the **same `keycast-windows.zip`**: a
+[Scoop](https://scoop.sh) bucket whose `keycast.json` manifest points at that
+asset. A Scoop install carries neither the installer marker nor a Caskroom-style
+receipt — it is simply the bundle extracted under `~/scoop/apps/keycast/current/`
+(or a relocated `$SCOOP` / `$SCOOP_GLOBAL` root). `detect_install_source()`
+classifies it as `SCOOP` from that location alone (path fragment + env-root
+fallback), checked after the installer marker and before the `GITHUB_RELEASE`
+fallback, so the three Windows channels stay separable by orthogonal signals.
+The bucket repo and its manifest live outside this repository.
+
 ## Release & CI
 
 The release pipeline (`.github/workflows/release.yml`, workflow name **Release**)
@@ -269,6 +279,64 @@ release is published, so a tap hiccup cannot block or unwind a shipped release.
 
 After this, the cask is edited only by `bump-cask-pr` in the tap; if a static
 stanza ever changes (caveats, signing later), edit it in the tap directly.
+
+## Scoop bucket
+
+keycast is also distributed through a [Scoop](https://scoop.sh) bucket
+(`hasansezertasan/scoop-bucket`). Mirroring the tap's **formula + cask** split,
+the bucket carries **two manifests** — Scoop has no formula/cask namespace, so
+each is a distinct installable name:
+
+| Manifest | Mirrors | Install | `checkver` source | `keycast info` reports |
+|---|---|---|---|---|
+| `keycast` | the **cask** | downloads `keycast-windows.zip`, shims `keycast.exe` | GitHub Releases | `Install source: scoop` |
+| `keycast-pipx` | the **formula** | `pipx install keycast` (a pipx shim; `"depends": "pipx"`) | PyPI | `Install source: pipx` |
+
+> The `keycast-pipx` route installs *through* pipx, so the running process lives
+> in a pipx venv and `detect_install_source()` reports **`PIPX`**, not `SCOOP` —
+> exactly as the tap's *formula* reports `HOMEBREW_FORMULA`, not a cask. Only the
+> binary `keycast` manifest yields `SCOOP`. This is intended, not a bug.
+
+As with the cask, this repo keeps **no** copy of either manifest — the bucket
+owns them and bumps them automatically.
+
+### How it bumps (dispatch + cron, PR-based)
+
+In the bucket, a Python updater re-derives each manifest's version from its
+**own** source (GitHub Releases for `keycast`, PyPI for `keycast-pipx`),
+recomputes the `.zip`
+`hash` for the binary manifest, and opens a **PR** via `peter-evans/create-pull-request`
+using the **bucket's own `GITHUB_TOKEN`**. It is driven two ways: a **cron**
+(the source of truth and safety net) and a **`repository_dispatch`** (`update-manifest`)
+that the package repo fires for promptness.
+
+`release.yml`'s `bump-scoop` job is that dispatch: after the release is published
+it `POST`s `repos/…/scoop-bucket/dispatches` so the bucket bumps immediately
+instead of waiting for its cron. The job is **best-effort and outside the atomic
+release gate** (mirrors `bump-cask`); if the dispatch is skipped or fails, the
+next scheduled run still bumps the manifests.
+
+> **Why a PAT:** `repository_dispatch` is cross-repo, which the automatic
+> `GITHUB_TOKEN` cannot do. The `bump-scoop` job needs a fine-grained PAT with
+> **Contents: write** scoped to **only** the bucket, in the `BUCKET_TOKEN`
+> secret. When it is absent the step warns and exits 0 — and the bucket's cron
+> still keeps both manifests current.
+
+### One-time setup
+
+1. **Create the bucket** `hasansezertasan/scoop-bucket` with the two manifests
+   under `bucket/`, the updater under `scripts/`, and the dispatch + cron + CI
+   workflows (the `update-manifest-dispatch.yml` workflow **must** listen for
+   `repository_dispatch: [update-manifest]` so the `bump-scoop` dispatch reaches
+   it). A draft of every file is generated alongside this change.
+2. **Create a fine-grained PAT** scoped to **only** `hasansezertasan/scoop-bucket`
+   with **Contents: Read and write** (to fire the dispatch).
+3. **Store it** on the keycast repo as the `BUCKET_TOKEN` secret. Without
+   it, the `bump-scoop` job warns and skips — releases still succeed.
+
+After this, the manifests are edited only by the bucket's updater; users install
+with `scoop bucket add keycast https://github.com/hasansezertasan/scoop-bucket`
+then `scoop install keycast` (or `keycast-pipx`).
 
 ## Local reproduction
 
