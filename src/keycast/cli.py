@@ -26,6 +26,11 @@ def main(ctx: typer.Context) -> None:
         # available" notice on stderr so it never corrupts the parseable stdout
         # of `version`/`info`. The GUI launch path notifies via the overlay
         # instead (see Keycast.start), so it is handled there, not here.
+        # Note: the notice is read from cache (no network here). The background
+        # refresh that *populates* that cache is a daemon thread, so a short-lived
+        # CLI process usually exits before it finishes — the cache is realistically
+        # refreshed by a long-lived GUI run instead. This is the deliberate
+        # npm-style tradeoff from ADR-002 (keeps `version`/`info` instant).
         from keycast.updates import notify_pending_update
 
         notify_pending_update(notify=lambda message: typer.echo(message, err=True))

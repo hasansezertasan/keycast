@@ -9,6 +9,7 @@ defensive posture of ``Settings.create_settings_file``.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import os
@@ -81,13 +82,9 @@ def write_state(state: UpdateState, path: Path = UPDATE_CHECK_FILE_PATH) -> None
         fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as tmp_file:
-                json.dump(
-                    {
-                        "last_checked": state.last_checked,
-                        "last_seen_tag": state.last_seen_tag,
-                    },
-                    tmp_file,
-                )
+                # Derive the JSON keys from the dataclass fields so a future
+                # field rename can't silently drift the on-disk schema.
+                json.dump(dataclasses.asdict(state), tmp_file)
             os.replace(tmp_name, path)
         except BaseException:
             Path(tmp_name).unlink(missing_ok=True)

@@ -7,7 +7,7 @@ set or an ``INSTALLER`` record of its own) cannot leak into the assertions.
 
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from unittest.mock import MagicMock
 
 import pytest
@@ -64,6 +64,28 @@ class TestHomebrewCaskReceipt:
         monkeypatch.setattr(sources, "_HOMEBREW_CASK_PREFIXES", (str(tmp_path),))
         monkeypatch.delenv("HOMEBREW_PREFIX", raising=False)
         assert sources._homebrew_cask_receipt_exists() is False
+
+
+class TestIsUnder:
+    """The env-dir containment check, including Windows-path normalization."""
+
+    def test_empty_dir_never_matches(self) -> None:
+        # An env var being *set to empty* is not evidence of where keycast lives.
+        assert sources._is_under("/home/u/.local/uv/tools/keycast", "") is False
+
+    def test_posix_dir_contains_location(self) -> None:
+        assert sources._is_under("/opt/elsewhere/keycast/x.py", "/opt/elsewhere")
+
+    def test_normalizes_windows_backslashes(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The env dir arrives with native Windows backslashes; the function must
+        # normalize it to lower-cased POSIX before comparing. Patching Path to
+        # PureWindowsPath reproduces a Windows host on a POSIX CI runner, so this
+        # pins the documented normalization independent of the test machine.
+        monkeypatch.setattr(sources, "Path", PureWindowsPath)
+        location_posix = "c:/users/u/.local/uv/tools/keycast/lib/sources.py"
+        assert sources._is_under(location_posix, r"C:\Users\U\.local\uv\tools") is True
 
 
 class TestReadInstaller:

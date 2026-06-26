@@ -116,6 +116,9 @@ def _update_enabled() -> bool:
 
         return bool(Settings().check_for_updates)
     except Exception:
+        logger.debug(
+            "Could not read check_for_updates; defaulting to enabled", exc_info=True
+        )
         return True
 
 
@@ -154,11 +157,20 @@ def notify_pending_update(
     if not enabled:
         return
 
-    now = time.time() if now is None else now
-    state = read_state(state_path)
+    # Outer guard: this runs on a *foreground* path (Keycast.start on the main
+    # thread; the Typer root callback for the CLI), so an unexpected raise here
+    # would abort app startup or crash `version`/`info`. detect_install_source()
+    # touches the filesystem and `notify` is a caller-supplied sink — neither is
+    # contractually raise-free — so the whole hot path degrades silently at DEBUG
+    # to honor the "never crash the caller" promise (ADR-002 offline-safety).
+    try:
+        now = time.time() if now is None else now
+        state = read_state(state_path)
 
-    if state.last_seen_tag and is_newer(state.last_seen_tag, current):
-        notify(format_notice(state.last_seen_tag, detect_install_source()))
+        if state.last_seen_tag and is_newer(state.last_seen_tag, current):
+            notify(format_notice(state.last_seen_tag, detect_install_source()))
 
-    if due_for_check(state, now, interval):
-        spawn(lambda: refresh_state(now, path=state_path, fetch=fetch))
+        if due_for_check(state, now, interval):
+            spawn(lambda: refresh_state(now, path=state_path, fetch=fetch))
+    except Exception:
+        logger.debug("Update notice hot path failed", exc_info=True)

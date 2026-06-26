@@ -109,6 +109,10 @@ class Keycast:
             # network refresh runs on a background daemon thread; any notice it
             # turns up appears on a later launch (see keycast.updates). Skipped on
             # a minimized start, like the splash, since the overlay is hidden.
+            # Tradeoff: when a notice *is* pending it replaces the version splash
+            # above on the single overlay — acceptable, the actionable upgrade
+            # line is the more useful thing to show, and it only fires when an
+            # update actually exists (the common, no-update case keeps the splash).
             notify_pending_update(
                 notify=self.display_window.show_text,
                 current=__version__,

@@ -205,6 +205,17 @@ _SOURCE_LABELS: dict[InstallSource, str] = {
     InstallSource.UNKNOWN: "unknown",
 }
 
+# Fail fast at import if a new InstallSource is added without wiring it up: every
+# member needs a label, and every member except the two URL-fallback sources
+# (GitHub download / unknown — where guessing a command would be wrong) needs an
+# upgrade command. Converts an otherwise-latent runtime KeyError into a loud
+# developer error at module load.
+assert set(_SOURCE_LABELS) == set(InstallSource), "every InstallSource needs a label"
+assert set(_UPGRADE_COMMANDS) | {
+    InstallSource.GITHUB_RELEASE,
+    InstallSource.UNKNOWN,
+} == set(InstallSource), "every non-URL-fallback InstallSource needs an upgrade command"
+
 
 def recommended_action(source: InstallSource) -> str:
     """Return the upgrade command for ``source``, or the Releases URL.

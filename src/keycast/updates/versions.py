@@ -32,11 +32,13 @@ REQUEST_TIMEOUT_SECONDS: float = 5.0
 def strip_v(tag: str) -> str:
     """Drop a single leading ``v`` from a release tag (``v0.3.0`` -> ``0.3.0``).
 
+    Case-insensitive: an uppercase ``V`` is stripped too (``V1.0`` -> ``1.0``).
+
     Args:
         tag: A release tag or version string.
 
     Returns:
-        The tag without a leading ``v``.
+        The tag without a leading ``v``/``V``.
     """
     return tag[1:] if tag[:1] in {"v", "V"} else tag
 
@@ -85,7 +87,10 @@ def fetch_latest_release_tag(timeout: float = REQUEST_TIMEOUT_SECONDS) -> str | 
         with urllib.request.urlopen(request, timeout=timeout) as response:
             payload = json.load(response)
     except Exception:
-        logger.debug("Update check could not reach GitHub", exc_info=True)
+        # Network, timeout, rate-limit (HTTP 403/429), and JSON-parse errors all
+        # land here; the traceback says which, so keep the message neutral rather
+        # than asserting "could not reach GitHub" (wrong for a 403 or bad body).
+        logger.debug("Update check failed", exc_info=True)
         return None
     tag = payload.get("tag_name") if isinstance(payload, dict) else None
     return tag if isinstance(tag, str) else None

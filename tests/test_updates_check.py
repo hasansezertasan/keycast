@@ -39,6 +39,13 @@ class TestRefreshState:
         updates.refresh_state(now=10.0, path=path, fetch=lambda: None)
         assert updates.read_state(path) == UpdateState(10.0, "v0.5.0")
 
+    def test_empty_string_fetch_keeps_previous_tag(self, tmp_path: Path) -> None:
+        # `tag or previous` must treat an empty string like None, not store "".
+        path = tmp_path / "u.json"
+        updates.write_state(UpdateState(1.0, "v0.5.0"), path)
+        updates.refresh_state(now=10.0, path=path, fetch=lambda: "")
+        assert updates.read_state(path) == UpdateState(10.0, "v0.5.0")
+
 
 class TestSpawnDaemon:
     """The background runner."""
@@ -101,6 +108,50 @@ class TestNotifyPendingUpdate:
         )
         assert any("9.9.9 available" in note for note in notes)
         assert spawned == []
+
+    def test_notifies_and_spawns_together_when_newer_and_due(
+        self, tmp_path: Path
+    ) -> None:
+        # The notify and the refresh are independent `if`s; this locks in that a
+        # single call does both when a newer tag is cached *and* the window elapsed.
+        path = tmp_path / "u.json"
+        updates.write_state(UpdateState(last_checked=0.0, last_seen_tag="v9.9.9"), path)
+        notes: list[str] = []
+        spawned: list[object] = []
+        updates.notify_pending_update(
+            notify=notes.append,
+            current="0.1.0",
+            enabled=True,
+            state_path=path,
+            now=10_000.0,
+            interval=100,  # 10_000 - 0 >= 100: due
+            fetch=lambda: "v9.9.9",
+            spawn=spawned.append,
+        )
+        assert any("9.9.9 available" in note for note in notes)
+        assert len(spawned) == 1
+
+    def test_hot_path_failure_is_swallowed(self, tmp_path: Path) -> None:
+        # The foreground guard must never let a raising sink crash the caller
+        # (Keycast.start / the Typer callback). A newer tag is cached so the
+        # notify path runs; notify raises and the call still returns cleanly.
+        path = tmp_path / "u.json"
+        updates.write_state(
+            UpdateState(last_checked=1000.0, last_seen_tag="v9.9.9"), path
+        )
+
+        def boom(_message: str) -> None:
+            raise RuntimeError("sink exploded")
+
+        updates.notify_pending_update(
+            notify=boom,
+            current="0.1.0",
+            enabled=True,
+            state_path=path,
+            now=1000.0,
+            interval=10_000,  # within window: no spawn, only the notify path
+            spawn=lambda _f: None,
+        )
 
     def test_no_notice_when_not_newer(self, tmp_path: Path) -> None:
         path = tmp_path / "u.json"

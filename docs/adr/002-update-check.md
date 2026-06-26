@@ -187,10 +187,13 @@ pattern:
 - **New runtime dependency:** `packaging` is added to `[project.dependencies]`
   (PEP 440 comparison; see [Version comparison](#version-comparison)). It is the
   only new dependency — the HTTP call uses stdlib `urllib`.
-- **New module:** `keycast.updates` (source detection, version compare,
-  throttle-file I/O, GitHub fetch, and the check callback). No new CLI
-  subcommand in Phase 1 — the check is invoked from the existing Typer root
-  callback in `cli.py`; the `keycast update` verb is reserved for Phase 2.
+- **New package:** `keycast.updates` (source detection, version compare,
+  throttle-file I/O, GitHub fetch, and the check callback). It is split into
+  modules by concern — `sources`, `versions`, `state`, and the `__init__`
+  orchestrator — and anchors non-frozen detection on the stdlib `INSTALLER`
+  record; both decisions are recorded in [ADR-004](004-updates-package-structure.md).
+  No new CLI subcommand in Phase 1 — the check is invoked from the existing Typer
+  root callback in `cli.py`; the `keycast update` verb is reserved for Phase 2.
 - **`keycast info` change:** gains an `Install source:` line. This is additive
   output; `tests/test_docs_contract.py` does not pin `info`'s text, so no
   contract change is needed for it (only the `check_for_updates` flag triggers
