@@ -73,7 +73,7 @@ def _load_font(px: int) -> ImageFont.FreeTypeFont:
             font = ImageFont.truetype(path, px)
             try:  # SFNS.ttf is a variable font; pin the Bold instance.
                 font.set_variation_by_name("Bold")
-            except (OSError, ValueError):
+            except OSError, ValueError:
                 pass
             return font
     msg = f"no system font with the ⌘ glyph found in {FONT_CANDIDATES}"

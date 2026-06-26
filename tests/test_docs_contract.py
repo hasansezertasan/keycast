@@ -220,9 +220,7 @@ class TestDmgBackgroundCoordinateContract:
         apps_loc = _coord_pair(settings, r'"Applications":\s*\((\d+),\s*(\d+)\)')
         # make_dmg_background.py: APP_CENTER / APPS_CENTER
         app_centre = _coord_pair(background, r"APP_CENTER\s*=\s*\((\d+),\s*(\d+)\)")
-        apps_centre = _coord_pair(
-            background, r"APPS_CENTER\s*=\s*\((\d+),\s*(\d+)\)"
-        )
+        apps_centre = _coord_pair(background, r"APPS_CENTER\s*=\s*\((\d+),\s*(\d+)\)")
         assert app_loc == app_centre
         assert apps_loc == apps_centre
 

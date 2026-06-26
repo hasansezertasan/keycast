@@ -67,8 +67,11 @@ def _load_font(px: int) -> ImageFont.FreeTypeFont:
                 # Non-variable font or a renamed/missing "Medium" instance: keep
                 # going at the default weight, but announce it — a silent weight
                 # drift would otherwise only show up by eyeballing the artifact.
-                print(f"warning: could not pin 'Medium' weight on {path}; "
-                      f"using default weight ({exc})", file=sys.stderr)
+                print(
+                    f"warning: could not pin 'Medium' weight on {path}; "
+                    f"using default weight ({exc})",
+                    file=sys.stderr,
+                )
             return font
     msg = f"no system font with the ⌘ glyph found in {FONT_CANDIDATES}"
     raise RuntimeError(msg)
@@ -95,8 +98,12 @@ def render_master() -> Image.Image:
 
     # Wordmark, top-left, slightly dimmed so it reads as branding not a heading.
     font = _load_font(round(22 * k))
-    draw.text((round(40 * k), round(28 * k)), f"keycast  {SHORTCUT}",
-              font=font, fill=(*INK, 235))
+    draw.text(
+        (round(40 * k), round(28 * k)),
+        f"keycast  {SHORTCUT}",
+        font=font,
+        fill=(*INK, 235),
+    )
 
     # Guiding arrow in the gap between the icons (~35% ink so it never competes
     # with the icons Finder draws on top). Centres at y=170; the app icon ends
