@@ -38,6 +38,7 @@ class InstallSource(enum.Enum):
     GITHUB_RELEASE = "github-release"
     WINDOWS_INSTALLER = "windows-installer"
     SCOOP = "scoop"
+    SCOOP_GLOBAL = "scoop-global"
     UNKNOWN = "unknown"
 
 
@@ -139,39 +140,52 @@ def _installer_marker_exists() -> bool:
 
 
 _SCOOP_PATH_MARKER = "/scoop/apps/keycast/"
-"""Lower-cased POSIX fragment marking a Scoop-managed keycast install.
+"""Lower-cased POSIX fragment marking a per-user Scoop-managed keycast install.
 
 Scoop extracts the *same* ``keycast-windows.zip`` bundle as a manual download —
 no ``.install-source`` marker, no Caskroom-style receipt — under
 ``~/scoop/apps/keycast/current/``. The Scoop signal is therefore the *location*
-itself: this path fragment for the default root, plus the ``SCOOP`` /
-``SCOOP_GLOBAL`` env vars for custom roots (see :func:`_looks_scoop`).
+itself: this fragment for the default per-user root, plus the ``SCOOP`` env var
+for a custom one (see :func:`_scoop_source`).
 """
 
-_SCOOP_ENV_VARS = ("SCOOP", "SCOOP_GLOBAL")
-"""Env vars naming a (possibly relocated) Scoop root — per-user and global."""
+_SCOOP_GLOBAL_PATH_MARKER = "/programdata/scoop/apps/keycast/"
+"""Lower-cased POSIX fragment marking a **global** Scoop install.
+
+``scoop install -g`` lands under ``C:\\ProgramData\\scoop`` (or a custom
+``SCOOP_GLOBAL`` root). A global install updates with ``-g`` and elevation
+(``sudo scoop update keycast -g``), so it is a *distinct* source from the
+per-user one — plain ``scoop update keycast`` would not touch it. Checked first,
+since a global path also contains :data:`_SCOOP_PATH_MARKER`.
+"""
 
 
-def _looks_scoop(location_posix: str, env: dict[str, str]) -> bool:
-    """Return whether a frozen bundle looks Scoop-managed.
+def _scoop_source(location_posix: str, env: dict[str, str]) -> InstallSource | None:
+    """Classify a frozen bundle as a global / per-user Scoop install, or neither.
 
-    Two signals, OR'd: the default-root path fragment
-    (:data:`_SCOOP_PATH_MARKER`), and containment under a custom root named by
-    ``SCOOP`` / ``SCOOP_GLOBAL``. The env path is reused via :func:`_is_under`,
-    so an env var being merely *set* (empty, or pointing elsewhere) never
-    matches — only a bundle that actually lives under the named root does.
+    Global is tested first (its default path also contains the per-user marker):
+    the ``C:\\ProgramData\\scoop`` fragment or a custom ``SCOOP_GLOBAL`` root.
+    Per-user is then the default-root fragment or a custom ``SCOOP`` root. Env
+    roots are matched via :func:`_is_under`, so a var that is merely *set* (empty,
+    or pointing elsewhere) never matches — only a bundle that truly lives under it.
 
     Args:
         location_posix: ``location.as_posix().lower()`` of the bundle executable.
         env: The process environment to consult for the Scoop root vars.
 
     Returns:
-        True if the path marker is present, or the bundle lives under a
-        configured Scoop root.
+        :attr:`InstallSource.SCOOP_GLOBAL`, :attr:`InstallSource.SCOOP`, or
+        ``None`` when the location is not Scoop-managed.
     """
-    if _SCOOP_PATH_MARKER in location_posix:
-        return True
-    return any(_is_under(location_posix, env.get(var, "")) for var in _SCOOP_ENV_VARS)
+    if _SCOOP_GLOBAL_PATH_MARKER in location_posix or _is_under(
+        location_posix, env.get("SCOOP_GLOBAL", "")
+    ):
+        return InstallSource.SCOOP_GLOBAL
+    if _SCOOP_PATH_MARKER in location_posix or _is_under(
+        location_posix, env.get("SCOOP", "")
+    ):
+        return InstallSource.SCOOP
+    return None
 
 
 def _read_installer(dist_name: str = "keycast") -> str | None:
@@ -244,10 +258,12 @@ def detect_install_source(
         if installer_marker_exists():
             return InstallSource.WINDOWS_INSTALLER
         # Scoop extracts the same bundle as a manual download (no marker); its
-        # location under ~/scoop/apps/keycast/ — or a custom SCOOP root — is the
-        # only signal, so it is checked before the GitHub-release fallback.
-        if _looks_scoop(posix, env):
-            return InstallSource.SCOOP
+        # location — ~/scoop or C:\ProgramData\scoop, or a custom SCOOP /
+        # SCOOP_GLOBAL root — is the only signal, and per-user vs global get
+        # different update commands. Checked before the GitHub-release fallback.
+        scoop = _scoop_source(posix, env)
+        if scoop is not None:
+            return scoop
         return InstallSource.GITHUB_RELEASE
 
     location = Path(__file__) if location is None else location
@@ -277,6 +293,7 @@ _UPGRADE_COMMANDS: dict[InstallSource, str] = {
     InstallSource.HOMEBREW_FORMULA: "brew upgrade keycast",
     InstallSource.HOMEBREW_CASK: "brew upgrade --cask keycast",
     InstallSource.SCOOP: "scoop update keycast",
+    InstallSource.SCOOP_GLOBAL: "sudo scoop update keycast -g",
 }
 
 _SOURCE_LABELS: dict[InstallSource, str] = {
@@ -288,6 +305,7 @@ _SOURCE_LABELS: dict[InstallSource, str] = {
     InstallSource.GITHUB_RELEASE: "GitHub release download",
     InstallSource.WINDOWS_INSTALLER: "Windows installer",
     InstallSource.SCOOP: "Scoop",
+    InstallSource.SCOOP_GLOBAL: "Scoop (global)",
     InstallSource.UNKNOWN: "unknown",
 }
 

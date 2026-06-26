@@ -297,6 +297,11 @@ each is a distinct installable name:
 > exactly as the tap's *formula* reports `HOMEBREW_FORMULA`, not a cask. Only the
 > binary `keycast` manifest yields `SCOOP`. This is intended, not a bug.
 
+> A **global** `keycast` install (`scoop install -g`, under `C:\ProgramData\scoop`)
+> reports `Install source: scoop-global` and is advised to run
+> `sudo scoop update keycast -g` — plain `scoop update keycast` does not touch a
+> global install.
+
 As with the cask, this repo keeps **no** copy of either manifest — the bucket
 owns them and bumps them automatically.
 
