@@ -36,6 +36,7 @@ class InstallSource(enum.Enum):
     HOMEBREW_FORMULA = "homebrew-formula"
     HOMEBREW_CASK = "homebrew-cask"
     GITHUB_RELEASE = "github-release"
+    WINDOWS_INSTALLER = "windows-installer"
     UNKNOWN = "unknown"
 
 
@@ -103,6 +104,39 @@ def _homebrew_cask_receipt_exists() -> bool:
     return any((Path(prefix) / "Caskroom" / "keycast").exists() for prefix in prefixes)
 
 
+_INSTALLER_MARKER_NAME = ".install-source"
+"""Sentinel file the Windows installer drops beside ``keycast.exe``.
+
+The Inno Setup installer and the plain ``.zip`` ship the *same* frozen
+PyInstaller bundle, so the only thing that tells an installed copy from an
+extracted one is this extra file — the Windows analogue of the macOS Caskroom
+receipt. Inno writes it (it is not part of ``dist/keycast/``, so the zip never
+contains it); its presence — checked only on Windows, see
+:func:`_installer_marker_exists` — flips ``GITHUB_RELEASE`` to
+``WINDOWS_INSTALLER``.
+"""
+
+
+def _installer_marker_exists() -> bool:
+    """Return whether the Windows-installer marker sits beside the executable.
+
+    Checks for :data:`_INSTALLER_MARKER_NAME` next to ``sys.executable`` (the
+    frozen ``keycast.exe``). The zip extraction has no such file, so this is the
+    signal used to recommend the installer/uninstall path over a zip re-download.
+
+    Guarded by a Windows platform check: only the Inno installer writes this
+    marker, so a stray ``.install-source`` beside a frozen macOS/Linux build must
+    never classify as :data:`InstallSource.WINDOWS_INSTALLER`.
+
+    Returns:
+        True if running on Windows and the marker file exists alongside the
+        running executable.
+    """
+    if sys.platform != "win32":
+        return False
+    return (Path(sys.executable).parent / _INSTALLER_MARKER_NAME).exists()
+
+
 def _read_installer(dist_name: str = "keycast") -> str | None:
     """Return the recorded ``INSTALLER`` for the distribution, lower-cased.
 
@@ -130,6 +164,7 @@ def detect_install_source(
     location: Path | None = None,
     env: dict[str, str] | None = None,
     cask_receipt_exists: Callable[[], bool] = _homebrew_cask_receipt_exists,
+    installer_marker_exists: Callable[[], bool] = _installer_marker_exists,
     read_installer: Callable[[], str | None] = _read_installer,
 ) -> InstallSource:
     """Classify how the running keycast was installed.
@@ -146,6 +181,8 @@ def detect_install_source(
         env: Override for the process environment (defaults to ``os.environ``).
         cask_receipt_exists: Predicate for a Homebrew cask receipt (injectable;
             defaults to a filesystem check).
+        installer_marker_exists: Predicate for the Windows-installer marker
+            (injectable; defaults to a filesystem check beside the executable).
         read_installer: Reader for the ``INSTALLER`` record (injectable; defaults
             to the stdlib metadata lookup).
 
@@ -165,6 +202,10 @@ def detect_install_source(
             "/applications/" in posix and cask_receipt_exists()
         ):
             return InstallSource.HOMEBREW_CASK
+        # A Windows installer ships the same frozen bundle as the zip; the marker
+        # Inno drops beside the exe is the only thing that tells them apart.
+        if installer_marker_exists():
+            return InstallSource.WINDOWS_INSTALLER
         return InstallSource.GITHUB_RELEASE
 
     location = Path(__file__) if location is None else location
@@ -202,17 +243,20 @@ _SOURCE_LABELS: dict[InstallSource, str] = {
     InstallSource.HOMEBREW_FORMULA: "Homebrew formula",
     InstallSource.HOMEBREW_CASK: "Homebrew cask",
     InstallSource.GITHUB_RELEASE: "GitHub release download",
+    InstallSource.WINDOWS_INSTALLER: "Windows installer",
     InstallSource.UNKNOWN: "unknown",
 }
 
 # Fail fast at import if a new InstallSource is added without wiring it up: every
-# member needs a label, and every member except the two URL-fallback sources
-# (GitHub download / unknown — where guessing a command would be wrong) needs an
+# member needs a label, and every member except the URL-fallback sources (GitHub
+# download / Windows installer / unknown — where guessing a command would be
+# wrong, so the notice points at the Releases page to re-download) needs an
 # upgrade command. Converts an otherwise-latent runtime KeyError into a loud
 # developer error at module load.
 assert set(_SOURCE_LABELS) == set(InstallSource), "every InstallSource needs a label"
 assert set(_UPGRADE_COMMANDS) | {
     InstallSource.GITHUB_RELEASE,
+    InstallSource.WINDOWS_INSTALLER,
     InstallSource.UNKNOWN,
 } == set(InstallSource), "every non-URL-fallback InstallSource needs an upgrade command"
 
@@ -225,8 +269,9 @@ def recommended_action(source: InstallSource) -> str:
 
     Returns:
         A package-manager command when one fits; otherwise :data:`RELEASES_URL`
-        (for a manual Release download or an undetermined source, where guessing
-        a command would be wrong).
+        (for a manual Release download, a Windows-installer copy, or an
+        undetermined source, where guessing a command would be wrong — the user
+        re-downloads the asset / installer from the Releases page).
     """
     return _UPGRADE_COMMANDS.get(source, RELEASES_URL)
 

@@ -206,9 +206,24 @@ jobs:
           if (-not (Get-ChildItem -Recurse dist/keycast -Filter '_tkinter*.pyd' -ErrorAction SilentlyContinue)) {
             Write-Host "::error::_tkinter missing from the bundle"; exit 1
           }
-      - name: Upload the folder as a preview build
+      - name: Compile the installer (Inno Setup)
+        shell: pwsh
+        # A broken keycast.iss would block the atomic release (release.yml's
+        # publish-pypi needs build-windows), so compile it here on every PR.
+        # iscc.exe ships in the windows-latest runner image (InnoSetup, verify on
+        # the runner-image readme); if a future image drops it, add an install
+        # step. No version flag here, so the script's 0.0.0 default is used.
+        # Assert the installer actually emerged.
+        run: |
+          iscc packaging/keycast.iss
+          if (-not (Test-Path packaging/keycast-setup.exe)) {
+            Write-Host "::error::keycast-setup.exe missing after iscc"; exit 1
+          }
+      - name: Upload the folder and installer as a preview build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: keycast-windows-preview
-          path: dist/keycast
+          path: |
+            dist/keycast
+            packaging/keycast-setup.exe
           retention-days: 7

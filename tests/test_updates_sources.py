@@ -66,6 +66,36 @@ class TestHomebrewCaskReceipt:
         assert sources._homebrew_cask_receipt_exists() is False
 
 
+class TestInstallerMarker:
+    """The Windows-installer marker probe beside the executable."""
+
+    def test_present_when_marker_beside_exe(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / sources._INSTALLER_MARKER_NAME).write_text("windows-installer")
+        monkeypatch.setattr(sources.sys, "platform", "win32")
+        monkeypatch.setattr(sources.sys, "executable", str(tmp_path / "keycast.exe"))
+        assert sources._installer_marker_exists() is True
+
+    def test_absent_for_bare_zip(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A zip extraction has no marker file beside the exe.
+        monkeypatch.setattr(sources.sys, "platform", "win32")
+        monkeypatch.setattr(sources.sys, "executable", str(tmp_path / "keycast.exe"))
+        assert sources._installer_marker_exists() is False
+
+    def test_absent_off_windows_even_with_marker(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A stray .install-source beside a frozen macOS/Linux build must never
+        # read as a Windows install — the probe is gated on the platform.
+        (tmp_path / sources._INSTALLER_MARKER_NAME).write_text("windows-installer")
+        monkeypatch.setattr(sources.sys, "platform", "darwin")
+        monkeypatch.setattr(sources.sys, "executable", str(tmp_path / "keycast"))
+        assert sources._installer_marker_exists() is False
+
+
 class TestIsUnder:
     """The env-dir containment check, including Windows-path normalization."""
 
@@ -147,9 +177,39 @@ class TestDetectInstallSource:
         loc = Path("C:/Program Files/keycast/keycast.exe")
         assert (
             sources.detect_install_source(
-                frozen=True, location=loc, cask_receipt_exists=lambda: True
+                frozen=True,
+                location=loc,
+                cask_receipt_exists=lambda: True,
+                installer_marker_exists=lambda: False,
             )
             == InstallSource.GITHUB_RELEASE
+        )
+
+    def test_frozen_with_installer_marker_is_windows_installer(self) -> None:
+        # Same frozen bundle as a zip download; the marker beside the exe is what
+        # flips it from GITHUB_RELEASE to WINDOWS_INSTALLER.
+        loc = Path("C:/Program Files/keycast/keycast.exe")
+        assert (
+            sources.detect_install_source(
+                frozen=True,
+                location=loc,
+                cask_receipt_exists=lambda: False,
+                installer_marker_exists=lambda: True,
+            )
+            == InstallSource.WINDOWS_INSTALLER
+        )
+
+    def test_cask_wins_over_installer_marker(self) -> None:
+        # macOS cask is decided before the installer marker is even consulted.
+        loc = Path("/Applications/keycast.app/Contents/MacOS/keycast")
+        assert (
+            sources.detect_install_source(
+                frozen=True,
+                location=loc,
+                cask_receipt_exists=lambda: True,
+                installer_marker_exists=lambda: True,
+            )
+            == InstallSource.HOMEBREW_CASK
         )
 
     def test_frozen_uses_sys_executable_by_default(
@@ -165,6 +225,39 @@ class TestDetectInstallSource:
                 frozen=True, cask_receipt_exists=lambda: False
             )
             == InstallSource.GITHUB_RELEASE
+        )
+
+    def test_frozen_uses_installer_marker_probe_by_default(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # With no installer_marker_exists arg, the real _installer_marker_exists
+        # probe runs: a marker dropped beside sys.executable flips the result to
+        # WINDOWS_INSTALLER. Pins the default wiring on the positive path.
+        (tmp_path / sources._INSTALLER_MARKER_NAME).write_text("windows-installer")
+        monkeypatch.setattr(sources.sys, "platform", "win32")
+        monkeypatch.setattr(sources.sys, "executable", str(tmp_path / "keycast.exe"))
+        assert (
+            sources.detect_install_source(
+                frozen=True, cask_receipt_exists=lambda: False
+            )
+            == InstallSource.WINDOWS_INSTALLER
+        )
+
+    def test_installer_marker_not_probed_when_not_frozen(self) -> None:
+        # The marker branch lives entirely inside `if frozen:`. A non-frozen
+        # (pip/pipx/...) install must never be classified by the marker, even if
+        # the probe would say True — pins that the probe stays behind the frozen
+        # gate against a future refactor.
+        loc = Path("/home/u/.local/pipx/venvs/keycast/lib/keycast/updates/sources.py")
+        assert (
+            sources.detect_install_source(
+                frozen=False,
+                location=loc,
+                env={},
+                read_installer=_none,
+                installer_marker_exists=lambda: True,
+            )
+            == InstallSource.PIPX
         )
 
     def test_pipx_by_path(self) -> None:
@@ -274,7 +367,12 @@ class TestRecommendedActionAndLabels:
         )
 
     @pytest.mark.parametrize(
-        "source", [InstallSource.GITHUB_RELEASE, InstallSource.UNKNOWN]
+        "source",
+        [
+            InstallSource.GITHUB_RELEASE,
+            InstallSource.WINDOWS_INSTALLER,
+            InstallSource.UNKNOWN,
+        ],
     )
     def test_fallback_sources_point_at_releases(self, source: InstallSource) -> None:
         assert sources.recommended_action(source) == sources.RELEASES_URL
@@ -282,3 +380,11 @@ class TestRecommendedActionAndLabels:
     def test_labels_cover_every_source(self) -> None:
         for source in InstallSource:
             assert isinstance(sources.install_source_label(source), str)
+
+    def test_windows_installer_label_is_exact(self) -> None:
+        # User-facing string (shown by `keycast info`); pin it so a typo can't
+        # ship silently — the cover-every-source test only checks the type.
+        assert (
+            sources.install_source_label(InstallSource.WINDOWS_INSTALLER)
+            == "Windows installer"
+        )

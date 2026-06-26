@@ -25,9 +25,12 @@ Pre-built, double-click applications are attached to each
   first launch is blocked by Gatekeeper: right-click the app and choose **Open**,
   then confirm once. You will also be prompted to grant Accessibility and Input
   Monitoring permission (see [macOS](#macos) below).
-- **Windows** — download `keycast-windows.zip`, extract it anywhere, and run
-  `keycast.exe` from the extracted folder. The build is unsigned, so Windows
-  SmartScreen may warn on first run: click **More info → Run anyway**.
+- **Windows** — download `keycast-setup.exe` and run it. The installer lets you
+  choose a per-user install (no admin) or a per-machine install (all users), adds
+  a Start Menu shortcut, and registers an uninstaller in **Settings → Apps**.
+  Prefer no install? Download `keycast-windows.zip` instead, extract it anywhere,
+  and run `keycast.exe` from the extracted folder. Either build is unsigned, so
+  Windows SmartScreen may warn on first run: click **More info → Run anyway**.
 
 ### From PyPI
 
@@ -198,7 +201,8 @@ matching action — it never tries to update something your package manager owns
 | `pipx` / `uv tool` / `uvx` / `pip` | suggest the matching upgrade command (e.g. `pipx upgrade keycast`) |
 | Homebrew **formula** (CLI) | suggest `brew upgrade keycast` |
 | Homebrew **cask** (the macOS app) | suggest `brew upgrade --cask keycast` |
-| a manual [GitHub Release](https://github.com/hasansezertasan/keycast/releases/latest) download | point you to the latest release (and, in a future phase, update itself in place) |
+| the **Windows installer** (`keycast-setup.exe`) | point you to the latest release to download the new installer |
+| a manual [GitHub Release](https://github.com/hasansezertasan/keycast/releases/latest) download (the `.zip`) | point you to the latest release (and, in a future phase, update itself in place) |
 
 - **Automatic, in the background:** keycast checks the GitHub Releases API at
   most once per day. The check runs on its own — there is no command to run. A

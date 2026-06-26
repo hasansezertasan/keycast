@@ -18,9 +18,13 @@ keycast ships through two Homebrew vehicles that intentionally coexist:
 | **Cask** | `brew install --cask keycast` | GUI users (double-click `.app`, grant input permissions once) | GitHub Release `.dmg` |
 
 Most of what follows concerns the **macOS `.app`** and its cask. The release
-pipeline also builds a **Windows `.zip`** (PyInstaller, attached as a GitHub
-Release asset for direct download); Linux users install from PyPI. Casks are
-macOS-only.
+pipeline also builds **two Windows assets** from the same PyInstaller folder
+build — a **`keycast-setup.exe`** Inno Setup installer (Start Menu shortcut,
+uninstall entry, per-user or per-machine at the user's choice) and the
+**`keycast-windows.zip`** (the portable / no-install option) — both attached to
+the GitHub Release for direct download (see
+[ADR-006](adr/006-windows-installer.md)). Linux users install from PyPI. Casks
+are macOS-only.
 
 ## Build foundation (non-negotiable)
 
@@ -109,12 +113,27 @@ shasum -a 256 dist/keycast.dmg   # sha256 for the cask
 (`create-dmg` may replace `hdiutil` later if a styled background/layout is
 wanted; `hdiutil` is the dependency-free baseline.)
 
-**Windows — `.zip`** (the `dist/keycast/` folder PyInstaller produces, since
-`BUNDLE` is a no-op off macOS):
+**Windows — `.zip` + installer** (both from the `dist/keycast/` folder
+PyInstaller produces, since `BUNDLE` is a no-op off macOS):
 
 ```powershell
+# Portable / no-install option
 Compress-Archive -Path dist/keycast -DestinationPath keycast-windows.zip
+
+# Installer (Inno Setup; iscc.exe ships on windows-latest runners). The version
+# is injected so the tag stays the single source of truth; omit /D to compile a
+# 0.0.0 build locally. Produces packaging/keycast-setup.exe.
+iscc /DMyAppVersion=1.2.3 packaging\keycast.iss
 ```
+
+The installer script (`packaging/keycast.iss`) wraps the same folder build: it
+offers per-user (no admin) or per-machine install, creates a Start Menu shortcut
+and an Add/Remove-Programs uninstall entry, and drops a `.install-source` marker
+beside `keycast.exe`. That marker — absent from the `.zip` — is what
+`detect_install_source()` reads to classify the copy as `WINDOWS_INSTALLER`
+rather than `GITHUB_RELEASE` (the Windows analogue of the macOS Caskroom
+receipt). The installer is **unsigned**, same as the bundle (see
+[ADR-006](adr/006-windows-installer.md) and the SmartScreen note in `README.md`).
 
 ## Release & CI
 
@@ -125,7 +144,7 @@ release is **atomic** — nothing publishes unless every artifact builds:
 ```text
 release-please ─┬─ build-package  (sdist + wheel,  ubuntu)
                 ├─ build-macos    (.app → .dmg,    macos-15 / arm64)
-                └─ build-windows  (.exe folder → .zip, windows-latest)
+                └─ build-windows  (.exe folder → .zip + installer, windows-latest)
                           │  publish-pypi needs ALL three
                           ▼
                    publish-pypi    (Trusted Publishing; id-token only)
@@ -140,7 +159,8 @@ release-please ─┬─ build-package  (sdist + wheel,  ubuntu)
   macOS/Windows builders **must** pin Astral Python 3.14.6 (see the
   build-foundation warning above); both build from the committed
   `packaging/keycast.spec` (PyInstaller's `BUNDLE` step is a no-op on Windows, so
-  there it yields the `dist/keycast/` folder, which is zipped).
+  there it yields the `dist/keycast/` folder, which is zipped and also compiled
+  into `keycast-setup.exe` via `packaging/keycast.iss`).
 - **`publish-pypi`** depends on all three builds, downloads the sdist/wheel, and
   publishes via PyPI Trusted Publishing (`id-token: write`, no other scope).
 - **`publish-release`** downloads every artifact, attaches them to the release
@@ -157,7 +177,9 @@ chosen so a published version never ships with a missing artifact.
 `ci.yml` runs **build-only checks** on every PR — `build-macos` and
 `build-windows` — that bundle from the same spec and assert the result contains
 the launcher and `_tkinter`, so packaging regressions fail on the PR, not at
-release. Each also uploads an **unsigned, version-0.0.0 preview artifact** (7-day
+release. `build-windows` additionally compiles `keycast.iss` (a broken installer
+script would otherwise block the atomic release) and asserts `keycast-setup.exe`
+emerged. Each also uploads an **unsigned, version-0.0.0 preview artifact** (7-day
 retention: `keycast-macos-preview`, `keycast-windows-preview`) so a reviewer can
 download and launch-test it — the live path CI cannot exercise (see the
 verification checklist below). The macOS preview is wrapped in a `.dmg` before
