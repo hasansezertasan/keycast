@@ -105,13 +105,18 @@ inside the bundle (default: no — the formula owns the CLI).
 **macOS — `.dmg`:**
 
 ```bash
-hdiutil create -volname keycast -srcfolder dist/keycast.app \
-  -ov -format UDZO dist/keycast.dmg
+uvx dmgbuild -s packaging/dmg_settings.py -D app=dist/keycast.app \
+  keycast dist/keycast.dmg
 shasum -a 256 dist/keycast.dmg   # sha256 for the cask
 ```
 
-(`create-dmg` may replace `hdiutil` later if a styled background/layout is
-wanted; `hdiutil` is the dependency-free baseline.)
+[`dmgbuild`](https://pypi.org/project/dmgbuild/) produces a styled
+drag-to-`/Applications` layout (`packaging/dmg_settings.py`). It writes the
+Finder `.DS_Store` directly, so the layout is deterministic and builds headless
+in CI — no Finder/AppleScript, unlike `create-dmg`. A branded background image
+can be added later by uncommenting `background` in that settings file; the icon
+positions are already laid out for it. The output is still a `UDZO` image, so
+the Homebrew cask (which keys off the sha256) is unaffected.
 
 **Windows — `.zip` + installer** (both from the `dist/keycast/` folder
 PyInstaller produces, since `BUNDLE` is a no-op off macOS):
