@@ -39,6 +39,61 @@ class TestLooksHomebrew:
         assert sources._looks_homebrew("/usr/lib/python3.14/site-packages") is False
 
 
+class TestScoopSource:
+    """The Scoop location heuristic: per-user vs global, path marker + env root."""
+
+    def test_default_user_root_path_marker(self) -> None:
+        posix = "c:/users/u/scoop/apps/keycast/current/keycast.exe"
+        assert sources._scoop_source(posix, {}) is InstallSource.SCOOP
+
+    def test_default_global_root_path_marker(self) -> None:
+        # C:\ProgramData\scoop also contains the per-user marker, so global must
+        # be matched first — a global install updates with `-g`, not plain update.
+        posix = "c:/programdata/scoop/apps/keycast/current/keycast.exe"
+        assert sources._scoop_source(posix, {}) is InstallSource.SCOOP_GLOBAL
+
+    def test_custom_user_root_via_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # A relocated root carries no "/scoop/" fragment; the env var is the only
+        # signal, and the bundle must actually live under it. The env dir arrives
+        # with native Windows backslashes, so PureWindowsPath reproduces a Windows
+        # host on the POSIX CI runner (mirrors TestIsUnder).
+        monkeypatch.setattr(sources, "Path", PureWindowsPath)
+        posix = "d:/tools/keycast/current/keycast.exe"
+        assert (
+            sources._scoop_source(posix, {"SCOOP": r"D:\tools"}) is InstallSource.SCOOP
+        )
+
+    def test_custom_global_root_via_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(sources, "Path", PureWindowsPath)
+        posix = "d:/globalscoop/apps/keycast/current/keycast.exe"
+        assert (
+            sources._scoop_source(posix, {"SCOOP_GLOBAL": r"D:\globalscoop"})
+            is InstallSource.SCOOP_GLOBAL
+        )
+
+    def test_global_env_root_wins_over_per_user_path_marker(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A bundle under a custom SCOOP_GLOBAL root whose path *also* contains the
+        # per-user "/scoop/apps/keycast/" fragment must still classify as global —
+        # the SCOOP_GLOBAL env check runs before the per-user marker. Pins the
+        # precedence against a future reorder that would wrongly drop the `-g`.
+        monkeypatch.setattr(sources, "Path", PureWindowsPath)
+        posix = "d:/gscoop/scoop/apps/keycast/current/keycast.exe"
+        assert (
+            sources._scoop_source(posix, {"SCOOP_GLOBAL": r"D:\gscoop"})
+            is InstallSource.SCOOP_GLOBAL
+        )
+
+    def test_env_set_but_package_elsewhere_is_ignored(self) -> None:
+        posix = "c:/program files/keycast/keycast.exe"
+        assert sources._scoop_source(posix, {"SCOOP": r"C:\Users\U\scoop"}) is None
+
+    def test_empty_env_and_non_scoop_path_rejected(self) -> None:
+        posix = "c:/program files/keycast/keycast.exe"
+        assert sources._scoop_source(posix, {"SCOOP": "", "SCOOP_GLOBAL": ""}) is None
+
+
 class TestHomebrewCaskReceipt:
     """The Caskroom-receipt filesystem probe that confirms a cask install."""
 
@@ -105,6 +160,13 @@ class TestIsUnder:
 
     def test_posix_dir_contains_location(self) -> None:
         assert sources._is_under("/opt/elsewhere/keycast/x.py", "/opt/elsewhere")
+
+    def test_sibling_prefix_does_not_match(self) -> None:
+        # Boundary, not bare prefix: a sibling whose name merely starts with the
+        # root must not match (D:\toolsX is not under D:\tools).
+        assert sources._is_under("/opt/elsewhere2/keycast/x.py", "/opt/elsewhere") is (
+            False
+        )
 
     def test_normalizes_windows_backslashes(
         self, monkeypatch: pytest.MonkeyPatch
@@ -197,6 +259,78 @@ class TestDetectInstallSource:
                 installer_marker_exists=lambda: True,
             )
             == InstallSource.WINDOWS_INSTALLER
+        )
+
+    def test_frozen_under_scoop_path_is_scoop(self) -> None:
+        # Same frozen bundle as a zip download, no installer marker; the
+        # ~/scoop/apps/keycast/ location is what flips it to SCOOP.
+        loc = Path("C:/Users/u/scoop/apps/keycast/current/keycast.exe")
+        assert (
+            sources.detect_install_source(
+                frozen=True,
+                location=loc,
+                cask_receipt_exists=lambda: False,
+                installer_marker_exists=lambda: False,
+            )
+            == InstallSource.SCOOP
+        )
+
+    def test_frozen_under_global_scoop_path_is_scoop_global(self) -> None:
+        # A global install (C:\ProgramData\scoop) updates with `-g`, so it is a
+        # distinct source from a per-user one.
+        loc = Path("C:/ProgramData/scoop/apps/keycast/current/keycast.exe")
+        assert (
+            sources.detect_install_source(
+                frozen=True,
+                location=loc,
+                cask_receipt_exists=lambda: False,
+                installer_marker_exists=lambda: False,
+            )
+            == InstallSource.SCOOP_GLOBAL
+        )
+
+    def test_frozen_under_custom_scoop_root_env_is_scoop(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Custom SCOOP root (no "/scoop/" fragment); PureWindowsPath reproduces a
+        # Windows host so the backslash env dir normalizes like it would on-target.
+        monkeypatch.setattr(sources, "Path", PureWindowsPath)
+        loc = PureWindowsPath("D:/tools/keycast/current/keycast.exe")
+        assert (
+            sources.detect_install_source(
+                frozen=True,
+                location=loc,
+                env={"SCOOP": r"D:\tools"},
+                cask_receipt_exists=lambda: False,
+                installer_marker_exists=lambda: False,
+            )
+            == InstallSource.SCOOP
+        )
+
+    def test_installer_marker_wins_over_scoop(self) -> None:
+        # Orthogonal in practice (a Scoop bundle has no marker), but the marker is
+        # checked first — pin that order so the precedence is intentional.
+        loc = Path("C:/Users/u/scoop/apps/keycast/current/keycast.exe")
+        assert (
+            sources.detect_install_source(
+                frozen=True,
+                location=loc,
+                cask_receipt_exists=lambda: False,
+                installer_marker_exists=lambda: True,
+            )
+            == InstallSource.WINDOWS_INSTALLER
+        )
+
+    def test_scoop_not_detected_when_not_frozen(self) -> None:
+        # The Scoop branch lives inside `if frozen:`. A non-frozen install whose
+        # path happens to contain /scoop/ must classify by the import-path rules,
+        # never as SCOOP.
+        loc = Path("/home/u/scoop/apps/keycast/lib/keycast/updates/sources.py")
+        assert (
+            sources.detect_install_source(
+                frozen=False, location=loc, env={}, read_installer=lambda: "pip"
+            )
+            == InstallSource.PIP
         )
 
     def test_cask_wins_over_installer_marker(self) -> None:
@@ -365,6 +499,10 @@ class TestRecommendedActionAndLabels:
         assert sources.recommended_action(InstallSource.HOMEBREW_CASK) == (
             "brew upgrade --cask keycast"
         )
+        assert sources.recommended_action(InstallSource.SCOOP) == "scoop update keycast"
+        assert sources.recommended_action(InstallSource.SCOOP_GLOBAL) == (
+            "sudo scoop update keycast -g"
+        )
 
     @pytest.mark.parametrize(
         "source",
@@ -387,4 +525,10 @@ class TestRecommendedActionAndLabels:
         assert (
             sources.install_source_label(InstallSource.WINDOWS_INSTALLER)
             == "Windows installer"
+        )
+
+    def test_scoop_label_is_exact(self) -> None:
+        assert sources.install_source_label(InstallSource.SCOOP) == "Scoop"
+        assert (
+            sources.install_source_label(InstallSource.SCOOP_GLOBAL) == "Scoop (global)"
         )

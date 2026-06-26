@@ -277,6 +277,53 @@ jobs:
             --message="Automated bump from keycast ${VERSION} release" \
             hasansezertasan/tap/keycast
 
+  bump-scoop:
+    # Nudge the Scoop bucket to refresh keycast's manifests for this release.
+    #
+    # Mirrors how the Homebrew tap is fed: the package repo fires a
+    # `repository_dispatch` at the bucket after publishing, and the bucket
+    # re-derives each manifest's version from its OWN source — PyPI for the
+    # pipx-shim manifest (`keycast-pipx`), the GitHub release for the binary-zip
+    # manifest (`keycast`) — recomputes the zip hash, and opens a PR. The manifest
+    # logic lives in the bucket (and runs on a cron there); this job only triggers
+    # it promptly instead of waiting for that cron.
+    #
+    # Best-effort and OUTSIDE the atomic release gate (mirrors bump-cask): runs
+    # after publish-release so the release is already un-drafted when the bucket's
+    # checkver looks for it. `repository_dispatch` is cross-repo, which GITHUB_TOKEN
+    # cannot do, so it needs a fine-grained PAT (Contents: write on the bucket
+    # only) in BUCKET_TOKEN. Absent the secret (forks, or before the bucket
+    # exists) the step warns and exits 0; the bucket's scheduled run still catches
+    # the release later, so a missed nudge is never fatal.
+    needs: [release-please, publish-release]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    # Linux is fine: this only POSTs a dispatch; the bucket's update job runs in
+    # the bucket repo.
+    runs-on: ubuntu-latest
+    name: Bump Scoop bucket
+    permissions: {}
+    steps:
+      - name: Dispatch the bucket update
+        env:
+          # gh reads GH_TOKEN for auth; the repo is given inline in the API path.
+          # This is the PAT, not GITHUB_TOKEN.
+          GH_TOKEN: ${{ secrets.BUCKET_TOKEN }}
+          VERSION: ${{ needs.release-please.outputs.version }}
+        run: |
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::BUCKET_TOKEN not set; skipping Scoop bucket bump"
+            exit 0
+          fi
+          echo "Dispatching update-manifest for keycast ${VERSION}"
+          # The bucket's update-manifest-dispatch workflow listens for this event;
+          # `version` is informational (the bucket re-checks each manifest's own
+          # source), `package` scopes the bump to keycast's manifests.
+          gh api repos/hasansezertasan/scoop-bucket/dispatches \
+            --method POST \
+            -f event_type=update-manifest \
+            -f 'client_payload[package]=keycast' \
+            -f "client_payload[version]=${VERSION}"
+
   reconcile:
     # release-please derives its commit range from the latest *published* GitHub
     # Release and ignores drafts. The release-please job above opened the next
