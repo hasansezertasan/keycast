@@ -237,45 +237,48 @@ jobs:
           gh release edit "${{ needs.release-please.outputs.tag_name }}" --draft=false
 
   bump-cask:
-    # Open a PR on the Homebrew tap bumping the cask to this release, via
-    # Homebrew's own `brew bump-cask-pr` (it downloads the published .dmg,
-    # computes the sha256, and the PR gets brew style/audit on the tap). The
-    # third-party "bump cask" wrapper actions are abandoned (macauley last shipped
-    # 2021), so we call the first-party tool directly.
+    # Signal the Homebrew tap to bump keycast's cask for this release. The tap's
+    # update-cask-dispatch.yml does the actual work (bump-cask-pr downloads the
+    # published .dmg, recomputes the sha256, audits, and opens the PR) — we only
+    # fire the event. This mirrors bump-scoop below: the downstream owns its own
+    # update logic, we just nudge it promptly instead of waiting for its cron.
     #
     # Best-effort and OUTSIDE the atomic release gate: runs after publish-release,
-    # so a tap hiccup never blocks or unwinds a shipped release. `bump-cask-pr`
-    # cannot act cross-repo with the default GITHUB_TOKEN, so it needs a
-    # fine-grained PAT (Contents + Pull requests: write on the tap) in the
-    # TAP_TOKEN secret; `--no-fork` pushes the PR branch straight to the tap you
-    # own instead of forking. When the secret is absent (forks, unconfigured
-    # clones) the step warns and exits 0 rather than failing.
+    # so a tap hiccup never blocks or unwinds a shipped release. `repository_dispatch`
+    # is cross-repo, which GITHUB_TOKEN cannot do, so it needs a PAT in the TAP_TOKEN
+    # secret. Scope: the POST /dispatches endpoint requires Contents: write for
+    # fine-grained PATs, so that stays — but Pull requests: write (needed by the old
+    # direct `bump-cask-pr --no-fork`) can now be dropped, since the tap opens the PR
+    # itself with its own GITHUB_TOKEN. When the secret is absent (forks, unconfigured
+    # clones) the step warns and exits 0; the tap's weekly cron still catches the
+    # release later, so a missed nudge is never fatal.
     needs: [release-please, publish-release]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
-    # macOS runner: `brew` rejects cask subcommands on Linux. Not the bundle
-    # builder, so it needn't track build-macos's deliberate min-OS pin.
-    runs-on: macos-latest
+    # Linux is fine now: this only POSTs a dispatch; the bump runs on the tap.
+    runs-on: ubuntu-latest
     name: Bump Homebrew cask
     permissions: {}
     steps:
-      - name: Bump the cask
+      - name: Dispatch the tap update
         env:
-          # brew uses this for both the GitHub API (open PR) and the authenticated
-          # git push of the PR branch. This is the PAT, not GITHUB_TOKEN.
-          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.TAP_TOKEN }}
+          # gh reads GH_TOKEN for auth; the repo is given inline in the API path.
+          # This is the PAT, not GITHUB_TOKEN.
+          GH_TOKEN: ${{ secrets.TAP_TOKEN }}
           VERSION: ${{ needs.release-please.outputs.version }}
         run: |
-          if [ -z "${HOMEBREW_GITHUB_API_TOKEN:-}" ]; then
+          if [ -z "${GH_TOKEN:-}" ]; then
             echo "::warning::TAP_TOKEN not set; skipping Homebrew cask bump"
             exit 0
           fi
-          brew tap hasansezertasan/tap
-          brew bump-cask-pr \
-            --version="${VERSION}" \
-            --no-fork \
-            --no-browse \
-            --message="Automated bump from keycast ${VERSION} release" \
-            hasansezertasan/tap/keycast
+          echo "Dispatching update-cask for keycast ${VERSION}"
+          # The tap's update-cask-dispatch.yml listens for this event; `version`
+          # is authoritative here (the release is freshly published), `cask`
+          # scopes the bump to keycast.
+          gh api repos/hasansezertasan/homebrew-tap/dispatches \
+            --method POST \
+            -f event_type=update-cask \
+            -f 'client_payload[cask]=keycast' \
+            -f "client_payload[version]=${VERSION}"
 
   bump-scoop:
     # Nudge the Scoop bucket to refresh keycast's manifests for this release.
