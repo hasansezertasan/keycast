@@ -111,7 +111,9 @@ The Inno Setup installer and the plain ``.zip`` ship the *same* frozen
 PyInstaller bundle, so the only thing that tells an installed copy from an
 extracted one is this extra file — the Windows analogue of the macOS Caskroom
 receipt. Inno writes it (it is not part of ``dist/keycast/``, so the zip never
-contains it); its presence flips ``GITHUB_RELEASE`` to ``WINDOWS_INSTALLER``.
+contains it); its presence — checked only on Windows, see
+:func:`_installer_marker_exists` — flips ``GITHUB_RELEASE`` to
+``WINDOWS_INSTALLER``.
 """
 
 
