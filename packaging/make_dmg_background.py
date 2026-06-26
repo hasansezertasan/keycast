@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -62,8 +63,12 @@ def _load_font(px: int) -> ImageFont.FreeTypeFont:
             font = ImageFont.truetype(path, px)
             try:  # SFNS.ttf is a variable font; pin a Medium instance.
                 font.set_variation_by_name("Medium")
-            except (OSError, ValueError):
-                pass
+            except (OSError, ValueError) as exc:
+                # Non-variable font or a renamed/missing "Medium" instance: keep
+                # going at the default weight, but announce it — a silent weight
+                # drift would otherwise only show up by eyeballing the artifact.
+                print(f"warning: could not pin 'Medium' weight on {path}; "
+                      f"using default weight ({exc})", file=sys.stderr)
             return font
     msg = f"no system font with the ⌘ glyph found in {FONT_CANDIDATES}"
     raise RuntimeError(msg)
@@ -114,12 +119,20 @@ def write_background(here: Path) -> None:
     img1x = master.resize((WIN_W, WIN_H), Image.LANCZOS)
 
     if shutil.which("tiffutil") is None:
-        # tiffutil is macOS-only. Fall back to a 1x PNG so something is produced;
-        # point `background` at the .png instead (no Retina @2x in that case).
+        # tiffutil is macOS-only. Write a 1x PNG as a preview so the run produces
+        # *something*, but it is NOT what the build consumes: dmg_settings.py
+        # points `background` at dmg_background.tiff, which we have not touched.
+        # Say so loudly so a non-macOS contributor doesn't think they regenerated
+        # the committed asset.
         png_path = here / "dmg_background.png"
         img1x.save(png_path)
-        print(f"tiffutil not found (macOS only); wrote 1x-only "
-              f"{png_path.relative_to(here.parent)}")
+        print(
+            f"WARNING: tiffutil not found (macOS only); wrote 1x-only preview "
+            f"{png_path.relative_to(here.parent)}. The committed "
+            f"dmg_background.tiff that dmg_settings.py loads was NOT "
+            f"regenerated — run this on macOS to update it.",
+            file=sys.stderr,
+        )
         return
 
     with tempfile.TemporaryDirectory() as tmp:

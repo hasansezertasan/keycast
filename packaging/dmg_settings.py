@@ -32,7 +32,10 @@ icon_size = 128
 text_size = 14
 
 # App on the left, the /Applications drop target on the right: the arrow the
-# eye expects to follow when dragging.
+# eye expects to follow when dragging. These centres MUST match APP_CENTER /
+# APPS_CENTER in make_dmg_background.py, whose arrow is drawn (hard-coded to the
+# gap, x=248..392) between them — move an icon here and the arrow misaligns
+# silently until the background is regenerated.
 icon_locations = {
     appname: (160, 170),
     "Applications": (480, 170),
