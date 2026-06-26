@@ -6,7 +6,10 @@
       "draft": true,
       "force-tag-creation": true,
       "include-component-in-tag": false,
-      "bump-minor-pre-major": true
+      "bump-minor-pre-major": true,
+      "prerelease": true,
+      "prerelease-type": "beta",
+      "versioning": "prerelease"
     }
   }
 }

@@ -18,6 +18,14 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       prs_created: ${{ steps.release.outputs.prs_created }}
       pr: ${{ steps.release.outputs.pr }}
+      # Prerelease detection (beta channel, see release-please-config.json's
+      # prerelease/versioning settings). release-please tags prereleases in
+      # SemVer form -- `v0.2.0-beta.1` -- which hatch-vcs normalizes to the PEP 440
+      # `0.2.0b1`. A final/graduated tag (`v0.2.0`) never contains a hyphen, so a
+      # `-` in the tag is an unambiguous prerelease marker. Downstream jobs gate on
+      # this: prereleases ship to PyPI (hidden from `pip install` without `--pre`)
+      # and the GitHub release, but are kept OFF the Homebrew/Scoop channels.
+      is_prerelease: ${{ contains(steps.release.outputs.tag_name, '-') }}
     steps:
       - name: Release Please
         id: release
@@ -226,6 +234,8 @@ jobs:
           # from. gh reads --repo / GH_REPO (NOT GITHUB_REPOSITORY), so set it
           # explicitly or gh release upload/edit cannot resolve the repository.
           GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+          IS_PRERELEASE: ${{ needs.release-please.outputs.is_prerelease }}
         run: |
           mapfile -t files < <(find artifacts -type f)
           # Defensive: the three required builders gate this job, so files should
@@ -233,8 +243,17 @@ jobs:
           if [ "${#files[@]}" -eq 0 ]; then
             echo "::error::no artifacts found to attach to the release"; exit 1
           fi
-          gh release upload "${{ needs.release-please.outputs.tag_name }}" "${files[@]}" --clobber
-          gh release edit "${{ needs.release-please.outputs.tag_name }}" --draft=false
+          gh release upload "$TAG" "${files[@]}" --clobber
+          # Un-draft, and set the prerelease/latest flags explicitly. A beta is
+          # marked --prerelease and kept OFF "Latest release" so it never displaces
+          # the newest stable on the repo home; a graduated stable forces the
+          # inverse (release-please flags drafts per the prerelease config, so the
+          # stable branch must clear it, not assume the default).
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            gh release edit "$TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$TAG" --draft=false --prerelease=false --latest
+          fi
 
   bump-cask:
     # Signal the Homebrew tap to bump keycast's cask for this release. The tap's
@@ -253,7 +272,10 @@ jobs:
     # clones) the step warns and exits 0; the tap's weekly cron still catches the
     # release later, so a missed nudge is never fatal.
     needs: [release-please, publish-release]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    # Stable releases only: a beta must never reach Homebrew users (brew has no
+    # `--pre` equivalent to PyPI's, so a bumped cask would push the beta to
+    # everyone). Prereleases stop at PyPI + the GitHub release.
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.release-please.outputs.is_prerelease != 'true' }}
     # Linux is fine now: this only POSTs a dispatch; the bump runs on the tap.
     runs-on: ubuntu-latest
     name: Bump Homebrew cask
@@ -299,7 +321,10 @@ jobs:
     # exists) the step warns and exits 0; the bucket's scheduled run still catches
     # the release later, so a missed nudge is never fatal.
     needs: [release-please, publish-release]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    # Stable releases only (mirrors bump-cask): Scoop has no prerelease channel,
+    # so a beta would land in every bucket user's `scoop update`. Betas stop at
+    # PyPI + the GitHub release.
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.release-please.outputs.is_prerelease != 'true' }}
     # Linux is fine: this only POSTs a dispatch; the bucket's update job runs in
     # the bucket repo.
     runs-on: ubuntu-latest
