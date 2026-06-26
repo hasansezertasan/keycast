@@ -245,11 +245,13 @@ jobs:
     #
     # Best-effort and OUTSIDE the atomic release gate: runs after publish-release,
     # so a tap hiccup never blocks or unwinds a shipped release. `repository_dispatch`
-    # is cross-repo, which GITHUB_TOKEN cannot do, so it needs a PAT able to fire a
-    # dispatch on the tap in the TAP_TOKEN secret (narrower than the old direct-bump
-    # token — no Contents/PR write on the tap is required anymore). When the secret
-    # is absent (forks, unconfigured clones) the step warns and exits 0; the tap's
-    # weekly cron still catches the release later, so a missed nudge is never fatal.
+    # is cross-repo, which GITHUB_TOKEN cannot do, so it needs a PAT in the TAP_TOKEN
+    # secret. Scope: the POST /dispatches endpoint requires Contents: write for
+    # fine-grained PATs, so that stays — but Pull requests: write (needed by the old
+    # direct `bump-cask-pr --no-fork`) can now be dropped, since the tap opens the PR
+    # itself with its own GITHUB_TOKEN. When the secret is absent (forks, unconfigured
+    # clones) the step warns and exits 0; the tap's weekly cron still catches the
+    # release later, so a missed nudge is never fatal.
     needs: [release-please, publish-release]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     # Linux is fine now: this only POSTs a dispatch; the bump runs on the tap.
