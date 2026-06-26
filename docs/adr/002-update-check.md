@@ -191,7 +191,7 @@ pattern:
   throttle-file I/O, GitHub fetch, and the check callback). It is split into
   modules by concern — `sources`, `versions`, `state`, and the `__init__`
   orchestrator — and anchors non-frozen detection on the stdlib `INSTALLER`
-  record; both decisions are recorded in [ADR-004](004-updates-package-structure.md).
+  record; both decisions are recorded in [ADR-005](005-updates-package-structure.md).
   No new CLI subcommand in Phase 1 — the check is invoked from the existing Typer
   root callback in `cli.py`; the `keycast update` verb is reserved for Phase 2.
 - **`keycast info` change:** gains an `Install source:` line. This is additive

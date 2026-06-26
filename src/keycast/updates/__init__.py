@@ -1,6 +1,6 @@
 """Install-source-aware update check (Phase 1: notify only).
 
-The package is split by concern (ADR-004):
+The package is split by concern (ADR-005):
 
 - :mod:`keycast.updates.sources` — how keycast was installed → the right action.
 - :mod:`keycast.updates.versions` — GitHub fetch + PEP 440 compare.

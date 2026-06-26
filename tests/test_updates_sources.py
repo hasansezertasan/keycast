@@ -112,7 +112,7 @@ class TestReadInstaller:
 
 
 class TestDetectInstallSource:
-    """The first-match-wins detection tree (ADR-002 / ADR-004)."""
+    """The first-match-wins detection tree (ADR-002 / ADR-005)."""
 
     def test_frozen_under_caskroom_is_cask(self) -> None:
         loc = Path(

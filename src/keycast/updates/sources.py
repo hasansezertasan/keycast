@@ -4,7 +4,7 @@ The detected :class:`InstallSource` drives the *right* update advice — a cask
 user is told ``brew upgrade --cask``, a pipx user ``pipx upgrade``, and so on
 (see ADR-002). The frozen-vs-not split is reliable; everything past it is a
 heuristic, with an ``UNKNOWN`` fallback that points at the Releases page rather
-than guessing a wrong command. Per ADR-004 the non-frozen path is anchored where
+than guessing a wrong command. Per ADR-005 the non-frozen path is anchored where
 it can be on the stdlib ``INSTALLER`` record, falling back to path markers for
 the cases that record cannot distinguish (pipx and Homebrew-formula both install
 via pip, so both record ``"pip"``).
@@ -134,7 +134,7 @@ def detect_install_source(
 ) -> InstallSource:
     """Classify how the running keycast was installed.
 
-    Resolution is a first-match-wins tree (see ADR-002 / ADR-004). ``sys.frozen``
+    Resolution is a first-match-wins tree (see ADR-002 / ADR-005). ``sys.frozen``
     splits "Python import" from "PyInstaller bundle"; past that the signals are
     heuristic. A Homebrew **cask** ships the *same* frozen bundle as a manual
     Release download, so it is disambiguated by a Caskroom receipt.

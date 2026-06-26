@@ -1,4 +1,4 @@
-# ADR-004: `keycast.updates` package structure and the `INSTALLER` signal
+# ADR-005: `keycast.updates` package structure and the `INSTALLER` signal
 
 ## Status
 
