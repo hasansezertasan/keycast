@@ -183,11 +183,21 @@ release-please ─┬─ build-package  (sdist + wheel,  ubuntu)
 - **`publish-pypi`** depends on all three builds, downloads the sdist/wheel, and
   publishes via PyPI Trusted Publishing (`id-token: write`, no other scope).
 - **`publish-release`** downloads every artifact, attaches them to the release
-  tag, and un-drafts it (`contents: write`). The GitHub Release **intentionally
-  mirrors the PyPI sdist/wheel** alongside the `.dmg`/`.zip`, for a complete,
-  offline-installable release page.
+  tag, and un-drafts it (`contents: write`), marking it `--prerelease` (and not
+  "Latest") for betas. The GitHub Release **intentionally mirrors the PyPI
+  sdist/wheel** alongside the `.dmg`/`.zip`, for a complete, offline-installable
+  release page.
 - **`reconcile`** closes the phantom release PR and re-dispatches the workflow
   (`pull-requests` + `actions` write).
+
+**Beta channel.** Mainline is a rolling prerelease (`prerelease: true` in
+`release-please-config.json`): merges cut `0.2.0-beta.N` tags that hatch-vcs
+normalizes to PEP 440 `0.2.0bN` and ship to **PyPI and the GitHub release only** —
+`pip install keycast` hides them without `--pre`, and the cask/Scoop bumps are
+gated off for prereleases (those channels have no prerelease notion). Graduate to
+stable with a `Release-As: X.Y.Z` commit footer; the stable tag then flows through
+every channel as before. See `CLAUDE.md` → *Release pipeline* for the full
+mechanics.
 
 Each write scope lives on exactly one job (least privilege). Because the release
 is **atomic**, a flaky platform build blocks the PyPI release too — the trade
@@ -212,7 +222,8 @@ release artifacts; `release.yml` produces those.
 
 The cask lives in
 [hasansezertasan/homebrew-tap](https://github.com/hasansezertasan/homebrew-tap),
-alongside the existing formula, and is **bumped automatically on every release**.
+alongside the existing formula, and is **bumped automatically on every stable
+release** (betas are skipped — see the beta-channel note above).
 `brew bump-cask-pr` owns the cask in the tap after the one-time bootstrap below,
 so this repo deliberately keeps **no** copy of `keycast.rb` (it would only drift
 behind the live file).

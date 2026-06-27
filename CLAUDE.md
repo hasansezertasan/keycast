@@ -88,6 +88,20 @@ driven entirely by Conventional Commit messages on `main`:
   a draft release's git tag until it is published, which would make hatch-vcs build
   the wrong version; **`force-tag-creation: true`** makes release-please create the
   tag immediately, so the tag exists at build time.
+- **Mainline is a rolling beta channel.** `prerelease: true` + `versioning:
+  "prerelease"` + `prerelease-type: "beta"` make release-please cut prereleases by
+  default: a normal merge bumps `0.2.0-beta.1 → 0.2.0-beta.2` rather than to a
+  stable version. release-please tags in SemVer (`v0.2.0-beta.1`); hatch-vcs
+  normalizes that to the **PEP 440** `0.2.0b1` (verified — `packaging` accepts the
+  SemVer pre-release forms), so PyPI accepts it and `pip install keycast` ignores
+  it unless `--pre` is passed. **To graduate to stable**, land a commit with a
+  `Release-As: X.Y.Z` footer (no suffix) — release-please then opens a stable
+  release PR at that exact version. The `is_prerelease` job output (`true` when the
+  tag contains a `-`) drives the channel guards: `publish-release` marks betas
+  `--prerelease --latest=false` (stable forces the inverse), and **`bump-cask` /
+  `bump-scoop` are skipped for prereleases** — Homebrew/Scoop have no `--pre`
+  notion, so a beta must never reach those buckets. Betas stop at PyPI + the
+  GitHub release.
 - The `publish` job checks out with `fetch-depth: 0` (hatch-vcs needs the tag
   history), builds with `uv build`, and publishes to PyPI via **trusted publishing**
   (no token; `[tool.uv] trusted-publishing = "always"`), then un-drafts the release.
