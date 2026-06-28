@@ -134,6 +134,14 @@ nightly / canary / insiders / edge are deferred — lives in
 - **Graduate to stable:** land `Release-As: 0.2.0` (no suffix). Only a hyphen-free
   tag clears the `is_prerelease` guard, so this is the build that reaches the
   Homebrew cask + Scoop bucket and is marked "Latest".
+  - **Consolidate the changelog by hand in this PR.** release-please generates
+    each entry from the diff since the *previous* (pre)release, so the `## 0.2.0`
+    section contains only what landed *after the last prerelease* — often empty,
+    since most features ship in the first `0.2.0-beta`. Before merging the
+    `Release-As: 0.2.0` PR, edit `CHANGELOG.md` to fold the `-beta*`/`-rc*`
+    subsections into one `## 0.2.0` section, then edit the `v0.2.0` GitHub Release
+    notes to match. This manual roll-up is the supported workflow — there is no
+    auto-aggregate flag (see [ADR-007](docs/adr/007-prerelease-release-channels.md)).
 - **First-beta `b0` quirk:** release-please's first beta in a cycle is unnumbered
   (`0.2.0-beta` → PEP 440 `0.2.0b0`) — valid, just unusual on PyPI. To force a
   clean `b1`, land `Release-As: 0.2.0-beta.1` before merging the release PR.

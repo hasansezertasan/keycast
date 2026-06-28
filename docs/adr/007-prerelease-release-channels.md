@@ -249,6 +249,16 @@ them):**
 - **Workflow change.** Every release now flows through prerelease mode by default;
   stable requires a deliberate `Release-As`. This makes shipping stable an explicit
   act, which is the intended safety property for a distribution-heavy app.
+- **Fragmented changelog — consolidate at graduation.** release-please generates
+  each `CHANGELOG.md` entry from the diff since the *previous* (pre)release, and
+  leaves the prerelease sections in place. So the final `## X.Y.Z` section contains
+  only commits landed *after the last prerelease* — and because most features ship
+  in the first `X.Y.Z-beta`, the stable entry (and its GitHub Release notes) is
+  often nearly empty. There is no auto-aggregate option; the supported workflow is
+  to **hand-edit `CHANGELOG.md` in the `Release-As` PR** (fold the `-beta*`/`-rc*`
+  subsections into one stable section) and **edit the stable GitHub Release notes**
+  to match. Graduating directly from the first beta (skipping extra beta/rc steps
+  when everything is already baked) minimizes how much there is to fold in.
 - **Nightly blocker (if ever added).** `pyproject.toml` pins `version_scheme =
   "only-version"`, which reports the *exact last tag* between tags (no dev
   distance), so every nightly would collide on the previous version. A nightly
