@@ -166,6 +166,39 @@ reach for a `nightly`/`edge` workflow first (cheap), before `canary` (needs a
 rollout/% mechanism) or `insiders` (needs sponsorship + access control to be worth
 the machinery).
 
+### Delivering prereleases through Homebrew / Scoop (deferred)
+
+Unlike `pip`/`uv`/`npm`/`cargo` — which carry prereleases on the *same* package
+behind a flag (`pip install --pre keycast`) — **Homebrew and Scoop have no `--pre`
+notion**: a package manager models a channel as a **separate, explicitly-named
+package** the user opts into. The conventions:
+
+- **Homebrew** — the same cask token with an `@<channel>` suffix, e.g.
+  `keycast@beta` (cf. `google-chrome@beta`, `visual-studio-code@insiders`). Per the
+  [Cask Cookbook](https://docs.brew.sh/Cask-Cookbook). (The old
+  `homebrew/cask-versions` tap was deprecated and merged into `homebrew/cask` in
+  2024, so variant casks now live beside the stable one.)
+- **Scoop** — a separate manifest with a suffix, e.g. `keycast-beta` (cf.
+  `vscode-insiders`, `firefox-nightly`), optionally in a `versions` bucket.
+
+This yields **two conventional postures**, and keycast is deliberately at (1):
+
+1. **Don't ship prereleases via package managers at all** — keep them on PyPI
+   (`--pre`) + the GitHub pre-release; brew/scoop users only ever see stable. This
+   is the common default (e.g. GoReleaser skips the Scoop bump on a prerelease
+   tag), and it is exactly what the `is_prerelease` guards above implement.
+2. **Ship an explicit opt-in channel package** — a `keycast@beta` cask + a
+   `keycast-beta` manifest, each with its *own* checkver/bump automation gated to
+   *prerelease* tags (the mirror image of the current stable-only guard). Strictly
+   more machinery: a second package per channel, per platform.
+
+Note on granularity: package-manager channels are named by coarse
+**cadence/audience** (`beta`, `nightly`, `insiders`), **not** by PEP 440 maturity
+— **`rc` rarely gets its own brew/scoop channel** (it folds into `beta` or stays
+PyPI-only). So even posture (2) would realistically add just one package:
+`keycast@beta`. Move to posture (2) only if users actually want to *track* betas
+through their package manager.
+
 **Other terms in the landscape (recorded for vocabulary, not because keycast needs
 them):**
 
