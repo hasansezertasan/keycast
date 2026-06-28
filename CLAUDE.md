@@ -115,141 +115,25 @@ driven entirely by Conventional Commit messages on `main`:
   mode rejects pydantic `Field(default=...)` against `Literal` types. mypy, pyright,
   and ty cover `src` instead.
 
-### Choosing a prerelease type (alpha / beta / rc) — and where nightly/canary/insiders fit
+### Prerelease channel — operational quick reference
 
-There are **three orthogonal axes** here, and conflating them is the usual mistake:
+keycast runs a **rolling `beta` prerelease channel** (`prerelease-type: "beta"` in
+`release-please-config.json`). Maturity ladder is `alpha < beta < rc < final`; we
+default to `beta`. **The full rationale — the maturity/cadence/audience three-axis
+model, why `beta` over alpha/rc, what release-please does and does not own, and why
+nightly / canary / insiders / edge are deferred — lives in
+[ADR-007](docs/adr/007-prerelease-release-channels.md).** Day-to-day:
 
-- **Maturity** — *how done is the code?* The ordered ladder
-  `alpha < beta < rc < final` (with `dev`/snapshot builds sitting *below* alpha).
-  PEP 440 recognizes exactly these three pre-release segments (`a`, `b`, `rc`).
-- **Cadence / trigger** — *when and how often is a build cut?* On-demand
-  milestone (what release-please does) vs scheduled (`nightly`) vs continuous
-  (`rolling` / `edge`).
-- **Audience / access** — *who is allowed to get it?* Public vs a small
-  risk-detection slice (`canary`) vs an enrolled-or-paying group (`insiders`) vs
-  internal-only (`dogfood`).
-
-release-please (and therefore `prerelease-type`) only ever speaks the **maturity**
-axis. Cadence and audience are separate mechanisms — see below. `nightly`,
-`canary`, and `insiders` look alike ("a build that's ahead of stable") but each is
-defined by a *different* axis, which is exactly why they get confused.
-
-**The maturity ladder — pick by "merge this if…":**
-
-| Type | PEP 440 | Meaning | Merge this if… |
-|------|---------|---------|----------------|
-| **alpha** | `a` (`0.2.0a1`) | Feature-*incomplete*, expect breakage; early/internal testers | …you're still adding or changing features for this release |
-| **beta** | `b` (`0.2.0b1`) | Feature-*complete*, hunting bugs; API may still shift slightly | …the features are in and you want real users to shake it out |
-| **rc** | `rc` (`0.2.0rc1`) | Believed shippable; ships unless a blocker appears | …this exact build *becomes* the final unless something's wrong |
-
-Sort order is `0.2.0a1 < 0.2.0b1 < 0.2.0rc1 < 0.2.0`, and `pip`/`uv` respect it;
-all three are hidden from a plain `pip install` (only surface with `--pre`).
-
-**Current default for keycast: `beta`** (set in `release-please-config.json` as
-`prerelease-type: "beta"`). Rationale, specific to this project:
-
-- We are pre-1.0 (0.x) and features for a given release are **done and merged**
-  before the prerelease is cut, so `alpha` is semantically too early — we're not
-  feature-incomplete.
-- The risk the prerelease actually manages is the **packaging / distribution
-  surface** (PyInstaller bundles, the Inno installer, the `.dmg`, the Scoop
-  manifest) being exercised in the wild — not API churn. That is textbook *beta*:
-  "feature-complete, help me find bugs."
-- `rc` carries a stronger contract — each rc means "this *is* the final, pending
-  sign-off," and the artifact should be bit-for-bit promotable. That ceremony fits
-  a 1.0 launch with a formal gate, not a rolling 0.x desktop app.
-
-**The type is not fixed forever — escalate within a cycle via `Release-As`.**
-The channel *default* is `beta`, but a `Release-As:` footer overrides the computed
-version per-release, so the natural progression is:
-
-1. Roll betas as features land: `0.2.0-beta.1`, `0.2.0-beta.2`, … (just merge).
-2. When you believe it's done, cut a final-candidate: land a commit with
-   `Release-As: 0.2.0-rc.1` → tag `v0.2.0-rc.1` → hatch-vcs `0.2.0rc1`.
-3. Graduate to stable: land `Release-As: 0.2.0` (no suffix). Only a hyphen-free
-   tag clears the `is_prerelease` guard, so this is the build that reaches the
-   Homebrew cask + Scoop bucket and is marked "Latest".
-
-**First-beta numbering quirk:** release-please's first beta in a cycle is
-unnumbered (`0.2.0-beta`), which normalizes to PEP 440 `0.2.0b0` — valid and
-correctly ordered (`b0 < b1`), just slightly unusual to see on PyPI. To force a
-clean `b1`, land `Release-As: 0.2.0-beta.1` before merging the release PR.
-
-**nightly vs canary vs insiders — the three that look alike:**
-
-- **nightly** *(cadence axis)* — an **automated, scheduled** build (cron) from the
-  tip of `main`, cut *whether or not anything is "ready."* Milestone-blind,
-  available to anyone, no access gate. The defining trait is the **schedule**. In
-  PEP 440 these use the **`.devN` developmental segment** (e.g. `0.3.0.dev20260628`),
-  which sorts *below* alpha: `.dev < a < b < rc < final`. Audience intent: "I want
-  the absolute latest and accept breakage."
-- **canary** *(audience axis — risk)* — a bleeding-edge build pushed to a **small
-  slice as a tripwire** (Chrome's term — the canary in the coal mine) to catch
-  regressions before the wider channel. The defining trait is **early warning via
-  progressive exposure**; the slice is often chosen automatically (e.g. a small %
-  of installs). Frequently continuous like nightly, but the *point* is risk
-  detection, not freshness.
-- **insiders** *(audience axis — access)* — early access gated by **membership,
-  enrollment, or sponsorship**, usually a *standing parallel channel* rather than a
-  one-off. Two common flavors:
-  - **Enrollment / program** — a separately-installable build opted-in users run
-    alongside stable (VS Code *Insiders*, Windows *Insider* rings).
-  - **Sponsorware** — features ship first (or exclusively) to financial sponsors,
-    graduating to the public edition as funding goals are met. The canonical
-    Python-OSS example is **Material for MkDocs Insiders**. This is a *funding /
-    access* model, **not** a maturity stage.
-  The defining trait is **who is permitted**, not how done or how fresh — an
-  insiders build can itself be stable, beta, *or* nightly underneath.
-
-One-liner: **nightly = "newest" (time), canary = "safest rollout" (risk),
-insiders = "privileged access" (membership/money).** They overlap only in the
-incidental sense that all three sit ahead of the public stable channel.
-
-**How they'd map to keycast's stack (none implemented today):**
-
-- `nightly` / `canary` / `edge` are **not** modeled by release-please (which is
-  milestone- and commit-driven — "given the commits since the last release, what's
-  next? open a PR"). They'd be a **separate `on: schedule:` workflow** building
-  from `main` HEAD and publishing a `.dev`/date version, with **no human-gated
-  release PR**.
-- `insiders` is **not a release-please setting at all** — it's a *distribution +
-  access-control* problem: a private package index, a sponsor-gated wheel, or a
-  separate project name (e.g. a hypothetical `keycast-insiders` on a private
-  index). Public PyPI cannot gate by audience, so it could not live there.
-
-> **Wrinkle if nightlies are ever added:** `pyproject.toml` pins
-> `version_scheme = "only-version"`, which reports the *exact last tag* between
-> tags (no dev distance), so every nightly would collide on the previous version.
-> A nightly workflow must override that scheme (or compute a unique date/`.devN`
-> version) to get ordered, non-colliding builds.
-
-**Other terms you'll encounter (vocabulary, not because keycast needs them):**
-
-- **stable / GA (General Availability)** — the final, recommended release; the
-  baseline every channel above is "ahead of." keycast's graduated `X.Y.Z`.
-- **dev channel** — in Chrome's four-channel model (**Stable → Beta → Dev →
-  Canary**), "Dev" sits between beta and canary: fresher than beta, more baked
-  than canary.
-- **edge** — common synonym for the continuously-bleeding-edge channel (Docker's
-  `edge`); effectively nightly-from-`main` without the "every night" promise.
-- **snapshot** — a point-in-time build of in-progress code (Java/Maven
-  `-SNAPSHOT`); conceptually a nightly whose version is understood to be mutable.
-- **rolling release** — continuous updates with no discrete versioned releases
-  (Arch Linux); the opposite of keycast's point-release model.
-- **LTS (Long-Term Support)** — a release *line* maintained with fixes for an
-  extended window; an orthogonal *maintenance-duration* axis. Irrelevant pre-1.0.
-- **preview / technical preview / early access (EA)** — vendor umbrella terms,
-  usually equivalent to beta or insiders depending on who is saying it.
-- **dogfood / internal** — builds restricted to the team before any external
-  exposure; the narrowest audience slice.
-- **feature flags / dark launch** — the *alternative to channels*: ship one build
-  to everyone but gate new behavior at runtime per-user. This is how you get
-  canary-style progressive exposure *without* a separate distribution channel —
-  worth knowing because it is often cheaper than standing one up.
-
-**Recommendation:** keycast needs **none** of nightly / canary / insiders / edge
-yet — the rolling **beta** channel already covers "let people test before stable
-reaches brew/scoop," which is the 90% case. Revisit only post-1.0, and even then
-reach for a `nightly`/`edge` workflow first (cheap), before `canary` (needs a
-rollout/% mechanism) or `insiders` (needs sponsorship + access control to be worth
-the machinery).
+- **Cut a beta: just merge.** release-please bumps `0.2.0-beta.1 → 0.2.0-beta.2`,
+  tagging SemVer (`v0.2.0-beta.1`) which hatch-vcs normalizes to PEP 440 `0.2.0b1`.
+  Betas reach **PyPI** (hidden until `pip install --pre`) and the **GitHub
+  release** (flagged `--prerelease --latest=false`); `bump-cask` / `bump-scoop` are
+  **skipped**, so brew/scoop users stay on stable. The `is_prerelease` workflow
+  output (`true` when the tag contains a `-`) drives these guards.
+- **Escalate to a final-candidate:** land `Release-As: 0.2.0-rc.1` → `0.2.0rc1`.
+- **Graduate to stable:** land `Release-As: 0.2.0` (no suffix). Only a hyphen-free
+  tag clears the `is_prerelease` guard, so this is the build that reaches the
+  Homebrew cask + Scoop bucket and is marked "Latest".
+- **First-beta `b0` quirk:** release-please's first beta in a cycle is unnumbered
+  (`0.2.0-beta` → PEP 440 `0.2.0b0`) — valid, just unusual on PyPI. To force a
+  clean `b1`, land `Release-As: 0.2.0-beta.1` before merging the release PR.
