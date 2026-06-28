@@ -114,3 +114,87 @@ driven entirely by Conventional Commit messages on `main`:
 - `pyrefly` is installed but intentionally **not** in the `style` gate: its strict
   mode rejects pydantic `Field(default=...)` against `Literal` types. mypy, pyright,
   and ty cover `src` instead.
+
+### Choosing a prerelease type (alpha / beta / rc) — and where nightly/canary fit
+
+There are **two orthogonal axes** here, and conflating them is the usual mistake:
+
+- **Maturity** — *how done is the code?* This is the ordered ladder
+  `alpha < beta < rc < final`. PEP 440 recognizes exactly these three pre-release
+  segments (`a`, `b`, `rc`).
+- **Cadence / trigger** — *when and how is the build cut, and for whom?*
+  `nightly` and `canary` live here, **not** on the maturity ladder.
+
+release-please (and therefore `prerelease-type`) only ever speaks the **maturity**
+axis. The cadence axis is a separate mechanism — see the nightly/canary note below.
+
+**The maturity ladder — pick by "merge this if…":**
+
+| Type | PEP 440 | Meaning | Merge this if… |
+|------|---------|---------|----------------|
+| **alpha** | `a` (`0.2.0a1`) | Feature-*incomplete*, expect breakage; early/internal testers | …you're still adding or changing features for this release |
+| **beta** | `b` (`0.2.0b1`) | Feature-*complete*, hunting bugs; API may still shift slightly | …the features are in and you want real users to shake it out |
+| **rc** | `rc` (`0.2.0rc1`) | Believed shippable; ships unless a blocker appears | …this exact build *becomes* the final unless something's wrong |
+
+Sort order is `0.2.0a1 < 0.2.0b1 < 0.2.0rc1 < 0.2.0`, and `pip`/`uv` respect it;
+all three are hidden from a plain `pip install` (only surface with `--pre`).
+
+**Current default for keycast: `beta`** (set in `release-please-config.json` as
+`prerelease-type: "beta"`). Rationale, specific to this project:
+
+- We are pre-1.0 (0.x) and features for a given release are **done and merged**
+  before the prerelease is cut, so `alpha` is semantically too early — we're not
+  feature-incomplete.
+- The risk the prerelease actually manages is the **packaging / distribution
+  surface** (PyInstaller bundles, the Inno installer, the `.dmg`, the Scoop
+  manifest) being exercised in the wild — not API churn. That is textbook *beta*:
+  "feature-complete, help me find bugs."
+- `rc` carries a stronger contract — each rc means "this *is* the final, pending
+  sign-off," and the artifact should be bit-for-bit promotable. That ceremony fits
+  a 1.0 launch with a formal gate, not a rolling 0.x desktop app.
+
+**The type is not fixed forever — escalate within a cycle via `Release-As`.**
+The channel *default* is `beta`, but a `Release-As:` footer overrides the computed
+version per-release, so the natural progression is:
+
+1. Roll betas as features land: `0.2.0-beta.1`, `0.2.0-beta.2`, … (just merge).
+2. When you believe it's done, cut a final-candidate: land a commit with
+   `Release-As: 0.2.0-rc.1` → tag `v0.2.0-rc.1` → hatch-vcs `0.2.0rc1`.
+3. Graduate to stable: land `Release-As: 0.2.0` (no suffix). Only a hyphen-free
+   tag clears the `is_prerelease` guard, so this is the build that reaches the
+   Homebrew cask + Scoop bucket and is marked "Latest".
+
+**First-beta numbering quirk:** release-please's first beta in a cycle is
+unnumbered (`0.2.0-beta`), which normalizes to PEP 440 `0.2.0b0` — valid and
+correctly ordered (`b0 < b1`), just slightly unusual to see on PyPI. To force a
+clean `b1`, land `Release-As: 0.2.0-beta.1` before merging the release PR.
+
+**Where nightly and canary sit (the cadence axis):**
+
+- **nightly** — an **automated, scheduled** build (cron) from the tip of `main`,
+  cut *whether or not anything is "ready."* Milestone-blind. In PEP 440 these use
+  the **`.devN` developmental segment** (e.g. `0.3.0.dev20260628`), which sorts
+  *below* alpha: `.dev < a < b < rc < final`. Audience: "I want the absolute
+  latest and accept breakage."
+- **canary** — a continuously bleeding-edge build pushed to a **small audience as
+  a tripwire** (Chrome's term — the canary in the coal mine) to catch problems
+  before the wider channel. Same scheduled/continuous cadence as nightly; the
+  defining trait is *progressive exposure*, not the schedule.
+
+These are **not implemented through release-please**, which is milestone- and
+commit-driven (it answers "given the conventional commits since the last release,
+what's next? open a PR" — inherently a *planned-release* tool). nightly/canary
+are schedule-driven with **no human-gated release PR**, so they would be a
+**separate `on: schedule:` workflow** that builds from `main` HEAD and publishes a
+`.dev`/date version.
+
+> **Wrinkle if nightlies are ever added:** `pyproject.toml` pins
+> `version_scheme = "only-version"`, which reports the *exact last tag* between
+> tags (no dev distance), so every nightly would collide on the previous version.
+> A nightly workflow must override that scheme (or compute a unique date/`.devN`
+> version) to get ordered, non-colliding builds.
+
+**Recommendation:** keycast does **not** need nightly/canary yet — the rolling
+beta channel already covers "let people test before stable reaches brew/scoop,"
+which is the 90% case. Revisit only post-1.0 if "latest `main`, accept breakage"
+becomes a real audience (enough contributors/users to justify it).
