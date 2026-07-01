@@ -88,20 +88,16 @@ driven entirely by Conventional Commit messages on `main`:
   a draft release's git tag until it is published, which would make hatch-vcs build
   the wrong version; **`force-tag-creation: true`** makes release-please create the
   tag immediately, so the tag exists at build time.
-- **Mainline is a rolling beta channel.** `prerelease: true` + `versioning:
-  "prerelease"` + `prerelease-type: "beta"` make release-please cut prereleases by
-  default: a normal merge bumps `0.2.0-beta.1 → 0.2.0-beta.2` rather than to a
-  stable version. release-please tags in SemVer (`v0.2.0-beta.1`); hatch-vcs
-  normalizes that to the **PEP 440** `0.2.0b1` (verified — `packaging` accepts the
-  SemVer pre-release forms), so PyPI accepts it and `pip install keycast` ignores
-  it unless `--pre` is passed. **To graduate to stable**, land a commit with a
-  `Release-As: X.Y.Z` footer (no suffix) — release-please then opens a stable
-  release PR at that exact version. The `is_prerelease` job output (`true` when the
-  tag contains a `-`) drives the channel guards: `publish-release` marks betas
-  `--prerelease --latest=false` (stable forces the inverse), and **`bump-cask` /
-  `bump-scoop` are skipped for prereleases** — Homebrew/Scoop have no `--pre`
-  notion, so a beta must never reach those buckets. Betas stop at PyPI + the
-  GitHub release.
+- **Mainline cuts stable releases** — the prerelease/beta channel is **designed
+  but currently disabled.** The pipeline *can* run mainline as a rolling `beta`
+  channel (`prerelease` + `versioning: "prerelease"` + `prerelease-type: "beta"`),
+  but those keys are intentionally **absent** from `release-please-config.json`, so
+  a normal merge bumps to a stable version. The `is_prerelease` guards in
+  `release.yml` remain in place but **inert**: a stable tag has no `-` →
+  `is_prerelease=false` → `bump-cask`/`bump-scoop` fire and the release is marked
+  "Latest", exactly as before the channel existed. To re-activate the channel, add
+  the three config keys back; the full design, rationale, and graduation workflow
+  are recorded in [ADR-007](docs/adr/007-prerelease-release-channels.md).
 - The `publish` job checks out with `fetch-depth: 0` (hatch-vcs needs the tag
   history), builds with `uv build`, and publishes to PyPI via **trusted publishing**
   (no token; `[tool.uv] trusted-publishing = "always"`), then un-drafts the release.
@@ -115,14 +111,16 @@ driven entirely by Conventional Commit messages on `main`:
   mode rejects pydantic `Field(default=...)` against `Literal` types. mypy, pyright,
   and ty cover `src` instead.
 
-### Prerelease channel — operational quick reference
+### Prerelease channel — operational quick reference (currently disabled)
 
-keycast runs a **rolling `beta` prerelease channel** (`prerelease-type: "beta"` in
-`release-please-config.json`). Maturity ladder is `alpha < beta < rc < final`; we
-default to `beta`. **The full rationale — the maturity/cadence/audience three-axis
-model, why `beta` over alpha/rc, what release-please does and does not own, and why
-nightly / canary / insiders / edge are deferred — lives in
-[ADR-007](docs/adr/007-prerelease-release-channels.md).** Day-to-day:
+The rolling `beta` prerelease channel is **designed but not active** (see the
+release-pipeline note above and [ADR-007](docs/adr/007-prerelease-release-channels.md)
+for the full rationale — the maturity/cadence/audience three-axis model, why `beta`
+over alpha/rc, what release-please does and does not own, and why
+nightly / canary / insiders / edge are deferred). **To enable it**, add
+`prerelease: true` + `versioning: "prerelease"` + `prerelease-type: "beta"` to
+`release-please-config.json`. Once enabled, the maturity ladder is
+`alpha < beta < rc < final` (default `beta`), and day-to-day:
 
 - **Cut a beta: just merge.** release-please bumps `0.2.0-beta.1 → 0.2.0-beta.2`,
   tagging SemVer (`v0.2.0-beta.1`) which hatch-vcs normalizes to PEP 440 `0.2.0b1`.

@@ -2,15 +2,29 @@
 
 ## Status
 
-Accepted — 2026-06-28. Implemented: `prerelease: true` + `versioning:
-"prerelease"` + `prerelease-type: "beta"` in `.github/release-please-config.json`,
-and the `is_prerelease` output + channel guards in `.github/workflows/release.yml`
-(prerelease GitHub releases marked `--prerelease --latest=false`; `bump-cask` /
-`bump-scoop` gated to stable). Builds on [ADR-001](001-desktop-app-packaging.md)
-(the multi-channel packaging this routes between) and the release pipeline
-documented in `CLAUDE.md` → *Release pipeline* and `docs/PACKAGING.md`. The
-operational "how to cut / graduate a beta" lives in `CLAUDE.md`; this ADR records
-the *why* and the landscape of alternatives. Supersedes nothing.
+**Proposed — deferred.** The mechanism was built and briefly live (the channel was
+enabled 2026-06-28, then **disabled 2026-07-01** — the decision was to ship 0.2.0
+as a normal stable release and not run a prerelease channel *for now*). The design
+and reasoning below are retained and ready to re-activate; this ADR is the record
+of both the design and the deferral.
+
+Current state:
+
+- **Config: OFF.** The `prerelease` / `versioning` / `prerelease-type` keys are
+  **absent** from `.github/release-please-config.json`, so mainline cuts **stable**
+  releases. Re-activating the channel is a one-line change: add those three keys
+  back (see *Decision*).
+- **Guards: present but inert.** The `is_prerelease` output + channel guards in
+  `.github/workflows/release.yml` (prerelease GitHub releases marked `--prerelease
+  --latest=false`; `bump-cask` / `bump-scoop` gated to stable) remain in place. For
+  a stable tag they are no-ops (no `-` → `is_prerelease=false`), so they cost
+  nothing while the channel is off and are ready the moment it is on.
+
+Builds on [ADR-001](001-desktop-app-packaging.md) (the multi-channel packaging this
+routes between) and the release pipeline documented in `CLAUDE.md` → *Release
+pipeline* and `docs/PACKAGING.md`. The operational "how to cut / graduate a beta"
+lives in `CLAUDE.md`; this ADR records the *why* and the landscape of
+alternatives. Supersedes nothing.
 
 ## Context
 
@@ -48,10 +62,15 @@ control).
 
 ## Decision
 
-- **Run mainline as a rolling `beta` prerelease channel.** Set `prerelease: true`,
-  `versioning: "prerelease"`, `prerelease-type: "beta"` in
-  `release-please-config.json`. A normal merge now bumps `0.2.0-beta.1 →
-  0.2.0-beta.2` rather than to a stable version.
+**Deferred for now:** do *not* run a prerelease channel; ship 0.2.0 (and further
+releases) as normal stable versions. The design below is the retained, ready-to-go
+shape *if the channel is re-activated* — it is written in the present tense as the
+intended behavior when enabled, not as current behavior.
+
+- **Run mainline as a rolling `beta` prerelease channel.** Add `prerelease: true`,
+  `versioning: "prerelease"`, `prerelease-type: "beta"` to
+  `release-please-config.json` (currently absent). When set, a normal merge bumps
+  `0.2.0-beta.1 → 0.2.0-beta.2` rather than to a stable version.
 - **Tag in SemVer, ship as PEP 440.** release-please tags `v0.2.0-beta.1`;
   hatch-vcs (`version_scheme = "only-version"`, `local_scheme =
   "no-local-version"`) normalizes that to `0.2.0b1`. Verified end-to-end (the
