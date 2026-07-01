@@ -184,20 +184,19 @@ release-please ─┬─ build-package  (sdist + wheel,  ubuntu)
   publishes via PyPI Trusted Publishing (`id-token: write`, no other scope).
 - **`publish-release`** downloads every artifact, attaches them to the release
   tag, and un-drafts it (`contents: write`), marking it `--prerelease` (and not
-  "Latest") for betas. The GitHub Release **intentionally mirrors the PyPI
-  sdist/wheel** alongside the `.dmg`/`.zip`, for a complete, offline-installable
-  release page.
+  "Latest") for prereleases (a no-op while the beta channel is off — see below).
+  The GitHub Release **intentionally mirrors the PyPI sdist/wheel** alongside the
+  `.dmg`/`.zip`, for a complete, offline-installable release page.
 - **`reconcile`** closes the phantom release PR and re-dispatches the workflow
   (`pull-requests` + `actions` write).
 
-**Beta channel.** Mainline is a rolling prerelease (`prerelease: true` in
-`release-please-config.json`): merges cut `0.2.0-beta.N` tags that hatch-vcs
-normalizes to PEP 440 `0.2.0bN` and ship to **PyPI and the GitHub release only** —
-`pip install keycast` hides them without `--pre`, and the cask/Scoop bumps are
-gated off for prereleases (those channels have no prerelease notion). Graduate to
-stable with a `Release-As: X.Y.Z` commit footer; the stable tag then flows through
-every channel as before. See `CLAUDE.md` → *Release pipeline* for the full
-mechanics.
+**Beta channel (designed, currently disabled).** The pipeline *can* run mainline
+as a rolling prerelease that ships `0.2.0-beta.N` (→ PEP 440 `0.2.0bN`) to **PyPI
+and the GitHub release only**, holding it back from the cask/Scoop buckets. It is
+**not active**: the `prerelease` keys are absent from `release-please-config.json`,
+so mainline cuts stable, and the `is_prerelease` guards above are inert. See
+[ADR-007](adr/007-prerelease-release-channels.md) for the full design, rationale,
+and how to re-enable it.
 
 Each write scope lives on exactly one job (least privilege). Because the release
 is **atomic**, a flaky platform build blocks the PyPI release too — the trade
