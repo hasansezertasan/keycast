@@ -93,6 +93,14 @@ driven entirely by Conventional Commit messages on `main`:
   (no token; `[tool.uv] trusted-publishing = "always"`), then un-drafts the release.
   PyPI must have a trusted publisher configured for this repo/workflow, and a
   `publish` GitHub environment must exist.
+- release-please runs with a dedicated **`RELEASE_PLEASE_TOKEN`** (a fine-grained
+  PAT / GitHub App token), *not* the default `GITHUB_TOKEN`. This is required: a PR
+  opened by `GITHUB_TOKEN` does not trigger further workflow runs (GitHub's
+  anti-recursion rule), so the release PR would never fire `check-pr-title.yml`'s
+  `pull_request_target`, and the required **Validate PR title** check would sit at
+  "Expected — Waiting for status to be reported" forever, blocking the merge. The
+  token must have `contents: write` + `pull-requests: write`. If it is missing or
+  expired, that stuck check is the symptom.
 - **CI** (`ci.yml`) runs `prek` hooks (`prek.toml`) and the full `tox` suite
   (`[tool.tox]`) on Linux/macOS/Windows; the Linux job needs `xvfb` because `pynput`
   imports an X backend at import time. **PR titles** are linted as Conventional

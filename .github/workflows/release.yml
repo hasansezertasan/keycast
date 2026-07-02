@@ -23,6 +23,14 @@ jobs:
         id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
+          # A non-GITHUB_TOKEN identity is required so the release PR triggers
+          # other workflows. GitHub deliberately suppresses workflow events for
+          # anything the default GITHUB_TOKEN creates (anti-recursion), so a PR
+          # opened as GITHUB_TOKEN never fires `check-pr-title.yml`'s
+          # `pull_request_target` -- leaving the required "Validate PR title"
+          # check stuck at "Expected -- Waiting for status to be reported" and
+          # blocking the merge forever. A PAT/App token restores the event.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: .github/release-please-config.json
           manifest-file: .github/release-please-manifest.json
 
