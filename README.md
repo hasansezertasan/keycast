@@ -69,9 +69,9 @@ scoop install keycast-pipx
 ```
 
 `keycast` is the packaged app; `keycast-pipx` is the terminal tool (it installs
-*via* pipx, so `keycast info` reports `Install source: pipx`). Upgrade later with
-`scoop update keycast` (or `sudo scoop update keycast -g` for a global `-g`
-install).
+*via* pipx, so `keycast info` reports `Install source: pipx`). Upgrade later by
+name — `scoop update keycast` for the app or `scoop update keycast-pipx` for the
+CLI (add `sudo … -g` for a global `-g` install).
 
 ### From PyPI
 
