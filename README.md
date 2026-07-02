@@ -32,6 +32,24 @@ Pre-built, double-click applications are attached to each
   and run `keycast.exe` from the extracted folder. Either build is unsigned, so
   Windows SmartScreen may warn on first run: click **More info → Run anyway**.
 
+### Homebrew
+
+keycast ships through a Homebrew [tap](https://github.com/hasansezertasan/homebrew-tap)
+as both a **cask** (the macOS `.app`) and a **formula** (the CLI):
+
+```bash
+# macOS app (GUI) — installs keycast.app into /Applications
+brew install --cask hasansezertasan/tap/keycast
+
+# CLI (keycast version, keycast info, run from a terminal)
+brew install hasansezertasan/tap/keycast
+```
+
+The cask is the double-click app; the formula is the terminal tool. On macOS the
+cask build is unsigned, so the same Gatekeeper and permission steps as the
+[Desktop app](#desktop-app-recommended) apply on first launch. Upgrade later with
+`brew upgrade --cask keycast` (cask) or `brew upgrade keycast` (formula).
+
 ### From PyPI
 
 If you already have Python 3.14+ and [uv](https://docs.astral.sh/uv/):
