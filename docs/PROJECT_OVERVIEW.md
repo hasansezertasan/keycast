@@ -224,8 +224,10 @@ variables are intentionally ignored (`Settings.settings_customise_sources`).
 ## Deployment and Distribution
 
 ### Distribution Method
-- **Source Distribution**: Standard Python package
-- **Console Script**: `keycast` command for easy execution
+- **PyPI**: Standard Python package (`uvx keycast`, `pipx install keycast`), exposing the `keycast` console script
+- **Pre-built apps**: signed-less `.dmg` / `keycast-windows.zip` bundles and a `keycast-setup.exe` installer attached to each GitHub release
+- **Homebrew**: a [tap](https://github.com/hasansezertasan/homebrew-tap) shipping a cask (macOS app) and a formula (CLI)
+- **Scoop**: a [bucket](https://github.com/hasansezertasan/scoop-bucket) shipping `keycast` (app) and `keycast-pipx` (CLI) manifests
 - **Cross-platform**: Works on all supported platforms
 
 ### Installation Requirements

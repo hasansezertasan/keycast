@@ -50,6 +50,29 @@ cask build is unsigned, so the same Gatekeeper and permission steps as the
 [Desktop app](#desktop-app-recommended) apply on first launch. Upgrade later with
 `brew upgrade --cask keycast` (cask) or `brew upgrade keycast` (formula).
 
+### Scoop
+
+On Windows, keycast ships through a
+[Scoop](https://scoop.sh) bucket ([`hasansezertasan/scoop-bucket`](https://github.com/hasansezertasan/scoop-bucket)).
+Mirroring the Homebrew cask/formula split, it carries **two manifests** — Scoop
+has no cask/formula namespace, so each is a distinct installable name. Add the
+bucket once, then install either:
+
+```powershell
+scoop bucket add keycast https://github.com/hasansezertasan/scoop-bucket
+
+# App (GUI) — the keycast.exe bundle, shimmed onto your PATH
+scoop install keycast
+
+# CLI — installed through pipx (keycast version, keycast info)
+scoop install keycast-pipx
+```
+
+`keycast` is the packaged app; `keycast-pipx` is the terminal tool (it installs
+*via* pipx, so `keycast info` reports `Install source: pipx`). Upgrade later by
+name — `scoop update keycast` for the app or `scoop update keycast-pipx` for the
+CLI (add `sudo … -g` for a global `-g` install).
+
 ### From PyPI
 
 If you already have Python 3.14+ and [uv](https://docs.astral.sh/uv/):
