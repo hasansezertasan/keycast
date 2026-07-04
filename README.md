@@ -107,6 +107,12 @@ On macOS, you'll need to grant accessibility permissions to your terminal or IDE
 2. Add your terminal application (Terminal.app, iTerm2, etc.) or IDE to the list.
 3. Make sure the checkbox is checked.
 
+#### Windows
+
+Windows usually works without an explicit input-permission prompt. On startup,
+keycast reports listener availability in the overlay (`Input status — ...`) so
+you can immediately see whether keyboard/mouse capture is active.
+
 ## Configuration
 
 keycast uses a JSON configuration file with Pydantic-based settings validation. You do not need to manually create this file—the application will automatically create it if it doesn't exist.
@@ -196,7 +202,8 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
   "debug": false,
   "start_minimized": false,
   "auto_start": true,
-  "check_for_updates": true
+  "check_for_updates": true,
+  "show_startup_status": true
 }
 ```
 
@@ -207,6 +214,10 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
 > version exists (see [Updates](#updates)). Set it to `false` to disable all
 > automatic update checks (offline and privacy-respecting). The check fails
 > silently when offline.
+
+> `show_startup_status` — when `true` (default), keycast shows a short startup
+> line on the overlay with keyboard/mouse capture status (e.g. OK, Off,
+> Permission needed, Unknown). Set it to `false` to suppress this message.
 
 > `debug` — when `true`, keycast surfaces verbose diagnostics regardless of
 > `logging.level`; a quick switch for troubleshooting without editing the logging

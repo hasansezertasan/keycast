@@ -29,7 +29,9 @@ def keycast() -> Iterator[Keycast]:
         # the wiring is asserted explicitly in TestUpdateCheck.
         patch("keycast.application.notify_pending_update"),
     ):
-        settings_cls.create_settings_file.return_value = Mock()
+        settings = Mock()
+        settings.show_startup_status = False
+        settings_cls.create_settings_file.return_value = settings
         window_cls.return_value = Mock()
         mouse_cls.return_value = Mock()
         key_cls.return_value = Mock()
@@ -173,6 +175,98 @@ class TestStart:
             call.show_text("keycast 9.9.9"),
             call.start(start_minimized=False),
         ]
+
+    def test_startup_status_shown_when_enabled(self, keycast: Keycast) -> None:
+        keycast.settings.auto_start = True
+        keycast.settings.start_minimized = False
+        keycast.settings.show_startup_status = True
+        keycast.mouse_listener.settings.enabled = True
+        keycast.key_listener.settings.enabled = True
+        manager = Mock()
+        manager.attach_mock(keycast.display_window.show_text, "show_text")
+        manager.attach_mock(keycast.display_window.start, "start")
+
+        with patch("keycast.application.__version__", "9.9.9"):
+            keycast.start()
+
+        assert manager.mock_calls == [
+            call.show_text("keycast 9.9.9"),
+            call.show_text("Input status — Keyboard: OK, Mouse: OK"),
+            call.start(start_minimized=False),
+        ]
+
+    def test_startup_status_logged_with_structured_fields(
+        self, keycast: Keycast, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        keycast.settings.auto_start = True
+        keycast.settings.start_minimized = False
+        keycast.mouse_listener.settings.enabled = True
+        keycast.key_listener.settings.enabled = True
+
+        with caplog.at_level("INFO", logger="keycast.application"):
+            keycast.start()
+
+        assert "startup_input_status" in caplog.text
+        assert "keyboard=active" in caplog.text
+        assert "mouse=active" in caplog.text
+        assert "precheck=unknown" in caplog.text
+
+    def test_windows_status_uses_listener_result_on_failure(
+        self, keycast: Keycast
+    ) -> None:
+        keycast.settings.auto_start = True
+        keycast.settings.start_minimized = False
+        keycast.settings.show_startup_status = True
+        keycast.mouse_listener.settings.enabled = True
+        keycast.key_listener.settings.enabled = True
+        keycast.key_listener.start.side_effect = RuntimeError("permission denied")
+
+        with patch("keycast.application.platform.system", return_value="Windows"):
+            keycast.start()
+
+        keycast.display_window.show_text.assert_any_call(
+            "Input status — Keyboard: Permission needed, Mouse: OK"
+        )
+
+    def test_macos_status_uses_precheck_denied_as_permission_needed(
+        self, keycast: Keycast
+    ) -> None:
+        keycast.settings.auto_start = True
+        keycast.settings.start_minimized = False
+        keycast.settings.show_startup_status = True
+        keycast.mouse_listener.settings.enabled = True
+        keycast.key_listener.settings.enabled = True
+        keycast.key_listener.start.side_effect = RuntimeError("permission denied")
+
+        with (
+            patch("keycast.application.platform.system", return_value="Darwin"),
+            patch.object(Keycast, "_macos_permission_precheck", return_value=False),
+        ):
+            keycast.start()
+
+        keycast.display_window.show_text.assert_any_call(
+            "Input status — Keyboard: Permission needed, Mouse: OK"
+        )
+
+    def test_macos_status_falls_back_to_unknown_when_precheck_unavailable(
+        self, keycast: Keycast
+    ) -> None:
+        keycast.settings.auto_start = True
+        keycast.settings.start_minimized = False
+        keycast.settings.show_startup_status = True
+        keycast.mouse_listener.settings.enabled = True
+        keycast.key_listener.settings.enabled = True
+        keycast.key_listener.start.side_effect = RuntimeError("permission denied")
+
+        with (
+            patch("keycast.application.platform.system", return_value="Darwin"),
+            patch.object(Keycast, "_macos_permission_precheck", return_value=None),
+        ):
+            keycast.start()
+
+        keycast.display_window.show_text.assert_any_call(
+            "Input status — Keyboard: Unknown, Mouse: OK"
+        )
 
     def test_no_version_splash_on_minimized_start(self, keycast: Keycast) -> None:
         """A minimized start stays fully hidden: no splash to defeat the point."""

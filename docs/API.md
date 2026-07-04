@@ -64,7 +64,9 @@ calls `setup_logging`, and constructs the `DisplayWindow`, `MouseListener`, and
 ##### start() -> None
 
 Starts the mouse and keyboard listeners, then starts the display window last
-(its `start()` blocks on the Tk main loop). Prefer `run()` for normal use.
+(its `start()` blocks on the Tk main loop). On non-minimized launch it also
+shows a short startup input-status line (when `show_startup_status=true`) and
+logs the same status as a structured event. Prefer `run()` for normal use.
 
 ##### stop() -> None
 
@@ -402,6 +404,7 @@ def create_settings_file(cls) -> Settings
 - `start_minimized` (bool): Start with the overlay hidden; it appears the first time a key or click is captured (default: `false`). Requires `auto_start` (rejected with it off, since nothing would ever re-show the overlay). If no listener is live at startup (all disabled, or all fail to start), the overlay is kept visible instead of hidden.
 - `auto_start` (bool): Start the input listeners on launch (default: `true`). When `false`, no listeners start regardless of `keyboard.enabled` / `mouse.enabled` — an app-level master switch.
 - `check_for_updates` (bool): Gate the automatic update check (default: `true`). When `true`, keycast queries the GitHub Releases API at most once per day and shows a non-blocking notice if a newer version exists; `false` disables all automatic checks. Throttle state lives in `~/.keycast/update-check.json`, not on `Settings`. See `keycast.updates` and [ADR-002](adr/002-update-check.md).
+- `show_startup_status` (bool): Show a one-line startup input-status summary on the overlay (default: `true`). This line reports keyboard/mouse capture as `OK`, `Off`, `Permission needed`, or `Unknown` and mirrors a structured startup log event. On macOS, a best-effort precheck informs permission-needed vs unknown; on Windows, listener start outcome is used directly.
 
 > The application version is exposed as `keycast.__version__`, generated at
 > build time from the git tag by hatch-vcs (into `src/keycast/_version.py`),

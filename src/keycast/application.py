@@ -1,9 +1,11 @@
 """Main entry point for the keycast application."""
 
+import ctypes
 import logging
 import platform
 import signal
 import sys
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from keycast import __version__
@@ -15,6 +17,15 @@ from keycast.updates import notify_pending_update
 
 if TYPE_CHECKING:
     import types
+
+
+class _InputSourceStatus(StrEnum):
+    """Startup status for one input source."""
+
+    ACTIVE = "active"
+    DISABLED = "disabled"
+    NO_ACCESS = "no_access"
+    UNKNOWN = "unknown"
 
 
 class Keycast:
@@ -75,16 +86,17 @@ class Keycast:
         """
         # auto_start is the app-level master switch: when off, no listeners start
         # regardless of the per-listener keyboard.enabled / mouse.enabled flags.
-        any_source_active = False
+        started: dict[str, bool] = {"mouse": False, "keyboard": False}
         if self.settings.auto_start:
             # Attempt both regardless of either's outcome (degrade, don't crash).
-            started = [
-                self._start_listener("mouse", self.mouse_listener),
-                self._start_listener("keyboard", self.key_listener),
-            ]
-            any_source_active = any(started)
+            started["mouse"] = self._start_listener("mouse", self.mouse_listener)
+            started["keyboard"] = self._start_listener("keyboard", self.key_listener)
         else:
             self.logger.info(format_event("listeners_autostart_disabled"))
+        any_source_active = any(started.values())
+        precheck = self._startup_permission_precheck()
+        statuses = self._startup_input_statuses(started=started, precheck=precheck)
+        self._log_startup_input_status(statuses=statuses, precheck=precheck)
 
         # Only honor start_minimized when an input source is actually live to
         # re-show the overlay. The restore path is driven by show_text, so with no
@@ -104,6 +116,8 @@ class Keycast:
         # splash would defeat that.
         if not start_minimized:
             self.display_window.show_text(f"keycast {__version__}")
+            if self.settings.show_startup_status:
+                self.display_window.show_text(self._format_startup_status_line(statuses))
             # Surface a cached "update available" notice through the same sink, so
             # it shares the fade timer and needs no special rendering path. The
             # network refresh runs on a background daemon thread; any notice it
@@ -120,6 +134,132 @@ class Keycast:
             )
         # Start the display window last to avoid race conditions.
         self.display_window.start(start_minimized=start_minimized)
+
+    def _startup_permission_precheck(self) -> bool | None:
+        """Return pre-start permission state when the platform can report it."""
+        if platform.system() != "Darwin":
+            return None
+        return self._macos_permission_precheck()
+
+    @staticmethod
+    def _macos_permission_precheck() -> bool | None:
+        """Return a best-effort macOS input permission precheck.
+
+        Returns:
+            ``True`` when both checks are explicitly granted, ``False`` when at
+            least one check is explicitly denied, and ``None`` when the host
+            APIs are unavailable or cannot be read.
+        """
+        try:
+            app_services = ctypes.CDLL(
+                "/System/Library/Frameworks/ApplicationServices.framework/"
+                "ApplicationServices"
+            )
+        except OSError:
+            return None
+
+        ax_check = getattr(app_services, "AXIsProcessTrusted", None)
+        if ax_check is not None:
+            ax_check.restype = ctypes.c_bool
+            ax_check.argtypes = []
+            try:
+                accessibility_ok: bool | None = bool(ax_check())
+            except Exception:
+                accessibility_ok = None
+        else:
+            accessibility_ok = None
+
+        input_check = getattr(app_services, "CGPreflightListenEventAccess", None)
+        if input_check is not None:
+            input_check.restype = ctypes.c_bool
+            input_check.argtypes = []
+            try:
+                input_ok: bool | None = bool(input_check())
+            except Exception:
+                input_ok = None
+        else:
+            input_ok = None
+
+        if accessibility_ok is False or input_ok is False:
+            return False
+        if accessibility_ok is True and input_ok is True:
+            return True
+        return None
+
+    def _startup_input_statuses(
+        self,
+        started: dict[str, bool],
+        precheck: bool | None,
+    ) -> dict[str, _InputSourceStatus]:
+        """Derive startup status per input source."""
+        system = platform.system()
+        return {
+            "keyboard": self._resolve_source_status(
+                enabled=self.key_listener.settings.enabled,
+                started=started["keyboard"],
+                precheck=precheck,
+                system=system,
+            ),
+            "mouse": self._resolve_source_status(
+                enabled=self.mouse_listener.settings.enabled,
+                started=started["mouse"],
+                precheck=precheck,
+                system=system,
+            ),
+        }
+
+    def _resolve_source_status(
+        self,
+        *,
+        enabled: bool,
+        started: bool,
+        precheck: bool | None,
+        system: str,
+    ) -> _InputSourceStatus:
+        """Resolve one source into a user-facing startup status."""
+        if not self.settings.auto_start or not enabled:
+            return _InputSourceStatus.DISABLED
+        if started:
+            return _InputSourceStatus.ACTIVE
+        if system == "Darwin":
+            if precheck is False:
+                return _InputSourceStatus.NO_ACCESS
+            return _InputSourceStatus.UNKNOWN
+        if system == "Windows":
+            return _InputSourceStatus.NO_ACCESS
+        return _InputSourceStatus.UNKNOWN
+
+    @staticmethod
+    def _format_startup_status_line(statuses: dict[str, _InputSourceStatus]) -> str:
+        """Build the one-line startup status for the overlay."""
+        labels = {
+            _InputSourceStatus.ACTIVE: "OK",
+            _InputSourceStatus.DISABLED: "Off",
+            _InputSourceStatus.NO_ACCESS: "Permission needed",
+            _InputSourceStatus.UNKNOWN: "Unknown",
+        }
+        keyboard = labels[statuses["keyboard"]]
+        mouse = labels[statuses["mouse"]]
+        return f"Input status — Keyboard: {keyboard}, Mouse: {mouse}"
+
+    def _log_startup_input_status(
+        self,
+        *,
+        statuses: dict[str, _InputSourceStatus],
+        precheck: bool | None,
+    ) -> None:
+        """Log startup input status as a structured event."""
+        precheck_text = (
+            "granted" if precheck is True else "denied" if precheck is False else "unknown"
+        )
+        self.logger.info(
+            format_event(
+                "startup_input_status",
+                keyboard=statuses["keyboard"],
+                mouse=statuses["mouse"],
+                precheck=precheck_text,
+            )
+        )
 
     def _start_listener(self, name: str, listener: MouseListener | KeyListener) -> bool:
         """Start one input listener, degrading to a logged hint on failure.
