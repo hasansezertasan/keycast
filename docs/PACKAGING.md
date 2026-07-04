@@ -293,9 +293,10 @@ stanza ever changes (caveats, signing later), edit it in the tap directly.
 ## Scoop bucket
 
 keycast is also distributed through a [Scoop](https://scoop.sh) bucket
-(`hasansezertasan/scoop-bucket`). Mirroring the tap's **formula + cask** split,
-the bucket carries **two manifests** — Scoop has no formula/cask namespace, so
-each is a distinct installable name:
+(`hasansezertasan/scoop-bucket`); see
+[ADR-008](adr/008-scoop-bucket.md) for the decision and rationale. Mirroring the
+tap's **formula + cask** split, the bucket carries **two manifests** — Scoop has
+no formula/cask namespace, so each is a distinct installable name:
 
 | Manifest | Mirrors | Install | `checkver` source | `keycast info` reports |
 |---|---|---|---|---|
