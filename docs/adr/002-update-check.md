@@ -229,3 +229,16 @@ pattern:
 - Throttle interval is specified at 24 h — confirm during implementation it
   shouldn't be configurable (kept fixed in Phase 1 to avoid a second new
   setting).
+
+## Update — 2026-07-04: Windows channels added since acceptance
+
+The source model above has since gained Windows sources not in the original
+decision tree. These extend it; the decision itself is unchanged:
+
+- **`WINDOWS_INSTALLER`** — the Inno Setup installer, detected via a
+  `.install-source` marker. See [ADR-006](006-windows-installer.md).
+- **`SCOOP` / `SCOOP_GLOBAL`** — the Scoop bucket, detected on the frozen branch
+  by install *location* (no marker; `keycast-pipx` installs via pipx and reports
+  `PIPX`). See [ADR-008](008-scoop-bucket.md).
+
+`keycast.updates.sources.InstallSource` is the authoritative enumeration.
