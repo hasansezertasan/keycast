@@ -189,9 +189,15 @@ class TestStart:
         with patch("keycast.application.__version__", "9.9.9"):
             keycast.start()
 
+        expected_status = Keycast._format_startup_status_line(
+            {
+                "keyboard": application_module._InputSourceStatus.ACTIVE,
+                "mouse": application_module._InputSourceStatus.ACTIVE,
+            }
+        )
         assert manager.mock_calls == [
             call.show_text("keycast 9.9.9"),
-            call.show_text("Input status — Keyboard: OK, Mouse: OK"),
+            call.show_text(expected_status),
             call.start(start_minimized=False),
         ]
 
@@ -224,9 +230,13 @@ class TestStart:
         with patch("keycast.application.platform.system", return_value="Windows"):
             keycast.start()
 
-        keycast.display_window.show_text.assert_any_call(
-            "Input status — Keyboard: Permission needed, Mouse: OK"
+        expected_status = Keycast._format_startup_status_line(
+            {
+                "keyboard": application_module._InputSourceStatus.NO_ACCESS,
+                "mouse": application_module._InputSourceStatus.ACTIVE,
+            }
         )
+        keycast.display_window.show_text.assert_any_call(expected_status)
 
     def test_macos_status_uses_precheck_denied_as_permission_needed(
         self, keycast: Keycast
@@ -244,9 +254,13 @@ class TestStart:
         ):
             keycast.start()
 
-        keycast.display_window.show_text.assert_any_call(
-            "Input status — Keyboard: Permission needed, Mouse: OK"
+        expected_status = Keycast._format_startup_status_line(
+            {
+                "keyboard": application_module._InputSourceStatus.NO_ACCESS,
+                "mouse": application_module._InputSourceStatus.ACTIVE,
+            }
         )
+        keycast.display_window.show_text.assert_any_call(expected_status)
 
     def test_macos_status_falls_back_to_unknown_when_precheck_unavailable(
         self, keycast: Keycast
@@ -264,9 +278,13 @@ class TestStart:
         ):
             keycast.start()
 
-        keycast.display_window.show_text.assert_any_call(
-            "Input status — Keyboard: Unknown, Mouse: OK"
+        expected_status = Keycast._format_startup_status_line(
+            {
+                "keyboard": application_module._InputSourceStatus.UNKNOWN,
+                "mouse": application_module._InputSourceStatus.ACTIVE,
+            }
         )
+        keycast.display_window.show_text.assert_any_call(expected_status)
 
     def test_no_version_splash_on_minimized_start(self, keycast: Keycast) -> None:
         """A minimized start stays fully hidden: no splash to defeat the point."""

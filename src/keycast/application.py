@@ -18,6 +18,10 @@ from keycast.updates import notify_pending_update
 if TYPE_CHECKING:
     import types
 
+_MACOS_APP_SERVICES_FRAMEWORK = (
+    "/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices"
+)
+
 
 class _InputSourceStatus(StrEnum):
     """Startup status for one input source."""
@@ -150,12 +154,26 @@ class Keycast:
             least one check is explicitly denied, and ``None`` when the host
             APIs are unavailable or cannot be read.
         """
+        logger = logging.getLogger(__name__)
         try:
-            app_services = ctypes.CDLL(
-                "/System/Library/Frameworks/ApplicationServices.framework/"
-                "ApplicationServices"
+            app_services = ctypes.CDLL(_MACOS_APP_SERVICES_FRAMEWORK)
+        except OSError as exc:
+            logger.debug(
+                format_event(
+                    "macos_permission_precheck_unavailable",
+                    reason=type(exc).__name__,
+                    detail=str(exc),
+                )
             )
-        except OSError:
+            return None
+        except (TypeError, ValueError, ctypes.ArgumentError) as exc:
+            logger.debug(
+                format_event(
+                    "macos_permission_precheck_unavailable",
+                    reason=type(exc).__name__,
+                    detail=str(exc),
+                )
+            )
             return None
 
         ax_check = getattr(app_services, "AXIsProcessTrusted", None)
@@ -163,8 +181,14 @@ class Keycast:
             ax_check.restype = ctypes.c_bool
             ax_check.argtypes = []
             try:
-                accessibility_ok: bool | None = bool(ax_check())
-            except Exception:
+                accessibility_ok: bool | None = ax_check()
+            except (OSError, TypeError, ValueError, ctypes.ArgumentError) as exc:
+                logger.debug(
+                    format_event(
+                        "macos_accessibility_precheck_failed",
+                        reason=type(exc).__name__,
+                    )
+                )
                 accessibility_ok = None
         else:
             accessibility_ok = None
@@ -174,8 +198,14 @@ class Keycast:
             input_check.restype = ctypes.c_bool
             input_check.argtypes = []
             try:
-                input_ok: bool | None = bool(input_check())
-            except Exception:
+                input_ok: bool | None = input_check()
+            except (OSError, TypeError, ValueError, ctypes.ArgumentError) as exc:
+                logger.debug(
+                    format_event(
+                        "macos_input_monitoring_precheck_failed",
+                        reason=type(exc).__name__,
+                    )
+                )
                 input_ok = None
         else:
             input_ok = None
@@ -249,9 +279,12 @@ class Keycast:
         precheck: bool | None,
     ) -> None:
         """Log startup input status as a structured event."""
-        precheck_text = (
-            "granted" if precheck is True else "denied" if precheck is False else "unknown"
-        )
+        if precheck is True:
+            precheck_text = "granted"
+        elif precheck is False:
+            precheck_text = "denied"
+        else:
+            precheck_text = "unknown"
         self.logger.info(
             format_event(
                 "startup_input_status",
