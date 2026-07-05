@@ -15,21 +15,24 @@ Supersedes nothing; does **not** reopen #6 (Authenticode) — see Rationale.
 ## Context
 
 Windows has three channels — the portable zip (ADR-001), the Inno installer
-(ADR-006), and Scoop (ADR-008). All three ship **unsigned** binaries (SmartScreen
-"More info → Run anyway" on every first run), and none has mainstream discovery:
-the zip and installer require finding the GitHub Releases page; Scoop is a
-developer tool. The Microsoft Store is the only channel preinstalled on every
-Windows 10/11 machine, and — decisive for an unsigned-binary project —
+(ADR-006), and Scoop (ADR-008). All three ship **unsigned** binaries — the zip
+and installer trip SmartScreen ("More info → Run anyway") on first run; Scoop
+sidesteps the prompt but not the missing signature — and none has mainstream
+discovery: the zip and installer require finding the GitHub Releases page;
+Scoop is a developer tool. The Microsoft Store is the only channel preinstalled
+on effectively every consumer Windows 10/11 machine, and — decisive for an
+unsigned-binary project —
 **Store-delivered apps bypass SmartScreen entirely**, because trust is
 established by Store signing and review rather than Authenticode reputation.
 
-Store registration is now **free** for individuals and companies (individual fee
-dropped late 2025, company fee removed May 2026). Two submission routes exist:
+Store registration is now **free** for individuals and companies (Microsoft has
+dropped both former registration fees). Two submission routes exist:
 
 - **Win32 (EXE/MSI) listing.** The Store links to a self-hosted installer. But
   the installer **must be Authenticode-signed** with a certificate chaining to
   the Microsoft Trusted Root Program — exactly the cost/complexity blocker that
-  closed #6. Worse, the cheap route (Azure Artifact Signing) is **geo-restricted**
+  closed #6. Worse, the cheap route (Azure Artifact Signing, formerly Trusted
+  Signing) is **geo-restricted**
   to US/CA individuals and US/CA/EU/UK organizations, which excludes this
   project's maintainer. The remaining options (SignPath Foundation's free OSS
   program, a Certum open-source certificate ~€70/yr) add an external dependency
@@ -54,8 +57,9 @@ works unchanged.
   submission notes (visible overlay, open-source repo, no storage or
   transmission of input — a visualizer, not a keylogger).
 - **Package the existing bundle.** A committed `packaging/AppxManifest.xml`
-  template wraps the untouched `dist/keycast/` folder; `makeappx pack` (Windows
-  SDK, present on `windows-latest` runners) produces `keycast.msix` in
+  template wraps the untouched `dist/keycast/` folder; `makeappx pack` (ships
+  in the Windows SDK on `windows-latest` runners, though not on `PATH` — the
+  pack step resolves it under `Windows Kits`) produces `keycast.msix` in
   `build-windows` as a **workflow artifact only** — the Partner Center
   submission input, deliberately **not** a GitHub Release asset. An MSIX must
   be signed before Windows will install it, and this package is unsigned until
@@ -66,8 +70,13 @@ works unchanged.
   `Major.Minor.Build.Revision`, all numeric — no prerelease suffixes. A stable
   tag `vX.Y.Z` maps to `X.Y.Z.0`, injected at pack time (mirrors the ADR-006
   `iscc /D` pattern; the template defaults to `0.0.0.0` so PR checks compile
-  without a tag). Prerelease tags **cannot** be expressed, which coincides with
-  ADR-007's stable-only gating: the Store job is skipped when `is_prerelease`.
+  without a tag). The tag exists at pack time for the same reason hatch-vcs can
+  stamp the right version inside the draft-release window: release-please's
+  `force-tag-creation: true` creates it immediately. Prerelease tags **cannot**
+  be expressed, which coincides with ADR-007's stable-only gating: the Store
+  job is skipped when `is_prerelease` (a guard that is currently inert —
+  mainline cuts only stable tags — but binding if the beta channel is
+  re-enabled).
 - **Submission: manual first, automated later.** The first submission (identity
   reservation, listing copy, capability justification, age rating) is manual in
   Partner Center. Subsequent version bumps are a **best-effort job outside the
@@ -77,7 +86,7 @@ works unchanged.
 - **New install source: `MICROSOFT_STORE`.** Store-installed MSIX apps run from
   under `C:\Program Files\WindowsApps\<PackageFamilyName>…`;
   `detect_install_source()` matches the POSIX-lowered `/windowsapps/` path
-  fragment — a filesystem predicate like the Scoop probes (ADR-008), checked
+  fragment — a location-only path predicate like the Scoop probes (ADR-008), checked
   before the `GITHUB_RELEASE` fallback. Update advice: "updates are delivered
   automatically by the Microsoft Store" (no upgrade command).
 
@@ -93,8 +102,9 @@ works unchanged.
   input hooks are the product; AppContainer forbids them. The capability is
   routinely granted to desktop-bridge apps and its optics are addressed head-on
   in the submission notes rather than engineered around.
-- **Store alongside Scoop, not replacing it.** ADR-008 chose Scoop *over* Store
-  ceremony for the package-manager audience; that reasoning stands. The Store
+- **Store alongside Scoop, not replacing it.** ADR-008 chose Scoop over
+  Chocolatey/WinGet ceremony for the package-manager audience; that reasoning
+  stands, and the Store question it left untouched is decided here. The Store
   serves a different audience (mainstream users who will never run a terminal)
   and removes SmartScreen — a problem Scoop users don't have and zip/installer
   users do.
