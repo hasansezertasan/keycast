@@ -9,6 +9,7 @@ A cross-platform keystroke and mouse click visualizer built in Python.
 - **Mouse click visualization**: Displays mouse clicks with optional position information
 - **Transparent overlay**: Semi-transparent window that stays on top (when Tkinter is available)
 - **Configurable display**: Customize colors, fonts, position, and behavior
+- **Presets ("modes")**: One-word bundles — `presenter`, `minimal`, `debug` — that retune the overlay for common scenarios
 - **Key mapping**: Customizable key name mappings for better display
 - **Fade effects**: Events fade out after a configurable duration
 - **Graceful error handling**: Handles permission issues and missing dependencies gracefully
@@ -168,6 +169,8 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
     "show_modifier_keys": true,
     "show_function_keys": true,
     "show_special_keys": true,
+    "group_chords": false,
+    "chord_separator": " + ",
     "key_mappings": {
       "ctrl_l": "Control Left",
       "space": "Space Bar",
@@ -176,6 +179,13 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
   }
 }
 ```
+
+> `group_chords` — when `true`, a key pressed while one or more modifiers are
+> held is shown as a single combined chord (e.g. `Control Left + S`) instead of
+> the modifier and the key as separate events. Modifiers held and released on
+> their own (no other key) still show individually, subject to
+> `show_modifier_keys`. `chord_separator` is the string joining the parts
+> (default `" + "`). Defaults to `false`; the `presenter` preset turns it on.
 
 #### Mouse Settings
 
@@ -191,6 +201,11 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
   }
 }
 ```
+
+> A **click ripple** (an expanding ring at the cursor, like a screencast tool's
+> click highlight) was prototyped and then **removed** pending a redesign — the
+> per-click overlay window caused input lag on macOS. See
+> [ADR-012](docs/adr/012-click-ripple.md) for the full rationale.
 
 #### Logging Settings
 
@@ -219,11 +234,23 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
   "start_minimized": false,
   "auto_start": true,
   "check_for_updates": true,
-  "show_startup_status": true
+  "show_startup_status": true,
+  "preset": "custom"
 }
 ```
 
 > These are top-level flags (not sections).
+
+> `preset` — a named settings bundle layered over the rest of your config on
+> load. `"custom"` (default) uses your file exactly as written. `"presenter"`
+> makes the overlay large and legible for screencasts, `"minimal"` makes it
+> small and quick to fade, and `"debug"` turns on verbose logging plus shows
+> mouse clicks and positions for troubleshooting. A preset only changes the
+> specific fields it names — everything else keeps your configured value — so it
+> **overrides** those fields rather than merging with them. To tweak a preset's
+> values, copy them into your config and keep `preset: "custom"`. The on-disk
+> config is never rewritten with the preset's values; only the running app sees
+> them.
 
 > `check_for_updates` — when `true` (default), keycast checks the GitHub
 > Releases API at most once a day and shows a non-blocking notice if a newer
@@ -322,6 +349,7 @@ keycast/
 │   ├── ARCHITECTURE.md  # Architecture documentation
 │   ├── API.md          # API documentation
 │   ├── DESIGN_DECISIONS.md # Design decisions
+│   ├── COMPARISON.md      # Comparison with alternatives
 │   └── PROJECT_OVERVIEW.md # Project overview
 ├── pyproject.toml       # Project configuration
 └── README.md           # This file
@@ -336,6 +364,7 @@ Comprehensive documentation is available in the `docs/` directory:
 - **[Architecture Documentation](docs/ARCHITECTURE.md)** - Technical architecture details
 - **[API Documentation](docs/API.md)** - Complete API reference
 - **[Design Decisions](docs/DESIGN_DECISIONS.md)** - Design rationale and trade-offs
+- **[Comparison / Alternatives](docs/COMPARISON.md)** - How keycast compares to KeyCastr, Keyviz, and VS Code Screencast Mode
 
 ### Adding New Features
 

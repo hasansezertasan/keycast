@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from keycast.logging_setup import _ErrorThrottler
+from keycast.logging_setup import _ErrorThrottler, format_event
 
 if TYPE_CHECKING:
     # tkinter is imported lazily in _setup_window so the module stays importable
@@ -53,6 +53,13 @@ class DisplayWindow:
         # and hang shutdown. ``request_stop`` only reads ``root`` and schedules a
         # callback (it never mutates ``events``), so re-entering an interrupted
         # locked section cannot corrupt the state the outer frame is building.
+        #
+        # INVARIANT: never held across a cross-thread ``root.after`` call. On
+        # macOS Tcl is thread-enabled, so ``after`` from a non-main thread blocks
+        # on the main loop, which also takes this lock (``_fade_timer`` /
+        # ``_update_display``) — holding it across ``after`` deadlocks. Callers
+        # (``show_text``, ``request_stop``) capture ``root`` under the lock and
+        # call ``after`` outside it; any future caller must do the same.
         self._lock = threading.RLock()
         # Throttles repeated errors from the Tk callbacks (``_fade_timer`` and
         # ``_update_display``), which fire continuously: the fade tick every
@@ -375,6 +382,16 @@ class DisplayWindow:
         # lock so ``stop`` cannot null and ``destroy`` ``root`` between the check
         # and the enqueue (which would raise TclError); ``after`` only schedules,
         # so holding the lock briefly here does not block the main loop.
+        # CRITICAL: capture ``root`` under the lock but call ``after`` *outside*
+        # it. On macOS Tcl is thread-enabled, so a cross-thread ``root.after``
+        # blocks until the main loop services the Tcl event queue. Holding
+        # ``_lock`` across that call deadlocks: the main thread's
+        # ``_fade_timer``/``_update_display`` also take ``_lock``, so the main
+        # thread waits for the lock while this thread — holding the lock — waits
+        # for the main thread. Only the state mutation (``events.append``) needs
+        # the lock; the local ``root`` reference keeps the later ``after`` valid
+        # even if ``stop`` nulls ``self.root`` in between (the call then raises
+        # and is tolerated below).
         with self._lock:
             if not self.root:
                 # Normal during shutdown (stop() nulled root); drop the event.
@@ -384,31 +401,32 @@ class DisplayWindow:
                 self.logger.debug("show_text_dropped_no_root")
                 return
             self.events.append((text, time.time()))
-            try:
-                # A minimized start hides the overlay until the first event;
-                # re-show it now. Scheduled on the main loop (not done inline)
-                # because Tk widgets may only be touched from the thread owning
-                # the main loop — the same reason _update_display is marshalled
-                # via after.
-                if self._minimized:
-                    self.root.after(0, self._restore_from_minimized)
-                self.root.after(0, self._update_display)
-            except RuntimeError, tk.TclError:
-                # The ``root is not None`` check above is not enough: the Tk loop
-                # can already be dead while ``root`` still exists, in the gap
-                # between mainloop() returning and stop() nulling root. This
-                # happens when the OS tears the app down out from under us (a
-                # native window close / app-quit, which is *not* the
-                # request_stop -> root.quit path the rest of teardown assumes),
-                # while an in-flight pynput callback is still calling show_text.
-                # ``after`` then raises RuntimeError ("main thread is not in main
-                # loop") or, if the app is already destroyed, TclError. The race
-                # is inherent to external teardown and untimeable, so tolerate it
-                # here — exactly as _fade_timer/_update_display tolerate a stale
-                # tick — and drop the event at debug level rather than letting it
-                # surface as a key_sink_error/mouse_sink_error traceback from the
-                # listener's sink-call handler.
-                self.logger.debug("show_text_dropped_loop_gone")
+            root = self.root
+            minimized = self._minimized
+
+        try:
+            # A minimized start hides the overlay until the first event; re-show
+            # it now. Scheduled on the main loop (not done inline) because Tk
+            # widgets may only be touched from the thread owning the main loop —
+            # the same reason _update_display is marshalled via after.
+            if minimized:
+                root.after(0, self._restore_from_minimized)
+            root.after(0, self._update_display)
+        except (RuntimeError, tk.TclError) as exc:
+            # The Tk loop can be dead while ``root`` still exists (external app
+            # teardown between mainloop() returning and stop() nulling root), or
+            # ``stop`` may have destroyed the captured ``root`` after we released
+            # the lock. ``after`` then raises RuntimeError ("main thread is not in
+            # main loop") or TclError; tolerate it and drop the event rather than
+            # surfacing a sink error to the listener's callback handler.
+            #
+            # Routed through the throttler, not a bare debug line: on a Tcl built
+            # without thread support a cross-thread ``after`` raises on *every*
+            # event while the loop is alive — the overlay would silently show
+            # nothing for the whole session. The throttler escalates that
+            # persistent failure to a visible (throttled) warning, while the
+            # legitimate one-or-two-event teardown race stays quiet in practice.
+            self._error_throttler.log("show_text_dropped_loop_gone", exc)
 
     def _restore_from_minimized(self) -> None:
         """Re-show the overlay after a minimized start, on the Tk main loop.
@@ -470,19 +488,34 @@ class DisplayWindow:
         (possibly signal-interrupted) main loop, where calling ``destroy``
         directly would raise Tcl errors.
 
-        The ``after`` call stays inside the lock for the same reason as
-        :meth:`show_text`: this method is contracted to be callable from any
-        thread, so a non-main-thread caller could otherwise race the main-thread
-        :meth:`stop` and let it null and destroy ``root`` between the check and
-        the enqueue (which would raise TclError). ``after`` only schedules, so
-        holding the lock briefly does not block the main loop. The lock is an
-        ``RLock`` so a signal handler invoking this method while the main thread
-        already holds the lock (mid ``_fade_timer``/``_update_display``) re-enters
-        instead of self-deadlocking — see the lock's definition in ``__init__``.
+        Captures ``root`` under the lock and calls ``after`` *outside* it, for the
+        deadlock reason documented in :meth:`show_text`: this method is contracted
+        to be callable from any thread, and a cross-thread ``after`` blocks on the
+        main loop, which must not happen while holding the lock the main loop's
+        fade/update ticks also take. The captured local keeps the call valid even
+        if :meth:`stop` nulls/destroys ``root`` in between (it then raises and is
+        tolerated). The lock is an ``RLock`` so a signal handler invoking this on
+        the main thread mid ``_fade_timer``/``_update_display`` re-enters instead
+        of self-deadlocking — see the lock's definition in ``__init__``.
         """
+        import tkinter as tk  # noqa: PLC0415  # lazy: see the import note at module top
+
         with self._lock:
-            if self.root:
-                self.root.after(0, self.root.quit)
+            root = self.root
+        if root is None:
+            return
+        try:
+            root.after(0, root.quit)
+        except (RuntimeError, tk.TclError) as exc:
+            # Loop already gone / root destroyed after we released the lock; the
+            # loop is (or is becoming) stopped anyway, so tolerate it. Logged at
+            # warning, not debug: unlike the per-event drops in show_text this
+            # fires at most once or twice per session (no noise argument), and a
+            # genuinely failed stop request — e.g. a non-thread-enabled Tcl build
+            # where a live loop rejects the cross-thread ``after`` — means the app
+            # ignores shutdown, which must be visible in the log at the default
+            # level (the user cannot raise verbosity on a process that won't quit).
+            self.logger.warning(format_event("request_stop_loop_gone", error=str(exc)))
 
     def stop(self) -> None:
         """Destroy the window.

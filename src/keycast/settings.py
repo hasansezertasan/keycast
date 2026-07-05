@@ -9,7 +9,7 @@ import time
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 
 from pydantic import (
     BaseModel,
@@ -293,6 +293,18 @@ class KeyboardSettings(BaseModel):
         default=True,
         description="Whether to show special keys (Enter, Space, etc.)",
     )
+    group_chords: bool = Field(
+        default=False,
+        description="Combine a key pressed while modifiers are held into a single "
+        'chord label (e.g. "Control Left + S") instead of separate events. A held '
+        "modifier released on its own is still shown alone (subject to "
+        "show_modifier_keys). Off by default; the presenter preset enables it.",
+    )
+    chord_separator: str = Field(
+        default=" + ",
+        min_length=1,
+        description="String joining the parts of a grouped chord (see group_chords).",
+    )
     # ``ReadOnlyStrMap`` validates the dict, freezes it in a read-only
     # ``MappingProxyType`` (``frozen=True`` only blocks rebinding the field, not
     # mutation of the dict it points at), and serializes it back to a plain dict.
@@ -482,6 +494,62 @@ class LoggingSettings(BaseModel):
         return value
 
 
+# The named presets. Kept as a dedicated Literal (rather than inlining the
+# names into the ``preset`` field) so ``_PRESET_OVERRIDES`` can be keyed by it:
+# a typo either in the field values or the override table's keys then fails type
+# checking, and the invariant "every non-custom preset has an override bundle"
+# is asserted at import (see below). ``"custom"`` is deliberately not a member —
+# it names no overrides.
+PresetName = Literal["presenter", "minimal", "debug"]
+
+_PRESET_OVERRIDES: dict[PresetName, dict[str, object]] = {
+    # Screencast / demo: large, legible, lingers a little longer, clicks shown.
+    "presenter": {
+        "display": {
+            "font_size": 28,
+            "fade_duration_ms": 3000,
+            "max_events": 3,
+            "alpha": 0.9,
+        },
+        "mouse": {"show_mouse_clicks": True},
+        "keyboard": {"group_chords": True},
+    },
+    # Unobtrusive corner overlay: small, faint, one event, gone quickly.
+    "minimal": {
+        "display": {
+            "font_size": 12,
+            "fade_duration_ms": 1000,
+            "max_events": 1,
+            "alpha": 0.6,
+        },
+    },
+    # Troubleshooting: verbose logging plus everything visible, kept on screen.
+    "debug": {
+        "debug": True,
+        "display": {"max_events": 10, "fade_duration_ms": 5000},
+        "mouse": {"show_mouse_clicks": True, "show_mouse_position": True},
+    },
+}
+"""Built-in preset name -> override bundle, layered over the loaded config.
+
+Each override is a partial settings tree: a top-level scalar flag (e.g. ``debug``)
+or a section name (``display`` / ``mouse`` / ``keyboard``) mapped to the fields it
+replaces. :meth:`Settings.resolve_preset` applies these on top of the file /
+defaults, so a preset only touches the fields it names; everything else keeps its
+configured value. Every value must stay within its field's declared bounds:
+``resolve_preset`` re-validates the merged result, so an out-of-range preset would
+raise at load. ``"custom"`` is intentionally absent — it means "no overrides".
+"""
+
+# Guard the two-sided coupling between the ``PresetName`` Literal and this table:
+# every named preset must have a bundle here, and vice versa. Catches a name added
+# to one but not the other at import time rather than as a silent runtime no-op.
+assert set(_PRESET_OVERRIDES) == set(get_args(PresetName)), (
+    "PresetName and _PRESET_OVERRIDES have drifted: "
+    f"{set(get_args(PresetName)) ^ set(_PRESET_OVERRIDES)}"
+)
+
+
 class Settings(BaseSettings):
     """Main settings class for the keycast application."""
 
@@ -542,6 +610,47 @@ class Settings(BaseSettings):
         "capture availability on the overlay. Set false to suppress this launch "
         "status message.",
     )
+    # pyrefly: ignore[bad-assignment]  # Field(default=...) can't be narrowed to the Literal; mypy/pyright/ty accept it.
+    preset: Literal["custom"] | PresetName = Field(
+        default="custom",
+        description="Named settings bundle layered over the config on load. "
+        '"custom" (default) uses the file verbatim; "presenter", "minimal" and '
+        '"debug" override a handful of display/mouse/keyboard fields (and, for '
+        '"debug", verbose logging) for common scenarios. A preset wins over the '
+        "file only for the fields it names; see resolve_preset and "
+        '_PRESET_OVERRIDES. An unrecognized name falls back to "custom" with a '
+        "warning rather than rejecting the whole config file.",
+    )
+
+    @field_validator("preset", mode="before")
+    @classmethod
+    def _coerce_unknown_preset(cls, value: object) -> object:
+        """Fall back to ``"custom"`` for an unrecognized preset name.
+
+        A misspelled ``preset`` is a single narrow, self-correcting mistake — it
+        would otherwise fail the Literal, and because ``preset`` lives on the
+        top-level config, that failure quarantines the *entire* file (moved to
+        ``.bak``, overwritten with defaults; see ``_recover_from_invalid_config``)
+        and silently discards every other customization. Degrade just this field
+        instead: warn and use ``"custom"``, keeping strict whole-file quarantine
+        for structurally corrupt configs. Non-string values are passed through
+        untouched so the Literal still rejects genuinely wrong types.
+
+        Args:
+            value: The raw ``preset`` value from the config source.
+
+        Returns:
+            ``value`` if it is a known preset name (or not a string); otherwise
+            ``"custom"``.
+        """
+        valid = {"custom", *get_args(PresetName)}
+        if isinstance(value, str) and value not in valid:
+            cls._warn_user(
+                f"Unknown preset {value!r}; falling back to 'custom'. "
+                f"Valid presets: {', '.join(sorted(valid))}."
+            )
+            return "custom"
+        return value
 
     # Note: per-listener enable flags live on `keyboard.enabled` / `mouse.enabled`;
     # auto_start is the app-level master switch layered above them.
@@ -595,6 +704,59 @@ class Settings(BaseSettings):
         if not self.debug:
             return self.logging
         return self.logging.model_copy(update={"level": "DEBUG"})
+
+    def resolve_preset(self) -> "Settings":
+        """Return the settings to apply, with the selected ``preset`` layered on.
+
+        ``preset`` names a built-in override bundle (see :data:`_PRESET_OVERRIDES`)
+        that is merged on top of the loaded config. ``"custom"`` (the default)
+        applies nothing, so the settings are returned unchanged. Called by
+        ``Keycast.__init__`` right after :meth:`create_settings_file`, so every
+        component sees the resolved settings while the on-disk config keeps the
+        user's raw values plus the ``preset`` name.
+
+        Each overridden **section** is re-validated the same way loading the
+        config does: its current values are dumped with ``model_dump(mode="json")``,
+        the preset's fields are merged on top, and the section model's
+        ``model_validate`` rebuilds it — re-running that section's field bounds and
+        cross-field validators (e.g. ``MouseSettings``' position-requires-clicks
+        rule), so a preset can never produce invalid section settings.
+        ``model_copy`` then swaps the rebuilt sections (and any top-level scalar
+        flags) into a new ``Settings``. Note the sub-models are plain
+        ``BaseModel``, where ``model_validate`` honours the passed data; the
+        top-level ``Settings`` is a ``BaseSettings`` whose ``model_validate``
+        re-runs the configured sources instead, so it deliberately is *not* used
+        to re-assemble here.
+
+        A preset wins over the file for the fields it names, and only those; every
+        other field keeps its configured value.
+
+        Returns:
+            A new ``Settings`` with the preset applied, or ``self`` when the
+            preset is ``"custom"`` (which names no overrides).
+        """
+        if self.preset == "custom":
+            return self
+        # Narrowed to a PresetName; the import-time assertion guarantees a bundle
+        # exists for every one, so index directly rather than defaulting to None.
+        overrides = _PRESET_OVERRIDES[self.preset]
+
+        updates: dict[str, object] = {}
+        for key, value in overrides.items():
+            # No default: a mistyped section/field name in _PRESET_OVERRIDES
+            # raises AttributeError loudly (caught by any preset test) instead of
+            # silently resolving to None and applying a broken override.
+            current = getattr(self, key)
+            if isinstance(value, dict) and isinstance(current, BaseModel):
+                # Re-validate the section with the preset's fields merged over its
+                # current values. mode="json" yields JSON-safe primitives (Color
+                # -> str, read-only mappings -> dict) that model_validate accepts.
+                merged = {**current.model_dump(mode="json"), **value}
+                updates[key] = type(current).model_validate(merged)
+            else:
+                # A top-level scalar flag (e.g. debug=True).
+                updates[key] = value
+        return self.model_copy(update=updates)
 
     @classmethod
     def settings_customise_sources(

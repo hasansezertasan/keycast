@@ -49,6 +49,9 @@ def keycast() -> Iterator[Keycast]:
         patch("keycast.application.notify_pending_update"),
     ):
         settings = Mock()
+        # __init__ chains create_settings_file().resolve_preset(); return the same
+        # mock so keycast.settings is one coherent object the tests can configure.
+        settings.resolve_preset.return_value = settings
         settings.show_startup_status = False
         settings_cls.create_settings_file.return_value = settings
         window_cls.return_value = Mock()
@@ -131,10 +134,35 @@ class TestInit:
         ):
             settings = Mock()
             settings_cls.create_settings_file.return_value = settings
+            # __init__ applies the preset via create_settings_file().resolve_preset();
+            # return the same mock so the resolved settings are this object.
+            settings.resolve_preset.return_value = settings
             Keycast()
 
         settings.effective_logging.assert_called_once_with()
         setup_logging.assert_called_once_with(settings.effective_logging.return_value)
+
+    def test_preset_is_resolved_on_init(self) -> None:
+        """__init__ applies the selected preset via Settings.resolve_preset().
+
+        The preset overlay only takes effect if resolution runs at startup; a
+        regression that used the raw create_settings_file() result would silently
+        ignore any non-"custom" preset while leaving the rest of the suite green.
+        """
+        with (
+            patch("keycast.application.Settings") as settings_cls,
+            patch("keycast.application.setup_logging"),
+            patch("keycast.application.DisplayWindow"),
+            patch("keycast.application.MouseListener"),
+            patch("keycast.application.KeyListener"),
+        ):
+            loaded = Mock()
+            settings_cls.create_settings_file.return_value = loaded
+            app = Keycast()
+
+        loaded.resolve_preset.assert_called_once_with()
+        # The resolved settings (not the raw loaded ones) are what the app keeps.
+        assert app.settings is loaded.resolve_preset.return_value
 
 
 class TestStart:

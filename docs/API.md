@@ -207,6 +207,8 @@ def __init__(self, show_text: TextSink, settings: KeyboardSettings) -> None
 - `show_modifier_keys` (bool): Whether to show modifier keys (Ctrl, Alt, etc.) (default: True)
 - `show_function_keys` (bool): Whether to show function keys (F1, F2, etc.) (default: True)
 - `show_special_keys` (bool): Whether to show special keys (Enter, Space, etc.) (default: True)
+- `group_chords` (bool): Whether to combine a key pressed with held modifiers into one chord label, e.g. `"Control Left + S"` (default: False). See Chord Grouping below.
+- `chord_separator` (str): String joining the parts of a grouped chord (default: `" + "`, min length 1).
 - `key_mappings` (dict[str, str]): Custom key name mappings. Keys are pynput key names with the "Key." prefix removed (e.g. "ctrl_l", "space"). Ships cross-platform defaults for the modifier, space and enter keys.
 
 **Example**:
@@ -290,6 +292,39 @@ Keys must be bare pynput key names — lowercase, with no `Key.` prefix (e.g.
 `ctrl_l`, `space`, `f1`). A key that carries the prefix or is capitalized can
 never match and is rejected at config load rather than silently doing nothing.
 
+#### Chord Grouping
+
+When `group_chords` is `true`, `KeyListener` combines a key pressed while one or
+more modifiers are held into a **single** chord label rather than emitting the
+modifier and the key as separate events:
+
+- Modifier presses are **held silently** while `group_chords` is on.
+- Pressing a non-modifier key while modifiers are held emits one label joining the
+  held modifier labels and the key, in press order, using `chord_separator`
+  (default `" + "`) — e.g. `"Control Left + Shift Left + S"`. The chord always
+  includes its modifiers, even if `show_modifier_keys` is `false` (a chord without
+  its modifiers would be meaningless).
+- A modifier **pressed and released on its own** (no other key during the hold) is
+  emitted alone on release, subject to `show_modifier_keys`. When several modifiers
+  are held and released without completing a chord, each is emitted on its own
+  release.
+- If the chord's non-modifier key is itself hidden by a visibility filter (e.g.
+  `Ctrl+F1` with `show_function_keys=false`), the whole chord is suppressed — and
+  the modifier is **not** re-emitted alone on release, since it was consumed by the
+  (hidden) chord. A hidden chord shows nothing rather than a misleading lone
+  `Control`.
+- `Ctrl`+letter combinations, which the OS delivers as control characters
+  (`Ctrl+S` arrives as `"\x13"`), render as the letter — e.g. `"Control Left + s"`,
+  not an invisible glyph.
+
+`group_chords` defaults to `false` (each key is emitted as its own event, the
+original behavior). The `presenter` preset enables it. Implementation notes: this
+is the one place `KeyListener` registers pynput's `on_release` — it needs release
+events to track which modifiers are currently held. A modifier held continuously
+for more than 30 seconds without a matching release is treated as stale and
+dropped (pynput can miss release events — secure-input fields, screen lock — which
+would otherwise wedge the chord state); the next keypress self-heals.
+
 ### MouseListener
 
 **Location**: `keycast.listeners.MouseListener`
@@ -307,10 +342,9 @@ def __init__(self, show_text: TextSink, settings: MouseSettings) -> None
 - `show_text` (TextSink): Sink invoked with the formatted label each time the mouse is clicked
 - `settings` (MouseSettings): Mouse configuration settings object
 
-> Unlike earlier versions, the sink receives a **single string**. When
-> `show_mouse_position` is enabled, the coordinates are formatted directly into
-> that string (e.g. `"Left Click (100, 200)"`) — the sink is not passed
-> separate `x`/`y` arguments.
+> The text sink receives a **single string**. When `show_mouse_position` is
+> enabled, the coordinates are formatted directly into that string (e.g.
+> `"Left Click (100, 200)"`) — the sink is not passed separate `x`/`y` arguments.
 
 **MouseSettings Properties**:
 - `enabled` (bool): Whether the mouse listener runs (default: True)
@@ -406,6 +440,7 @@ def create_settings_file(cls) -> Settings
 - `auto_start` (bool): Start the input listeners on launch (default: `true`). When `false`, no listeners start regardless of `keyboard.enabled` / `mouse.enabled` — an app-level master switch.
 - `check_for_updates` (bool): Gate the automatic update check (default: `true`). When `true`, keycast queries the GitHub Releases API at most once per day and shows a non-blocking notice if a newer version exists; `false` disables all automatic checks. Throttle state lives in `~/.keycast/update-check.json`, not on `Settings`. See `keycast.updates` and [ADR-002](adr/002-update-check.md).
 - `show_startup_status` (bool): Show a one-line startup input-status summary on the overlay (default: `true`). This line reports keyboard/mouse capture as `OK` (capturing), `Off` (disabled), `Permission needed` (macOS reports the input permission denied), `Not capturing` (the listener failed to start for another reason), or `Unknown` (an unrecognized platform). It is gated by this flag and skipped on a minimized start; the mirrored structured `startup_input_status` log event is written on every launch regardless. On macOS, a best-effort permission precheck (via `AXIsProcessTrusted` and `CGPreflightListenEventAccess`, neither of which prompts) distinguishes `Permission needed` from other failures — and, because a macOS listener start "succeeds" even when permission is denied, a denied precheck is believed over an apparently-successful start. On Windows and Linux, which expose no such precheck, a failed start is reported as `Not capturing` rather than guessed as a permission problem.
+- `preset` (Literal["custom", "presenter", "minimal", "debug"]): Named settings bundle layered over the config on load (default: `"custom"`). `"custom"` uses the file verbatim; the other presets override a handful of fields for common scenarios (see `resolve_preset` and the table below). A preset wins over the file **only for the fields it names**; everything else keeps its configured value. An unrecognized preset name is not fatal: it falls back to `"custom"` with a warning, rather than quarantining the whole config file.
 
 > The application version is exposed as `keycast.__version__`, generated at
 > build time from the git tag by hatch-vcs (into `src/keycast/_version.py`),
@@ -432,6 +467,33 @@ settings = Settings.create_settings_file()  # Creates ~/.keycast/config.json on 
 Returns the `LoggingSettings` actually applied at startup, resolving the `debug`
 flag against `logging.level`. `Keycast.__init__` passes the result to
 `setup_logging`. When `debug` is off, the configured `logging` is used unchanged.
+
+##### resolve_preset() -> Settings
+
+Returns the `Settings` to actually apply, with the selected `preset`'s overrides
+layered on top of the loaded config. `Keycast.__init__` calls this right after
+`create_settings_file()`, so every component sees the resolved settings; the
+on-disk config file is unaffected (it keeps the raw values plus the `preset`
+name). When `preset` is `"custom"` the settings are returned unchanged.
+
+Each overridden section is rebuilt through its own `model_validate` (with the
+preset's fields merged over the current values) and the results are assembled with
+`model_copy`, so the merged sections are re-validated against every field bound and
+cross-field validator — a preset can never yield invalid settings. The built-in
+presets:
+
+| Preset | Overrides |
+| --- | --- |
+| `custom` | none — the config file is used verbatim (default) |
+| `presenter` | `display.font_size=28`, `display.fade_duration_ms=3000`, `display.max_events=3`, `display.alpha=0.9`, `mouse.show_mouse_clicks=true`, `keyboard.group_chords=true` |
+| `minimal` | `display.font_size=12`, `display.fade_duration_ms=1000`, `display.max_events=1`, `display.alpha=0.6` |
+| `debug` | `debug=true`, `display.max_events=10`, `display.fade_duration_ms=5000`, `mouse.show_mouse_clicks=true`, `mouse.show_mouse_position=true` |
+
+```python
+from keycast.settings import Settings
+
+settings = Settings.create_settings_file().resolve_preset()
+```
 
 ### DisplaySettings
 
@@ -466,6 +528,8 @@ flag against `logging.level`. `Keycast.__init__` passes the result to
 - `show_modifier_keys` (bool): Whether to show modifier keys (Ctrl, Alt, etc.) (default: True)
 - `show_function_keys` (bool): Whether to show function keys (F1, F2, etc.) (default: True)
 - `show_special_keys` (bool): Whether to show special keys (Enter, Space, etc.) (default: True)
+- `group_chords` (bool): Combine a key pressed with held modifiers into one chord label (default: False). See Chord Grouping under `KeyListener`.
+- `chord_separator` (str): String joining the parts of a grouped chord (default: `" + "`, min length 1).
 - `key_mappings` (dict[str, str]): Custom key name mappings. Keys are pynput key names with the "Key." prefix removed (e.g. "ctrl_l", "space"). Ships cross-platform defaults for the modifier, space and enter keys.
 
 ### MouseSettings
@@ -551,7 +615,9 @@ from keycast.display import DisplayWindow
 from keycast.listeners import KeyListener, MouseListener
 from keycast.settings import Settings
 
-settings = Settings.create_settings_file()
+# resolve_preset() applies the selected preset ("modes"); it is a no-op for the
+# default "custom" preset. The Keycast orchestrator does this for you.
+settings = Settings.create_settings_file().resolve_preset()
 
 window = DisplayWindow(settings.display)
 key_listener = KeyListener(show_text=window.show_text, settings=settings.keyboard)

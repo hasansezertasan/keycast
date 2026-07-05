@@ -1,7 +1,7 @@
 """Tests for the display module."""
 
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from unittest.mock import Mock, call, patch
 
 import pytest
@@ -561,6 +561,7 @@ class TestDisplayWindow:
 
         mock_root, _ = mock_tk
         window = DisplayWindow(DisplaySettings())
+        window._error_throttler = Mock()
 
         for exc in (
             RuntimeError("main thread is not in main loop"),
@@ -568,6 +569,36 @@ class TestDisplayWindow:
         ):
             mock_root.after.side_effect = exc
             window.show_text("A")  # must not raise
+
+        # Routed through the throttler (not a silent debug line): a *persistent*
+        # cross-thread after() failure — e.g. a non-thread-enabled Tcl build where
+        # the overlay would otherwise show nothing all session — escalates to a
+        # visible warning. Both attempts are reported with the event + caught exc.
+        assert window._error_throttler.log.call_count == 2
+        event, exc = window._error_throttler.log.call_args.args
+        assert event == "show_text_dropped_loop_gone"
+        assert isinstance(exc, (RuntimeError, tk.TclError))
+
+    def test_request_stop_logs_warning_when_after_fails(
+        self, mock_tk: tuple[Mock, Mock]
+    ) -> None:
+        """A failed stop-schedule is visible at warning, not a silent debug line.
+
+        Unlike per-event show_text drops, request_stop fires once per session, and
+        a genuine failure (e.g. a live but non-thread-enabled Tcl loop rejecting a
+        cross-thread after) means the app ignores shutdown — which must be visible
+        without the user raising verbosity on a process that won't quit. It must
+        also not let the exception escape the signal handler / caller.
+        """
+        mock_root, _ = mock_tk
+        window = DisplayWindow(DisplaySettings())
+        window.logger = Mock()
+        mock_root.after.side_effect = RuntimeError("main thread is not in main loop")
+
+        window.request_stop()  # must not raise
+
+        window.logger.warning.assert_called_once()
+        assert "request_stop_loop_gone" in window.logger.warning.call_args.args[0]
 
     def test_request_stop_racing_stop_is_safe(self, mock_tk: tuple[Mock, Mock]) -> None:
         """request_stop (any thread) racing stop (main thread) must not crash.
@@ -982,3 +1013,64 @@ class TestWindowIcon:
             window._apply_window_icon()
 
         fake_appkit.NSApplication.sharedApplication.assert_not_called()
+
+
+class TestSchedulingDoesNotHoldLock:
+    """Regression: cross-thread ``after`` must not run while holding ``_lock``.
+
+    On macOS a cross-thread ``root.after`` blocks until the main loop services
+    the Tcl queue; if it were called while holding ``_lock`` (which the main
+    loop's ``_fade_timer``/``_update_display`` also take), the main thread would
+    block on the lock while the listener thread blocks on the main thread —
+    deadlock, freezing the overlay. These tests model the main loop grabbing
+    ``_lock`` from another thread *during* the ``after`` call and assert it is
+    free (which would only be true if scheduling happens outside the lock).
+    """
+
+    def _assert_lock_free_during_after(
+        self, window: DisplayWindow, mock_root: Mock, action: Callable[[], None]
+    ) -> None:
+        results: list[bool] = []
+
+        def after_impl(_delay: int, _cb: object) -> None:
+            # Another thread models the Tk main loop taking _lock. A plain Lock
+            # would deadlock across threads; _lock is reentrant only on the SAME
+            # thread, so a separate thread genuinely blocks if the lock is held.
+            def grab() -> None:
+                got = window._lock.acquire(timeout=1.0)
+                results.append(got)
+                if got:
+                    window._lock.release()
+
+            thread = threading.Thread(target=grab)
+            thread.start()
+            thread.join(timeout=2.0)
+
+        mock_root.after.reset_mock()  # drop the fade-timer after() from __init__
+        mock_root.after.side_effect = after_impl
+
+        action()  # triggers root.after -> after_impl, which probes the lock
+
+        assert results, "after() was never called, so the lock was not exercised"
+        assert all(results), "show_* held _lock while scheduling after() (deadlock)"
+
+    def test_show_text_schedules_after_outside_lock(
+        self, mock_tk: tuple[Mock, Mock]
+    ) -> None:
+        mock_root, _ = mock_tk
+        window = DisplayWindow(DisplaySettings())
+
+        self._assert_lock_free_during_after(
+            window, mock_root, lambda: window.show_text("A")
+        )
+
+    def test_request_stop_schedules_after_outside_lock(
+        self, mock_tk: tuple[Mock, Mock]
+    ) -> None:
+        # request_stop applies the same capture-root-then-schedule pattern and is
+        # called from the signal handler / pynput threads; it must also release
+        # _lock before the cross-thread after(), or Ctrl+C would deadlock at quit.
+        mock_root, _ = mock_tk
+        window = DisplayWindow(DisplaySettings())
+
+        self._assert_lock_free_during_after(window, mock_root, window.request_stop)

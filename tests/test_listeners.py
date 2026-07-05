@@ -6,7 +6,12 @@ from unittest.mock import Mock, patch
 import pytest
 from pynput import keyboard, mouse
 
-from keycast.listeners import KeyListener, MouseListener, _ErrorThrottler
+from keycast.listeners import (
+    _MODIFIER_STALE_SECONDS,
+    KeyListener,
+    MouseListener,
+    _ErrorThrottler,
+)
 from keycast.settings import KeyboardSettings, MouseSettings
 
 
@@ -334,7 +339,11 @@ class TestKeyListener:
             mock_listener_class.return_value = mock_listener
 
             listener.start()
-            mock_listener_class.assert_called_once_with(on_press=listener._on_press)
+            # on_release is registered too (inert unless group_chords is set), so
+            # the listener can track held modifiers for chord grouping.
+            mock_listener_class.assert_called_once_with(
+                on_press=listener._on_press, on_release=listener._on_release
+            )
             mock_listener.start.assert_called_once()
 
             listener.stop()
@@ -775,3 +784,313 @@ class TestErrorThrottler:
         except RuntimeError as exc:
             throttler.log("context", exc)
         assert "repeated=5" in logger.warning.call_args[0][0]
+
+
+class TestChordGrouping:
+    """KeyListener.group_chords: combining held modifiers with a key.
+
+    Uses real pynput ``Key``/``KeyCode`` objects (they resolve headless) and a
+    list sink. ``Key.ctrl_l``/``shift_l`` map to the platform-stable labels
+    ``"Control Left"``/``"Shift Left"`` via ``_default_key_mappings``.
+    """
+
+    def _listener(self, captured: list[str], **overrides: object) -> KeyListener:
+        settings = KeyboardSettings(group_chords=True, **overrides)  # type: ignore[arg-type]
+        return KeyListener(captured.append, settings)
+
+    def test_modifier_press_is_held_silently(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+
+        # Held, not emitted, until a key completes the chord or it is released.
+        assert captured == []
+
+    def test_chord_combines_modifier_and_key(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.KeyCode.from_char("s"))
+
+        assert captured == ["Control Left + s"]
+
+    def test_chord_lists_modifiers_in_press_order(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.Key.shift_l)
+        listener._on_press(keyboard.KeyCode.from_char("a"))
+
+        assert captured == ["Control Left + Shift Left + a"]
+
+    def test_custom_chord_separator(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured, chord_separator="+")
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.KeyCode.from_char("s"))
+
+        assert captured == ["Control Left+s"]
+
+    def test_lone_modifier_is_emitted_on_release(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_release(keyboard.Key.ctrl_l)
+
+        assert captured == ["Control Left"]
+
+    def test_modifier_used_in_chord_is_not_re_emitted_on_release(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.KeyCode.from_char("s"))
+        listener._on_release(keyboard.KeyCode.from_char("s"))
+        listener._on_release(keyboard.Key.ctrl_l)
+
+        # Only the chord shows; the modifier is not repeated on release.
+        assert captured == ["Control Left + s"]
+
+    def test_next_hold_after_chord_can_emit_lone_modifier(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        # First hold completes a chord...
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.KeyCode.from_char("s"))
+        listener._on_release(keyboard.Key.ctrl_l)
+        # ...and the "fired" state resets, so a later lone tap still shows.
+        listener._on_press(keyboard.Key.shift_l)
+        listener._on_release(keyboard.Key.shift_l)
+
+        assert captured == ["Control Left + s", "Shift Left"]
+
+    def test_lone_modifier_respects_show_modifier_keys(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured, show_modifier_keys=False)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_release(keyboard.Key.ctrl_l)
+
+        assert captured == []
+
+    def test_chord_shows_modifiers_even_when_lone_modifiers_hidden(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured, show_modifier_keys=False)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.KeyCode.from_char("s"))
+
+        # A chord always carries its modifiers; show_modifier_keys only gates
+        # lone modifier taps.
+        assert captured == ["Control Left + s"]
+
+    def test_character_without_modifiers_is_emitted_normally(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.KeyCode.from_char("a"))
+
+        assert captured == ["a"]
+
+    def test_on_release_is_noop_when_grouping_disabled(self) -> None:
+        captured: list[str] = []
+        listener = KeyListener(captured.append, KeyboardSettings())  # group off
+
+        # Default behavior: press emits immediately, release does nothing.
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_release(keyboard.Key.ctrl_l)
+
+        assert captured == ["Control Left"]
+
+    def test_on_release_none_is_safe(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_release(None)  # must not raise
+
+        assert captured == []
+
+    def test_repeated_chords_under_one_hold(self) -> None:
+        # The core presenter sequence: Ctrl held across Ctrl+C then Ctrl+V. Both
+        # chords must show, and Ctrl must not leak out as a lone modifier.
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.KeyCode.from_char("c"))
+        listener._on_release(keyboard.KeyCode.from_char("c"))
+        listener._on_press(keyboard.KeyCode.from_char("v"))
+        listener._on_release(keyboard.KeyCode.from_char("v"))
+        listener._on_release(keyboard.Key.ctrl_l)
+
+        assert captured == ["Control Left + c", "Control Left + v"]
+
+    def test_ctrl_letter_control_char_maps_to_letter(self) -> None:
+        # The OS delivers Ctrl+S as the C0 control character "\x13"; it must
+        # render as the letter, not an invisible glyph.
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.KeyCode.from_char("\x13"))  # Ctrl+S
+
+        assert captured == ["Control Left + s"]
+
+    def test_hidden_chord_key_suppresses_chord_and_lone_modifier(self) -> None:
+        # Ctrl+F1 with function keys hidden: the chord is not shown, and the
+        # modifier is NOT fabricated as a lone "Control" on release — it was
+        # consumed by the (hidden) chord.
+        captured: list[str] = []
+        listener = self._listener(captured, show_function_keys=False)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.Key.f1)
+        listener._on_release(keyboard.Key.f1)
+        listener._on_release(keyboard.Key.ctrl_l)
+
+        assert captured == []
+
+    @staticmethod
+    def _backdate(listener: KeyListener, name: str) -> None:
+        """Push a held modifier's press time past the staleness window."""
+        held = listener._held_modifiers[name]
+        listener._held_modifiers[name] = held._replace(
+            pressed_at=held.pressed_at - (_MODIFIER_STALE_SECONDS + 1)
+        )
+
+    def test_stale_held_modifier_is_evicted_on_next_press(self) -> None:
+        # A missed release (secure-input field, screen lock, ...) would otherwise
+        # wedge the modifier "held" forever. Backdate its press time past the
+        # staleness window; the next keypress evicts it and is a plain key, not a
+        # phantom chord.
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        # Key name is platform-dependent (ctrl_l aliases ctrl on macOS), so read
+        # it back rather than assuming which name pynput used.
+        (name,) = listener._held_modifiers
+        self._backdate(listener, name)
+
+        listener._on_press(keyboard.KeyCode.from_char("a"))
+
+        assert captured == ["a"]
+        assert listener._held_modifiers == {}
+
+    def test_partial_stale_eviction_clears_chord_fired(self) -> None:
+        # A stuck modifier (missed release) after a completed chord must not
+        # poison a later, unrelated hold. Ctrl wedges after Ctrl+S; a fresh Shift
+        # is then held. When Ctrl is evicted (Shift survives), _chord_fired must
+        # reset so Shift's lone tap is still emitted on release — not swallowed.
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.KeyCode.from_char("s"))  # fires a chord
+        (ctrl_name,) = listener._held_modifiers
+        self._backdate(listener, ctrl_name)  # Ctrl's release was missed
+
+        listener._on_press(keyboard.Key.shift_l)  # fresh hold; evicts stale Ctrl
+        listener._on_release(keyboard.Key.shift_l)
+
+        assert captured == ["Control Left + s", "Shift Left"]
+
+    def test_ungrouped_ctrl_letter_control_char_maps_to_letter(self) -> None:
+        # The control-char remap lives in _format_key, so it applies even with
+        # grouping off: a raw "\x13" still renders as "s", not an invisible glyph.
+        captured: list[str] = []
+        listener = KeyListener(captured.append, KeyboardSettings())  # group off
+
+        listener._on_press(keyboard.KeyCode.from_char("\x13"))  # Ctrl+S
+
+        assert captured == ["s"]
+
+    def test_release_of_untracked_modifier_is_ignored(self) -> None:
+        # A release for a modifier that was never recorded as held (e.g. the
+        # press was missed, or it was already evicted) is a no-op, not a crash.
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_release(keyboard.Key.ctrl_l)  # no matching press
+
+        assert captured == []
+        assert listener._held_modifiers == {}
+
+    def test_releasing_one_of_several_held_modifiers_emits_it_alone(self) -> None:
+        # With two modifiers held and no chord completed, releasing one emits it
+        # alone while the other stays held (the hold session is not yet over, so
+        # the chord-fired flag is left untouched).
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.Key.shift_l)
+        listener._on_release(keyboard.Key.shift_l)
+
+        assert captured == ["Shift Left"]
+        assert listener._chord_fired is False
+        assert list(listener._held_modifiers) == [keyboard.Key.ctrl_l.name]
+
+    def test_on_release_swallows_and_logs_sink_error(self) -> None:
+        # A sink that raises on a lone-modifier emit is reported as key_sink_error
+        # and must not escape the pynput callback.
+        callback = Mock(side_effect=RuntimeError("boom"))
+        listener = self._listener([])  # type: ignore[arg-type]
+        listener.show_text = callback
+        listener._error_throttler = Mock()
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_release(keyboard.Key.ctrl_l)  # must not raise
+
+        assert listener._error_throttler.log.call_count == 1
+        assert listener._error_throttler.log.call_args[0][0] == "key_sink_error"
+
+    def test_on_release_state_error_is_reported_as_format_error(self) -> None:
+        # A failure while resolving release state (not the sink) is reported under
+        # key_format_error, mirroring _on_press's two-failure-domain split.
+        captured: list[str] = []
+        listener = self._listener(captured)
+        listener._error_throttler = Mock()
+
+        with patch.object(listener, "_key_name", side_effect=RuntimeError("boom")):
+            listener._on_release(keyboard.Key.ctrl_l)  # must not raise
+
+        assert captured == []
+        assert listener._error_throttler.log.call_count == 1
+        assert listener._error_throttler.log.call_args[0][0] == "key_format_error"
+
+
+class TestMouseFractionalCoordinates:
+    """pynput can deliver float coordinates on high-DPI (Retina) displays.
+
+    The type hint says int, but the runtime value is a float; the position text
+    (show_mouse_position) must render clean integers, not "(210.89453125, 72.4...)".
+    """
+
+    def test_fractional_coordinates_rounded_in_position_text(self) -> None:
+        captured: list[str] = []
+        settings = MouseSettings(show_mouse_clicks=True, show_mouse_position=True)
+        listener = MouseListener(captured.append, settings)
+
+        listener._on_click(210.89453125, 72.421875, mouse.Button.left, pressed=True)  # type: ignore[arg-type]
+
+        assert captured == ["Left Click (211, 72)"]
+
+    def test_non_numeric_coordinate_does_not_crash_the_listener(self) -> None:
+        # A backend handing back a non-numeric coord must surface as a throttled
+        # mouse_format_error, not an unhandled exception escaping the pynput
+        # callback (which would silently stop the listener thread). The rounding
+        # lives inside the try for exactly this reason.
+        captured: list[str] = []
+        settings = MouseSettings(show_mouse_clicks=True, show_mouse_position=True)
+        listener = MouseListener(captured.append, settings)
+
+        listener._on_click(None, None, mouse.Button.left, pressed=True)  # type: ignore[arg-type]
+
+        assert captured == []  # no event emitted, and no exception raised

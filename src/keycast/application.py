@@ -89,7 +89,11 @@ class Keycast:
         # unvalidated model_construct (see Settings._safe_defaults), so the rest
         # of this class must not assume field invariants beyond what defaults
         # provide. That fallback is near-impossible to reach in practice.
-        self.settings = Settings.create_settings_file()
+        # resolve_preset layers the selected preset ("modes") over the loaded
+        # config; "custom" (the default) is a no-op. Applied here so every
+        # component below sees the resolved settings, while the on-disk config
+        # keeps the user's raw values (see Settings.resolve_preset).
+        self.settings = Settings.create_settings_file().resolve_preset()
         # debug mode can widen logging beyond the configured level; resolve the
         # effective logging settings in one place (Settings.effective_logging)
         # rather than branching on settings.debug here.

@@ -108,8 +108,14 @@ class TestAppLevelFlagsAreDocumented:
         assert "draggable" in DisplaySettings.model_fields
         assert DisplaySettings.model_fields["draggable"].default is False
 
+    def test_preset_present_with_custom_default(self) -> None:
+        # The preset field is documented in README / API.md as defaulting to
+        # "custom" (a no-op). A string default is compared by value, not `is`.
+        assert "preset" in Settings.model_fields
+        assert Settings.model_fields["preset"].default == "custom"
+
     def test_settings_sections_are_exactly_documented(self) -> None:
-        # The four sections every doc lists, plus the five top-level scalar flags
+        # The four sections every doc lists, plus the six top-level scalar flags
         # -- nothing more, nothing less. The scalars are flags, not sections.
         documented_sections = {"display", "keyboard", "mouse", "logging"}
         scalar_flags = {
@@ -118,6 +124,7 @@ class TestAppLevelFlagsAreDocumented:
             "auto_start",
             "check_for_updates",
             "show_startup_status",
+            "preset",
         }
         assert set(Settings.model_fields) == documented_sections | scalar_flags
 

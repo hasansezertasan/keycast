@@ -1,7 +1,8 @@
 """Input event listeners for keyboard and mouse events."""
 
 import logging
-from typing import TYPE_CHECKING, Protocol
+import time
+from typing import TYPE_CHECKING, NamedTuple, Protocol
 
 from pynput import keyboard, mouse
 
@@ -13,6 +14,28 @@ from keycast.logging_setup import _ErrorThrottler, format_event
 
 if TYPE_CHECKING:
     from keycast.settings import KeyboardSettings, MouseSettings
+
+# A modifier physically held longer than this (continuously, without a matching
+# release) is treated as stale and dropped from the chord state. pynput can miss
+# release events entirely — macOS secure-input fields, screen lock, focus
+# stealing, event-tap timeouts — which would otherwise leave a modifier "held"
+# forever, rendering every subsequent keystroke as a phantom chord with no
+# recovery. No real modifier+key chord is held continuously for this long, so
+# eviction self-heals the stuck state on the next keypress without breaking
+# legitimate held-modifier sequences (e.g. Shift held across many arrow keys).
+_MODIFIER_STALE_SECONDS = 30.0
+
+
+class HeldModifier(NamedTuple):
+    """A modifier currently held down, for chord grouping.
+
+    ``pressed_at`` is a :func:`time.monotonic` timestamp used only for staleness
+    eviction (see :data:`_MODIFIER_STALE_SECONDS`); ``label`` is the pre-resolved
+    display string so a chord or lone-release can reuse it without re-formatting.
+    """
+
+    label: str
+    pressed_at: float
 
 
 class TextSink(Protocol):
@@ -54,6 +77,31 @@ class KeyListener:
         """The logger instance."""
         self._error_throttler = _ErrorThrottler(self.logger)
         """Throttles repeated errors from the per-keystroke callback."""
+        # Chord-grouping state (only used when settings.group_chords is set).
+        # Insertion-ordered so a chord lists modifiers in the order pressed.
+        # Mutated only on the single pynput listener thread, so no lock is needed.
+        self._held_modifiers: dict[str, HeldModifier] = {}
+        """Currently held modifiers: key name -> HeldModifier(label, pressed_at)."""
+        self._chord_fired = False
+        """Whether a non-modifier completed a chord during the current hold."""
+
+    @staticmethod
+    def _is_modifier(key_name: str | None) -> bool:
+        """Return whether a pynput key name is a modifier keycast tracks for chords.
+
+        Mirrors the modifier prefixes ``_should_show_key`` keys off; the Super key
+        is reported as "cmd" on every platform (never "win"), so there is no "win"
+        prefix here.
+
+        Args:
+            key_name: The pynput key name, or None for character/unknown keys.
+
+        Returns:
+            True if the name is a ctrl/alt/shift/cmd modifier.
+        """
+        return key_name is not None and key_name.startswith(
+            ("ctrl", "alt", "shift", "cmd")
+        )
 
     def _key_name(self, key: keyboard.Key | keyboard.KeyCode) -> str | None:
         """Return the stable pynput name for a special key, or None for others.
@@ -87,6 +135,14 @@ class KeyListener:
         # Handle regular character keys
         if isinstance(key, keyboard.KeyCode):
             if key.char:
+                # Ctrl+<letter> arrives as a C0 control character (Ctrl+A is
+                # "\x01", ... Ctrl+Z is "\x1a") on Windows/X11 and for Ctrl
+                # combos on macOS. Map it back to its letter so a grouped chord
+                # reads "Control Left + a" instead of an invisible/garbage glyph.
+                # Named keys like Tab/Enter/Esc/Backspace arrive as Key objects,
+                # not here, so only the 26 Ctrl+letter codes are remapped.
+                if len(key.char) == 1 and 1 <= ord(key.char) <= 26:
+                    return chr(ord(key.char) + 96)
                 return key.char
             # Dead/virtual key code with no character: fall back to its repr.
             return str(key)
@@ -146,6 +202,33 @@ class KeyListener:
         # Any other named special key is shown by default.
         return True
 
+    def _evict_stale_modifiers(self) -> None:
+        """Drop modifiers held longer than ``_MODIFIER_STALE_SECONDS``.
+
+        Guards against pynput missing a release event (see the constant's note),
+        which would otherwise wedge a modifier in ``_held_modifiers`` forever and
+        turn every later keystroke into a phantom chord. Called at the top of
+        :meth:`_on_press` so the stuck state self-heals on the next keypress.
+        """
+        now = time.monotonic()
+        stale = [
+            name
+            for name, held in self._held_modifiers.items()
+            if now - held.pressed_at > _MODIFIER_STALE_SECONDS
+        ]
+        for name in stale:
+            del self._held_modifiers[name]
+            self.logger.debug(
+                format_event("stale_held_modifier_evicted", modifier=name)
+            )
+        # Any eviction ends the current hold session: an evicted modifier belongs
+        # to a wedged, stuck-open hold, so _chord_fired (set by that session) is no
+        # longer meaningful — clear it even if fresher modifiers are still held, or
+        # a later lone tap of one of those would be wrongly suppressed. A fresh
+        # modifier that then completes a real chord re-sets the flag on that press.
+        if stale:
+            self._chord_fired = False
+
     def _on_press(self, key: keyboard.Key | keyboard.KeyCode | None) -> None:
         """Handle key press events.
 
@@ -163,15 +246,87 @@ class KeyListener:
                     format_event("key_event_skipped", reason="key_is_none")
                 )
                 return
+            if self.settings.group_chords:
+                self._evict_stale_modifiers()
+            key_name = self._key_name(key)
+            if (
+                self.settings.group_chords
+                and key_name is not None
+                and self._is_modifier(key_name)
+            ):
+                # Hold the modifier silently; its label is resolved now so a later
+                # chord or a lone-release can reuse it.
+                self._held_modifiers[key_name] = HeldModifier(
+                    self._format_key(key), time.monotonic()
+                )
+                return
+            # A non-modifier pressed while modifiers are held completes a chord.
+            # Record that *before* the visibility filter: if the chord's key is
+            # hidden (e.g. Ctrl+F1 with show_function_keys off), we must still
+            # mark the hold session as consumed so releasing the modifier does
+            # not fabricate a misleading lone "Control" — the modifier was used,
+            # even though its chord is not displayed.
+            chord_active = self.settings.group_chords and bool(self._held_modifiers)
+            if chord_active:
+                self._chord_fired = True
             if not self._should_show_key(key):
                 return
             formatted_key = self._format_key(key)
+            if chord_active:
+                # Prefix the held modifiers, in the order pressed. The chord
+                # always carries its modifiers, even when show_modifier_keys is
+                # off (a chord without them is useless).
+                labels = [held.label for held in self._held_modifiers.values()]
+                formatted_key = self.settings.chord_separator.join(
+                    [*labels, formatted_key]
+                )
         except Exception as exc:
             self._error_throttler.log("key_format_error", exc, key=key)
             return
 
         try:
             self.show_text(formatted_key)
+        except Exception as exc:
+            self._error_throttler.log("key_sink_error", exc, key=key)
+
+    def _on_release(self, key: keyboard.Key | keyboard.KeyCode | None) -> None:
+        """Handle key release events, used only for chord grouping.
+
+        Tracks which modifiers are currently held so :meth:`_on_press` can build
+        chords. A modifier released without having completed a chord during its
+        hold is emitted alone here (subject to ``show_modifier_keys``), so a lone
+        modifier tap still shows. A no-op unless ``group_chords`` is set.
+
+        Args:
+            key: The released key (pynput may deliver None).
+        """
+        if not self.settings.group_chords:
+            return
+
+        # Formatting/state and the sink call are separate failure domains, mirrored
+        # from _on_press so a broken sink is not mislabeled as a format error.
+        try:
+            if key is None:
+                return
+            key_name = self._key_name(key)
+            if key_name is None or not self._is_modifier(key_name):
+                return
+            if key_name not in self._held_modifiers:
+                return
+            label = self._held_modifiers.pop(key_name).label
+            # Emit a lone modifier only if no chord consumed this hold session.
+            emit_lone = not self._chord_fired and self.settings.show_modifier_keys
+            if not self._held_modifiers:
+                # Hold session ended; reset for the next one.
+                self._chord_fired = False
+            if not emit_lone:
+                return
+        except Exception as exc:
+            self._error_throttler.log("key_format_error", exc, key=key)
+            return
+
+        try:
+            self.show_text(label)
         except Exception as exc:
             self._error_throttler.log("key_sink_error", exc, key=key)
 
@@ -182,7 +337,11 @@ class KeyListener:
             return
 
         try:
-            self.listener = keyboard.Listener(on_press=self._on_press)
+            # on_release is registered unconditionally; it early-returns unless
+            # group_chords is set, so it is inert in the default configuration.
+            self.listener = keyboard.Listener(
+                on_press=self._on_press, on_release=self._on_release
+            )
             self.listener.start()
             self.logger.info("keyboard_listener_started")
         except Exception:
@@ -263,16 +422,27 @@ class MouseListener:
             pressed: Whether the button was pressed (True) or released (False)
 
         """
-        # Formatting and the sink call are separate failure domains; see the
+        # Only presses are visualized (button-up is not an event keycast shows).
+        if not pressed:
+            return
+
+        # Formatting and the text-sink call are separate failure domains; see the
         # matching note in ``KeyListener._on_press``. They are caught and
         # reported under different event names so a broken display sink is not
         # mislabeled as a mouse-formatting error.
         try:
-            if not (pressed and self.settings.show_mouse_clicks):
+            if not self.settings.show_mouse_clicks:
                 return
             text = self._format_button(button)
             if self.settings.show_mouse_position:
-                text += f" ({x}, {y})"
+                # pynput may deliver fractional coordinates on high-DPI (Retina)
+                # displays; the type hint says int but the runtime value can be a
+                # float, so round for a clean "(210, 72)" rather than
+                # "(210.89453125, 72.4...)". Kept inside the try so a non-numeric
+                # coordinate surfaces as a throttled mouse_format_error instead of
+                # an unhandled exception that would silently kill the pynput
+                # listener thread (clicks would then stop appearing, no logs).
+                text += f" ({round(x)}, {round(y)})"
         except Exception as exc:
             self._error_throttler.log("mouse_format_error", exc, button=button)
             return
