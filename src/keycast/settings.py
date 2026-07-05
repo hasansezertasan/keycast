@@ -293,6 +293,15 @@ class KeyboardSettings(BaseModel):
         default=True,
         description="Whether to show special keys (Enter, Space, etc.)",
     )
+    mask_secure_input: bool = Field(
+        default=True,
+        description="Suppress keystrokes typed while the OS reports secure input "
+        "is active (macOS password/authentication fields), so a typed password is "
+        "never rendered onto the overlay. On by default -- a leaked credential on "
+        "camera is worse than a missed keystroke. Best-effort and macOS-only: "
+        "there is no reliable global secure-field signal on Windows or Linux/X11, "
+        "so the flag is a no-op there (see keycast.secure_input).",
+    )
     group_chords: bool = Field(
         default=False,
         description="Combine a key pressed while modifiers are held into a single "

@@ -232,6 +232,63 @@ class TestKeyListener:
 
         callback.assert_called_once_with("Control Left")
 
+    def test_on_press_masks_keystroke_when_secure_input_active(self) -> None:
+        """No label reaches the sink while secure input is reported active."""
+        callback = Mock()
+        listener = KeyListener(
+            callback, KeyboardSettings(), is_secure_input=lambda: True
+        )
+
+        listener._on_press(keyboard.KeyCode.from_char("s"))
+
+        callback.assert_not_called()
+
+    def test_on_press_shows_keystroke_when_secure_input_inactive(self) -> None:
+        """A normal keystroke is unaffected when secure input is not active."""
+        callback = Mock()
+        listener = KeyListener(
+            callback, KeyboardSettings(), is_secure_input=lambda: False
+        )
+
+        listener._on_press(keyboard.KeyCode.from_char("s"))
+
+        callback.assert_called_once_with("s")
+
+    def test_on_press_ignores_secure_input_when_masking_disabled(self) -> None:
+        """mask_secure_input off: keystrokes show even during secure input."""
+        callback = Mock()
+        listener = KeyListener(
+            callback,
+            KeyboardSettings(mask_secure_input=False),
+            is_secure_input=lambda: True,
+        )
+
+        listener._on_press(keyboard.KeyCode.from_char("s"))
+
+        callback.assert_called_once_with("s")
+
+    def test_masked_modifier_is_not_stashed_as_chord(self) -> None:
+        """A modifier pressed under secure input must not wedge chord state.
+
+        If a masked Ctrl press were stashed in ``_held_modifiers``, the next
+        visible key (after secure input clears) would be fabricated into a
+        phantom "Control + x" chord. The mask must drop it before it is held.
+        """
+        callback = Mock()
+        secure = True
+        listener = KeyListener(
+            callback,
+            KeyboardSettings(group_chords=True),
+            is_secure_input=lambda: secure,
+        )
+
+        listener._on_press(keyboard.Key.ctrl_l)  # masked: must not be held
+        assert listener._held_modifiers == {}
+
+        secure = False
+        listener._on_press(keyboard.KeyCode.from_char("x"))
+        callback.assert_called_once_with("x")  # a lone "x", never "Control + x"
+
     def test_should_show_key_modifier_keys(self) -> None:
         """Test showing modifier keys based on settings."""
         mock_callback = Mock()

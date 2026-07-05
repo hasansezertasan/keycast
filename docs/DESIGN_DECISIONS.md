@@ -491,6 +491,54 @@ recent_events = self.events[-self.settings.max_events:]
 - ❌ No data persistence
 - ❌ No playback capabilities
 
+### Secure-input masking (macOS)
+
+**Decision**: Suppress keystrokes typed while the OS reports **secure input** is
+active (macOS password/authentication fields), on by default
+(`KeyboardSettings.mask_secure_input`). See
+[ADR-015](adr/015-secure-input-masking.md).
+
+**Rationale**:
+- A system-wide visualizer renders *every* keystroke, including passwords typed
+  during a live demo or screencast — that leaks credentials on camera, a
+  security failure, not a cosmetic gap.
+- macOS exposes `IsSecureEventInputEnabled()` (Carbon/HIToolbox), which reports
+  exactly when a password/authentication field is focused, without a prompt or
+  entitlement. It is the same OS mechanism that already makes pynput miss key
+  releases in those windows (see the stale-modifier eviction in
+  `listeners.py`), so keycast already lives with this state — masking is its
+  intentional use.
+- The check lives at the single-sink boundary (`KeyListener._on_press`), ahead of
+  chord state, so a secret key is dropped before it can be formatted, held as a
+  modifier, or reach the display — the display layer stays unaware, consistent
+  with the TextSink architecture.
+
+**Decisions within the decision**:
+- **Full suppression, not `••••`** — showing a mask glyph still leaks length and
+  typing cadence (a minor side channel) and adds display complexity for no real
+  benefit; emitting nothing is simpler and leaks strictly less.
+- **On by default** — a leaked password is worse than a missed keystroke, so the
+  safe default is masking; users who want to demo typing into a password field on
+  purpose can set `mask_secure_input: false`.
+- **Fail open** — when the signal cannot be read (non-macOS, or a framework/symbol
+  failure), capture continues normally rather than blanking the overlay, which
+  would read as a broken app. Security-wise this means masking is best-effort, not
+  a guarantee — documented honestly.
+
+**Alternatives Considered**:
+- **Cross-platform coverage now**: Windows has no direct global secure-field flag
+  (would need focused-window/control-class heuristics) and Linux/X11 has no
+  reliable signal at all — deferred rather than shipped half-working.
+- **Manual "pause capture" hotkey** as the cross-platform floor: considered and
+  deferred to a separate change; macOS auto-detection is the focused first step.
+
+**Trade-offs**:
+- ✅ Passwords typed into macOS secure fields never reach the overlay/recording
+- ✅ Reuses an OS signal keycast already contends with; tiny surface
+- ✅ Safe by default; display layer unchanged
+- ❌ macOS-only — Windows/Linux users get no automatic protection today
+- ❌ Best-effort, not a guarantee (fail-open by design)
+
 ## Testing Decisions
 
 ### Comprehensive Mocking Strategy

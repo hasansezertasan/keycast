@@ -2,6 +2,7 @@
 
 import logging
 import time
+from collections.abc import Callable
 from typing import TYPE_CHECKING, NamedTuple, Protocol
 
 from pynput import keyboard, mouse
@@ -11,6 +12,7 @@ from pynput import keyboard, mouse
 # listener callbacks. Imported into this namespace so existing references to
 # ``keycast.listeners._ErrorThrottler`` keep resolving.
 from keycast.logging_setup import _ErrorThrottler, format_event
+from keycast.secure_input import is_secure_input_active
 
 if TYPE_CHECKING:
     from keycast.settings import KeyboardSettings, MouseSettings
@@ -59,18 +61,32 @@ class TextSink(Protocol):
 class KeyListener:
     """Keyboard event listener using pynput."""
 
-    def __init__(self, show_text: TextSink, settings: KeyboardSettings) -> None:
+    def __init__(
+        self,
+        show_text: TextSink,
+        settings: KeyboardSettings,
+        *,
+        is_secure_input: Callable[[], bool] = is_secure_input_active,
+    ) -> None:
         """Initialize the keyboard listener.
 
         Args:
             show_text: Sink invoked (on a pynput listener thread) with the
                 formatted label each time a key is pressed
             settings: Keyboard settings
+            is_secure_input: Predicate returning whether the OS currently reports
+                secure input (a password/authentication field is focused). Called
+                per press when ``settings.mask_secure_input`` is set; injected so
+                tests can drive masking without a real secure field. Defaults to
+                the macOS probe :func:`keycast.secure_input.is_secure_input_active`
+                (a no-op returning ``False`` on other platforms).
         """
         self.show_text = show_text
         """The callback function called when a key is pressed."""
         self.settings = settings
         """The keyboard settings."""
+        self._is_secure_input = is_secure_input
+        """Predicate telling whether secure input is active (see __init__)."""
         self.listener: keyboard.Listener | None = None
         """The keyboard listener instance."""
         self.logger = logging.getLogger(__name__)
@@ -245,6 +261,16 @@ class KeyListener:
                 self.logger.warning(
                     format_event("key_event_skipped", reason="key_is_none")
                 )
+                return
+            # Secure-input masking: if the OS reports a password/authentication
+            # field is focused, drop the keystroke entirely before it can be
+            # formatted, held as a chord modifier, or reach the sink -- so a typed
+            # credential never lands on the overlay. Checked ahead of chord state
+            # so a modifier pressed inside a secure field is not stashed in
+            # _held_modifiers (which would fabricate a phantom chord on the next
+            # visible key). Best-effort: is_secure_input is False off macOS.
+            if self.settings.mask_secure_input and self._is_secure_input():
+                self.logger.debug(format_event("key_event_masked_secure_input"))
                 return
             if self.settings.group_chords:
                 self._evict_stale_modifiers()

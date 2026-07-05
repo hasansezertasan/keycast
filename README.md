@@ -169,6 +169,7 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
     "show_modifier_keys": true,
     "show_function_keys": true,
     "show_special_keys": true,
+    "mask_secure_input": true,
     "group_chords": false,
     "chord_separator": " + ",
     "key_mappings": {
@@ -186,6 +187,16 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
 > their own (no other key) still show individually, subject to
 > `show_modifier_keys`. `chord_separator` is the string joining the parts
 > (default `" + "`). Defaults to `false`; the `presenter` preset turns it on.
+>
+> `mask_secure_input` — when `true` (the default), keystrokes typed while the OS
+> reports **secure input** is active (macOS password/authentication fields) are
+> suppressed entirely, so a typed password is never rendered onto the overlay or
+> a recording. **Best-effort and macOS-only:** there is no reliable global
+> secure-field signal on Windows or Linux/X11, so the flag is a no-op there —
+> treat masking as unavailable on those platforms. On by default because a leaked
+> credential on camera is worse than a missed keystroke. See
+> [docs/COMPARISON.md](docs/COMPARISON.md) and
+> [ADR-015](docs/adr/015-secure-input-masking.md).
 
 #### Mouse Settings
 

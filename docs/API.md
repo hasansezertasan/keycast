@@ -207,6 +207,7 @@ def __init__(self, show_text: TextSink, settings: KeyboardSettings) -> None
 - `show_modifier_keys` (bool): Whether to show modifier keys (Ctrl, Alt, etc.) (default: True)
 - `show_function_keys` (bool): Whether to show function keys (F1, F2, etc.) (default: True)
 - `show_special_keys` (bool): Whether to show special keys (Enter, Space, etc.) (default: True)
+- `mask_secure_input` (bool): Suppress keystrokes typed while the OS reports secure input is active — macOS password/authentication fields — so a typed password never reaches the overlay (default: True). Best-effort and **macOS-only**; a no-op on Windows/Linux (no reliable global secure-field signal). See Secure-input masking below.
 - `group_chords` (bool): Whether to combine a key pressed with held modifiers into one chord label, e.g. `"Control Left + S"` (default: False). See Chord Grouping below.
 - `chord_separator` (str): String joining the parts of a grouped chord (default: `" + "`, min length 1).
 - `key_mappings` (dict[str, str]): Custom key name mappings. Keys are pynput key names with the "Key." prefix removed (e.g. "ctrl_l", "space"). Ships cross-platform defaults for the modifier, space and enter keys.
@@ -324,6 +325,32 @@ events to track which modifiers are currently held. A modifier held continuously
 for more than 30 seconds without a matching release is treated as stale and
 dropped (pynput can miss release events — secure-input fields, screen lock — which
 would otherwise wedge the chord state); the next keypress self-heals.
+
+#### Secure-input masking
+
+When `mask_secure_input` is `true` (the default), `KeyListener` drops every
+keystroke while the OS reports **secure input** is active — the mode macOS
+enables for password and authentication fields. The key is suppressed *before* it
+is formatted, stashed as a chord modifier, or handed to the sink, so a typed
+credential never reaches the overlay (full suppression — nothing is shown, not
+even `••••`). It is checked ahead of chord state so a modifier pressed inside a
+secure field is not held (which would otherwise fabricate a phantom chord on the
+next visible key).
+
+Detection is **best-effort and macOS-only** (`IsSecureEventInputEnabled`, in
+`keycast.secure_input`); Windows and Linux/X11 expose no reliable global
+secure-field signal, so the flag is a no-op there. On by default because a leaked
+password on camera is worse than a missed keystroke. The probe is injectable via
+the keyword-only `is_secure_input` constructor argument (defaults to the real
+macOS probe) so tests can drive masking without a real secure field:
+
+```python
+listener = KeyListener(
+    show_text=captured.append,
+    settings=KeyboardSettings(),
+    is_secure_input=lambda: True,  # simulate a focused password field
+)
+```
 
 ### MouseListener
 
@@ -528,6 +555,7 @@ settings = Settings.create_settings_file().resolve_preset()
 - `show_modifier_keys` (bool): Whether to show modifier keys (Ctrl, Alt, etc.) (default: True)
 - `show_function_keys` (bool): Whether to show function keys (F1, F2, etc.) (default: True)
 - `show_special_keys` (bool): Whether to show special keys (Enter, Space, etc.) (default: True)
+- `mask_secure_input` (bool): Suppress keystrokes typed during macOS secure input (password/authentication fields) so they never reach the overlay (default: True). Best-effort and **macOS-only**; a no-op on Windows/Linux. See Secure-input masking under `KeyListener`.
 - `group_chords` (bool): Combine a key pressed with held modifiers into one chord label (default: False). See Chord Grouping under `KeyListener`.
 - `chord_separator` (str): String joining the parts of a grouped chord (default: `" + "`, min length 1).
 - `key_mappings` (dict[str, str]): Custom key name mappings. Keys are pynput key names with the "Key." prefix removed (e.g. "ctrl_l", "space"). Ships cross-platform defaults for the modifier, space and enter keys.

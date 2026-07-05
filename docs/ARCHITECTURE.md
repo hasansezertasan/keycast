@@ -16,6 +16,7 @@ keycast/
 │   ├── main.py           # main(): constructs and runs Keycast
 │   ├── display.py        # Tkinter overlay window (DisplayWindow)
 │   ├── listeners.py      # Input event listeners + TextSink protocol
+│   ├── secure_input.py   # macOS secure-input probe (password-field masking)
 │   ├── settings.py       # Pydantic settings configuration
 │   └── logging_setup.py  # Logging configuration
 ├── tests/                # Test suite
@@ -24,6 +25,7 @@ keycast/
 │   ├── test_main.py           # Entry point tests
 │   ├── test_display.py        # Display window tests
 │   ├── test_listeners.py      # Listener tests
+│   ├── test_secure_input.py   # Secure-input probe tests
 │   ├── test_settings.py       # Settings/validation tests
 │   └── test_logging_setup.py  # Logging configuration tests
 ├── docs/                 # Documentation
@@ -163,6 +165,10 @@ main.py / cli.py / __main__.py are thin entry points that call Keycast().run().
 - **Cross-platform**: Uses pynput for consistent behavior across platforms
 - **Configurable Filtering**: Show/hide different types of keys and mouse events
 - **Custom Mappings**: User-defined key and button name mappings
+- **Secure-input masking**: On macOS, `KeyListener` drops keystrokes while the OS
+  reports secure input (password/authentication fields) so credentials never
+  reach the sink; the check sits at the single-sink boundary ahead of chord
+  state, via the `secure_input` probe (best-effort, macOS-only)
 - **Error Handling**: Graceful handling of permission issues and errors
 
 **Design Decisions**:
@@ -382,6 +388,10 @@ keycast uses a simple threading model:
 - **No Storage**: Events not persisted to disk
 - **Memory Only**: Temporary in-memory storage only
 - **User Control**: User controls what events are displayed
+- **Secure-input masking**: On macOS, keystrokes typed into password/authentication
+  fields are suppressed by default (`keyboard.mask_secure_input`) so credentials
+  never appear on the overlay or in a recording — best-effort, macOS-only (see
+  [ADR-015](adr/015-secure-input-masking.md))
 
 ## Platform Compatibility
 
