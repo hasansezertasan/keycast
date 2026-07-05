@@ -664,6 +664,24 @@ class TestRecommendedActionAndLabels:
         for source in InstallSource:
             assert isinstance(sources.install_source_label(source), str)
 
+    def test_only_fallback_sources_point_at_releases(self) -> None:
+        # Exhaustiveness guard mirroring test_labels_cover_every_source: a source
+        # accidentally omitted from _UPGRADE_COMMANDS silently falls through to
+        # RELEASES_URL via the .get() default — exactly the "wrong channel" bug a
+        # store source must never hit. Pin that only the three URL-fallback
+        # sources resolve to the Releases page; every other source (commands and
+        # the store statements alike) must resolve to something else.
+        fallback = {
+            InstallSource.GITHUB_RELEASE,
+            InstallSource.WINDOWS_INSTALLER,
+            InstallSource.UNKNOWN,
+        }
+        for source in InstallSource:
+            points_at_releases = (
+                sources.recommended_action(source) == sources.RELEASES_URL
+            )
+            assert points_at_releases == (source in fallback)
+
     def test_windows_installer_label_is_exact(self) -> None:
         # User-facing string (shown by `keycast info`); pin it so a typo can't
         # ship silently — the cover-every-source test only checks the type.

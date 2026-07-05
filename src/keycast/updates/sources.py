@@ -119,8 +119,9 @@ def _mas_receipt_exists() -> bool:
 
     A MAS-distributed ``.app`` carries ``Contents/_MASReceipt/receipt``. App
     Store apps install into ``/Applications`` — the same place as a cask or a
-    manual drag-install — so this receipt is the only reliable signal (ADR-011),
-    the macOS-store analogue of the Caskroom receipt. ``sys.executable`` is
+    manual drag-install — so this receipt is the only reliable signal that
+    distinguishes it from a cask / drag-install (ADR-011), the macOS-store
+    analogue of the Caskroom receipt. ``sys.executable`` is
     ``<bundle>/Contents/MacOS/keycast``, so the receipt is one level up from
     ``MacOS`` under ``Contents``.
 
@@ -128,12 +129,19 @@ def _mas_receipt_exists() -> bool:
     a stray ``_MASReceipt`` on another OS must never classify as
     :data:`InstallSource.MAC_APP_STORE`.
 
+    Any ``OSError`` from the probe degrades to ``False`` — detection is
+    best-effort, so an unreadable path falls through to the next branch rather
+    than crashing the caller (mirrors :func:`_read_installer`).
+
     Returns:
         True if running on macOS and the receipt exists inside the bundle.
     """
     if sys.platform != "darwin":
         return False
-    return (Path(sys.executable).parent.parent / "_MASReceipt" / "receipt").exists()
+    try:
+        return (Path(sys.executable).parent.parent / "_MASReceipt" / "receipt").exists()
+    except OSError:
+        return False
 
 
 _INSTALLER_MARKER_NAME = ".install-source"
