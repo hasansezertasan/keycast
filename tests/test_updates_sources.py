@@ -121,6 +121,53 @@ class TestHomebrewCaskReceipt:
         assert sources._homebrew_cask_receipt_exists() is False
 
 
+class TestMacAppStoreReceipt:
+    """The _MASReceipt filesystem probe inside the running bundle.
+
+    ``sys.platform`` is faked to ``"darwin"`` so the receipt path is exercised on
+    every CI OS (coverage uploads from Linux, where the real guard returns early).
+    """
+
+    def _bundle(self, tmp_path: Path) -> Path:
+        # sys.executable is <bundle>/Contents/MacOS/keycast.
+        macos = tmp_path / "keycast.app" / "Contents" / "MacOS"
+        macos.mkdir(parents=True)
+        return macos / "keycast"
+
+    def test_present_when_receipt_in_bundle(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        exe = self._bundle(tmp_path)
+        receipt = tmp_path / "keycast.app" / "Contents" / "_MASReceipt" / "receipt"
+        receipt.parent.mkdir(parents=True)
+        receipt.write_text("mas")
+        monkeypatch.setattr(sources.sys, "platform", "darwin")
+        monkeypatch.setattr(sources.sys, "executable", str(exe))
+        assert sources._mas_receipt_exists() is True
+
+    def test_absent_when_no_receipt(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A cask or drag-install .app has the same layout but no _MASReceipt.
+        exe = self._bundle(tmp_path)
+        monkeypatch.setattr(sources.sys, "platform", "darwin")
+        monkeypatch.setattr(sources.sys, "executable", str(exe))
+        assert sources._mas_receipt_exists() is False
+
+    def test_absent_off_macos_even_with_receipt(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A stray _MASReceipt on another OS must never read as a MAS install —
+        # the probe is gated on the platform, like the Windows installer marker.
+        exe = self._bundle(tmp_path)
+        receipt = tmp_path / "keycast.app" / "Contents" / "_MASReceipt" / "receipt"
+        receipt.parent.mkdir(parents=True)
+        receipt.write_text("mas")
+        monkeypatch.setattr(sources.sys, "platform", "win32")
+        monkeypatch.setattr(sources.sys, "executable", str(exe))
+        assert sources._mas_receipt_exists() is False
+
+
 class TestInstallerMarker:
     """The Windows-installer marker probe beside the executable."""
 
