@@ -1011,6 +1011,60 @@ class TestChordGrouping:
 
         assert captured == ["s"]
 
+    def test_release_of_untracked_modifier_is_ignored(self) -> None:
+        # A release for a modifier that was never recorded as held (e.g. the
+        # press was missed, or it was already evicted) is a no-op, not a crash.
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_release(keyboard.Key.ctrl_l)  # no matching press
+
+        assert captured == []
+        assert listener._held_modifiers == {}
+
+    def test_releasing_one_of_several_held_modifiers_emits_it_alone(self) -> None:
+        # With two modifiers held and no chord completed, releasing one emits it
+        # alone while the other stays held (the hold session is not yet over, so
+        # the chord-fired flag is left untouched).
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.Key.shift_l)
+        listener._on_release(keyboard.Key.shift_l)
+
+        assert captured == ["Shift Left"]
+        assert listener._chord_fired is False
+        assert list(listener._held_modifiers) == [keyboard.Key.ctrl_l.name]
+
+    def test_on_release_swallows_and_logs_sink_error(self) -> None:
+        # A sink that raises on a lone-modifier emit is reported as key_sink_error
+        # and must not escape the pynput callback.
+        callback = Mock(side_effect=RuntimeError("boom"))
+        listener = self._listener([])  # type: ignore[arg-type]
+        listener.show_text = callback
+        listener._error_throttler = Mock()
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_release(keyboard.Key.ctrl_l)  # must not raise
+
+        assert listener._error_throttler.log.call_count == 1
+        assert listener._error_throttler.log.call_args[0][0] == "key_sink_error"
+
+    def test_on_release_state_error_is_reported_as_format_error(self) -> None:
+        # A failure while resolving release state (not the sink) is reported under
+        # key_format_error, mirroring _on_press's two-failure-domain split.
+        captured: list[str] = []
+        listener = self._listener(captured)
+        listener._error_throttler = Mock()
+
+        with patch.object(listener, "_key_name", side_effect=RuntimeError("boom")):
+            listener._on_release(keyboard.Key.ctrl_l)  # must not raise
+
+        assert captured == []
+        assert listener._error_throttler.log.call_count == 1
+        assert listener._error_throttler.log.call_args[0][0] == "key_format_error"
+
 
 class TestMouseFractionalCoordinates:
     """pynput can deliver float coordinates on high-DPI (Retina) displays.
