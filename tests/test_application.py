@@ -220,6 +220,28 @@ class TestStart:
         assert "mouse=active" in caplog.text
         assert "precheck=unknown" in caplog.text
 
+    @pytest.mark.parametrize(
+        ("precheck", "expected"),
+        [(True, "granted"), (False, "denied"), (None, "unknown")],
+    )
+    def test_precheck_states_map_to_log_labels(
+        self,
+        keycast: Keycast,
+        caplog: pytest.LogCaptureFixture,
+        precheck: bool | None,
+        expected: str,
+    ) -> None:
+        """Each tri-state precheck value gets a stable structured-log label."""
+        statuses = {
+            "keyboard": application_module._InputSourceStatus.ACTIVE,
+            "mouse": application_module._InputSourceStatus.ACTIVE,
+        }
+
+        with caplog.at_level("INFO", logger="keycast.application"):
+            keycast._log_startup_input_status(statuses=statuses, precheck=precheck)
+
+        assert f"precheck={expected}" in caplog.text
+
     def test_windows_status_uses_listener_result_on_failure(
         self, keycast: Keycast
     ) -> None:
