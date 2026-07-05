@@ -167,6 +167,22 @@ class TestMacAppStoreReceipt:
         monkeypatch.setattr(sources.sys, "executable", str(exe))
         assert sources._mas_receipt_exists() is False
 
+    def test_oserror_from_probe_degrades_to_false(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A rare OSError from the filesystem probe must degrade to False (the
+        # intended fall-through) rather than crash detect_install_source —
+        # detection is best-effort, like _read_installer.
+        exe = self._bundle(tmp_path)
+        monkeypatch.setattr(sources.sys, "platform", "darwin")
+        monkeypatch.setattr(sources.sys, "executable", str(exe))
+
+        def _raise(self: Path) -> bool:
+            raise OSError("probe failed")
+
+        monkeypatch.setattr(sources.Path, "exists", _raise)
+        assert sources._mas_receipt_exists() is False
+
 
 class TestInstallerMarker:
     """The Windows-installer marker probe beside the executable."""
@@ -290,7 +306,7 @@ class TestDetectInstallSource:
 
     def test_frozen_with_mas_receipt_is_mac_app_store(self) -> None:
         # A MAS .app lives in /Applications like a cask; the bundle's
-        # _MASReceipt is what flips it to MAC_APP_STORE (ADR-011).
+        # _MASReceipt is what flips it to MAC_APP_STORE (ADR-014).
         loc = Path("/Applications/keycast.app/Contents/MacOS/keycast")
         assert (
             sources.detect_install_source(
@@ -712,7 +728,7 @@ class TestRecommendedActionAndLabels:
         )
 
     def test_mac_app_store_action_is_a_statement_not_a_command(self) -> None:
-        # ADR-011: the Mac App Store updates its apps itself, so the recommended
+        # ADR-014: the Mac App Store updates its apps itself, so the recommended
         # action is that fact stated outright — never a command, never the
         # Releases page (which would send a MAS user to the wrong channel).
         assert sources.recommended_action(InstallSource.MAC_APP_STORE) == (
