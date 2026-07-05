@@ -30,20 +30,15 @@ Input events flow through a single text sink:
 
 ```
 KeyListener  ─┐
-              ├─►  show_text(text: str)   ─►  DisplayWindow  (Tk overlay)
-MouseListener ┤        (TextSink)
-              └─►  show_click(x, y)       ─►  DisplayWindow  (click ripple)
-                       (ClickSink, optional)
+              ├─►  show_text(text: str)  ─►  DisplayWindow  (Tk overlay)
+MouseListener ┘        (TextSink)
 ```
 
 Each listener formats an event into a single display string and hands it to a
 `TextSink` callable. `DisplayWindow.show_text` is the production sink; it
 marshals the update onto the Tk main loop because listeners invoke the sink
-from pynput listener threads. The mouse listener additionally has an optional
-second channel — a `ClickSink` (`DisplayWindow.show_click`) carrying the raw
-`(x, y)` — used only when the click ripple is enabled. The `Keycast` class in
-`application.py` wires these components together and owns the application
-lifecycle.
+from pynput listener threads. The `Keycast` class in `application.py` wires
+these components together and owns the application lifecycle.
 
 ## Core Classes
 
@@ -100,19 +95,11 @@ mouse clicks. Implements the `TextSink` protocol via its `show_text` method.
 #### Constructor
 
 ```python
-def __init__(
-    self,
-    settings: DisplaySettings,
-    *,
-    ripple_color: Color | str = "yellow",
-    ripple_max_radius: int = 40,
-    ripple_duration_ms: int = 400,
-) -> None
+def __init__(self, settings: DisplaySettings) -> None
 ```
 
 **Parameters**:
 - `settings` (DisplaySettings): Display configuration settings object
-- `ripple_color` / `ripple_max_radius` / `ripple_duration_ms` (keyword-only): Appearance of the click ripple drawn by `show_click`. The `Keycast` orchestrator sources these from `MouseSettings` (`ripple_color`, `ripple_max_radius`, `ripple_duration_ms`) so the ripple's look is configured in the mouse section. They are ignored unless something calls `show_click`.
 
 **DisplaySettings Properties**:
 - `width` (int): Window width in pixels (default: 400, range: 100-2000)
@@ -151,22 +138,6 @@ window = DisplayWindow(settings)
 window.show_text("A")
 window.show_text("Left Click (100, 200)")
 ```
-
-##### show_click(x: int, y: int) -> None
-
-Paints a short expanding, fading ring centered at screen position `(x, y)` — the
-production `ClickSink`. Like `show_text`, it is **thread-safe**: it may be called
-from a pynput listener thread and marshals the actual rendering onto the Tk main
-loop via `root.after`. The ripple is drawn in its own transient, always-on-top,
-borderless window that tears itself down when the animation completes. The window
-is made **click-through** so it never intercepts the click it visualizes
-(`NSWindow.setIgnoresMouseEvents_` on macOS via pyobjc, `WS_EX_TRANSPARENT` on
-Windows; best-effort elsewhere). Background transparency is separately best-effort
-per platform, and any rendering error is logged (throttled) rather than raised.
-
-**Parameters**:
-- `x` (int): Click x-coordinate (screen pixels)
-- `y` (int): Click y-coordinate (screen pixels)
 
 ##### start() -> None
 
@@ -210,25 +181,6 @@ wrapper, a test double, etc.
 > **Threading contract**: listeners invoke the sink on a **pynput listener
 > thread**, not the main thread. A sink that touches a GUI toolkit must marshal
 > the work onto its own UI thread (as `DisplayWindow.show_text` does).
-
-### ClickSink
-
-**Location**: `keycast.listeners.ClickSink`
-
-**Purpose**: A `typing.Protocol` describing a callable that receives the raw
-`(x, y)` position of a mouse click. This is the second, optional listener channel
-(alongside `TextSink`), used to drive the click ripple with real coordinates that
-a formatted string can't carry. `DisplayWindow.show_click` is the production
-implementation.
-
-```python
-class ClickSink(Protocol):
-    def __call__(self, x: int, y: int) -> None: ...
-```
-
-Any `Callable[[int, int], None]` satisfies it. The same pynput-thread threading
-contract as `TextSink` applies: a GUI implementation must marshal onto its own UI
-thread (as `DisplayWindow.show_click` does).
 
 ### KeyListener
 
@@ -369,34 +321,21 @@ passes it to a `TextSink`.
 #### Constructor
 
 ```python
-def __init__(
-    self,
-    show_text: TextSink,
-    settings: MouseSettings,
-    *,
-    on_click_position: ClickSink | None = None,
-) -> None
+def __init__(self, show_text: TextSink, settings: MouseSettings) -> None
 ```
 
 **Parameters**:
 - `show_text` (TextSink): Sink invoked with the formatted label each time the mouse is clicked
 - `settings` (MouseSettings): Mouse configuration settings object
-- `on_click_position` (ClickSink | None, keyword-only): Optional second sink invoked with the raw `(x, y)` of each click, used to drive the click ripple. Only wired up when `settings.show_click_ripple` is true. `DisplayWindow.show_click` is the production `ClickSink`.
 
 > The text sink receives a **single string**. When `show_mouse_position` is
 > enabled, the coordinates are formatted directly into that string (e.g.
-> `"Left Click (100, 200)"`) — the text sink is not passed separate `x`/`y`
-> arguments. The raw coordinates instead flow through the separate, optional
-> `on_click_position` (`ClickSink`) channel.
+> `"Left Click (100, 200)"`) — the sink is not passed separate `x`/`y` arguments.
 
 **MouseSettings Properties**:
 - `enabled` (bool): Whether the mouse listener runs (default: True)
 - `show_mouse_clicks` (bool): Whether to show mouse clicks (default: True)
 - `show_mouse_position` (bool): Whether to append the click position to the label (default: False)
-- `show_click_ripple` (bool): Whether each click paints an expanding, fading ring at the cursor (default: False). Independent of `show_mouse_clicks`.
-- `ripple_color` (Color): Ring color (default: "yellow")
-- `ripple_max_radius` (int): Final ring radius in pixels (default: 40, range: 5-200)
-- `ripple_duration_ms` (int): How long the ring animates in milliseconds (default: 400, range: 100-2000)
 - `button_names` (dict[str, str]): Custom button name mappings (default: {})
 
 > `show_mouse_position` only takes effect alongside `show_mouse_clicks` (the
@@ -588,10 +527,6 @@ settings = Settings.create_settings_file().resolve_preset()
 - `enabled` (bool): Whether the mouse listener runs (default: True)
 - `show_mouse_clicks` (bool): Whether to show mouse clicks (default: True)
 - `show_mouse_position` (bool): Whether to append the click position coordinates to the label (default: False). Requires `show_mouse_clicks`; the combination `show_mouse_position=True, show_mouse_clicks=False` is rejected at load time (it would otherwise render nothing).
-- `show_click_ripple` (bool): Whether each click paints an expanding, fading ring at the cursor (default: False). Independent of `show_mouse_clicks` — the ripple is a separate visual channel via `on_click_position`.
-- `ripple_color` (Color): Ring color (default: "yellow")
-- `ripple_max_radius` (int): Final ring radius in pixels (default: 40, range: 5-200)
-- `ripple_duration_ms` (int): How long the ring animates in milliseconds (default: 400, range: 100-2000)
 - `button_names` (dict[str, str]): Custom button name mappings (default: {})
 
 ### LoggingSettings

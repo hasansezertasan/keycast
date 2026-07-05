@@ -33,26 +33,6 @@ class TextSink(Protocol):
         ...
 
 
-class ClickSink(Protocol):
-    """A sink that receives the raw ``(x, y)`` position of a mouse click.
-
-    The second, optional listener channel alongside :class:`TextSink`, used to
-    drive the click ripple with coordinates a formatted string cannot carry. The
-    same threading contract applies: it is invoked on a **pynput listener
-    thread**, so a GUI implementation must marshal onto its own UI thread (see
-    :meth:`keycast.display.DisplayWindow.show_click`).
-    """
-
-    def __call__(self, x: int, y: int) -> None:
-        """Handle a click at ``(x, y)``.
-
-        Args:
-            x: The click x-coordinate in screen pixels.
-            y: The click y-coordinate in screen pixels.
-        """
-        ...
-
-
 class KeyListener:
     """Keyboard event listener using pynput."""
 
@@ -314,29 +294,16 @@ class KeyListener:
 class MouseListener:
     """Mouse event listener using pynput."""
 
-    def __init__(
-        self,
-        show_text: TextSink,
-        settings: MouseSettings,
-        *,
-        on_click_position: ClickSink | None = None,
-    ) -> None:
+    def __init__(self, show_text: TextSink, settings: MouseSettings) -> None:
         """Initialize the mouse listener.
 
         Args:
             show_text: Sink invoked (on a pynput listener thread) with the
                 formatted label each time the mouse is clicked
             settings: Mouse settings
-            on_click_position: Optional second sink invoked with the raw ``(x, y)``
-                of each click, used to drive the click ripple. Keyword-only so the
-                documented positional signature stays ``(show_text, settings)``.
-                The composition root wires this only when
-                ``settings.show_click_ripple`` is set.
         """
         self.show_text = show_text
         """The callback function called when mouse is clicked."""
-        self.on_click_position = on_click_position
-        """Optional sink for the raw click position (drives the click ripple)."""
         self.settings = settings
         """The mouse settings."""
         self.listener: mouse.Listener | None = None
@@ -389,20 +356,9 @@ class MouseListener:
 
         # pynput may deliver fractional coordinates on high-DPI displays (Retina);
         # the type hint says int, but the runtime value can be a float. Round once
-        # here, at the capture boundary, so both channels get clean integers: the
-        # ripple's Tk geometry string rejects non-integers, and the position text
-        # would otherwise render "(210.89453125, 72.4...)".
+        # here so show_mouse_position renders clean integers rather than
+        # "(210.89453125, 72.4...)".
         x, y = round(x), round(y)
-
-        # The ripple is an independent channel: it fires on any click when
-        # enabled, regardless of show_mouse_clicks (which gates only the text
-        # label). Its own failure domain so a broken ripple sink is not mislabeled
-        # as a text-sink or format error.
-        if self.settings.show_click_ripple and self.on_click_position is not None:
-            try:
-                self.on_click_position(x, y)
-            except Exception as exc:
-                self._error_throttler.log("mouse_ripple_error", exc, button=button)
 
         # Formatting and the text-sink call are separate failure domains; see the
         # matching note in ``KeyListener._on_press``. They are caught and

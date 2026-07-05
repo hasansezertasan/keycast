@@ -52,25 +52,10 @@ class Keycast:
             )
         )
         self._stopped = False
-        # The ripple's appearance lives in the mouse settings (it visualizes
-        # clicks) but is drawn by the window (which owns the Tk loop); pass the
-        # three appearance values through so DisplayWindow stays self-contained.
-        self.display_window = DisplayWindow(
-            self.settings.display,
-            ripple_color=self.settings.mouse.ripple_color,
-            ripple_max_radius=self.settings.mouse.ripple_max_radius,
-            ripple_duration_ms=self.settings.mouse.ripple_duration_ms,
-        )
+        self.display_window = DisplayWindow(self.settings.display)
         self.mouse_listener = MouseListener(
             show_text=self.display_window.show_text,
             settings=self.settings.mouse,
-            # Only wire the ripple channel when enabled, so a disabled ripple costs
-            # nothing per click (MouseListener also guards on show_click_ripple).
-            on_click_position=(
-                self.display_window.show_click
-                if self.settings.mouse.show_click_ripple
-                else None
-            ),
         )
         self.key_listener = KeyListener(
             show_text=self.display_window.show_text,

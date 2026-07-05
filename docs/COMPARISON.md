@@ -13,8 +13,7 @@ young (pre-1.0), and the mature tools below do some things better today.
 - **keycast's niche**: a *system-wide*, *genuinely cross-platform* (macOS **and**
   Linux **and** Windows) visualizer that you install and configure like a normal
   Python package (`pip` / Homebrew / Scoop, JSON config). Its "Screencast Mode"
-  presets, chord grouping, and click ripple are aimed at presenters and
-  screencasters.
+  presets and chord grouping are aimed at presenters and screencasters.
 - **Pick KeyCastr** if you're macOS-only and want the most mature, batteries-
   included Mac experience.
 - **Pick Keyviz** if you're on Windows/macOS and want the most polished visuals
@@ -34,7 +33,7 @@ young (pre-1.0), and the mature tools below do some things better today.
 | Keystroke overlay | ✅ | ✅ | ✅ | ✅ |
 | Modifier/chord grouping | ✅ (`presenter`) | ✅ | ✅ | ✅ |
 | **Semantic command names** | ❌ (see below) | ❌ | ❌ | ✅ |
-| Mouse click highlight | ✅ (ripple) | ✅ (cursor ring) | ✅ | ✅ (click dot) |
+| Mouse click highlight | ❌ (removed — [ADR-007](adr/007-click-ripple.md)) | ✅ (cursor ring) | ✅ | ✅ (click dot) |
 | Mouse position / scroll | ✅ position · ❌ scroll | partial | ✅ scroll | ❌ |
 | Fade / linger control | ✅ | ✅ | ✅ | ✅ (timeout) |
 | Named presets ("modes") | ✅ | ❌ | ~ (styles) | ❌ |
@@ -45,7 +44,8 @@ young (pre-1.0), and the mature tools below do some things better today.
 | Maturity | young (0.x) | mature | mature | mature |
 
 Legend: ✅ yes · ❌ no · ~ partial. keycast rows reflect the current feature set
-(presets, chord grouping in `presenter`, click ripple, mouse position).
+(presets, chord grouping in `presenter`, mouse position). A click highlight was
+prototyped and removed — see [ADR-007](adr/007-click-ripple.md).
 
 ## The one thing keycast cannot do: semantic command names
 

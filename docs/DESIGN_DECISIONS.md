@@ -364,71 +364,15 @@ into the string upstream.
 - ❌ Adds per-thread state to the previously stateless listener
 - ❌ Sequential (multi-stroke) chords are not grouped yet
 
-### Click Ripple (Second Listener Channel)
+### Click Ripple — prototyped and removed
 
-**Decision**: Optionally paint an expanding, fading ring at the cursor on each
-click (`MouseSettings.show_click_ripple`, default `false`). The ripple is fed by a
-**second** listener channel — a `ClickSink` (`Callable[[int, int], None]`) —
-separate from the `TextSink`, because it needs the raw `(x, y)` a formatted string
-cannot carry. `DisplayWindow.show_click` is the production `ClickSink`; the
-`presenter` and `debug` presets enable the feature.
-
-**Why a second channel, not a richer TextSink**: the `TextSink` decision above
-deliberately settled on one signature, `(text: str) -> None`, and noted the
-trade-off that coordinate data is baked into a string — "a consumer needing raw
-`x`/`y` would have to parse or be re-extended." The ripple is exactly that
-consumer. Rather than overload the text sink (and break every existing sink), a
-parallel, optional `ClickSink` is added. `MouseListener` takes it as a
-**keyword-only** argument so the documented positional constructor
-(`show_text, settings`) — pinned by `test_docs_contract.py` — is unchanged.
-
-**Why the appearance lives in `MouseSettings` but rendering in `DisplayWindow`**:
-the ripple is conceptually a mouse-click visualization, so its knobs
-(`ripple_color`, `ripple_max_radius`, `ripple_duration_ms`) sit with the other
-mouse settings. Rendering, however, needs the Tk main loop the `DisplayWindow`
-owns, so the window draws it. The composition root passes the three appearance
-values into `DisplayWindow` as keyword-only constructor args (again keeping the
-pinned `settings`-only positional signature), so the window stays self-contained
-and does not import `MouseSettings`.
-
-**Rendering & platform reality**: the ring is drawn in its own transient,
-borderless, always-on-top toplevel that animates via the same self-rescheduling
-`root.after` pattern as the fade timer, then destroys itself. The animation math
-is factored into a pure `_ripple_frame` helper so it is unit-testable without Tk.
-
-Two distinct concerns, both needing native APIs Tk does not expose:
-
-- **Click-through (input)** — critical: a topmost window at the cursor otherwise
-  *catches the click it is visualizing* (an Electron app like the Superset desktop
-  app was a real victim). Fixed with `NSWindow.setIgnoresMouseEvents_(True)` on
-  macOS (via pyobjc; the new window is found by diffing `NSApplication.windows()`
-  before/after creation) and the `WS_EX_TRANSPARENT | WS_EX_LAYERED` extended
-  style on Windows. Reliable on macOS/Windows; best-effort elsewhere (X11 input
-  shaping is not implemented), where the ring may intercept clicks.
-- **Background transparency (visual)** — so only the ring shows, not a filled
-  square: `-transparent` on macOS, `-transparentcolor` on Windows. Genuinely
-  unreliable from Tk, so best-effort; a failure leaves a brief translucent square.
-
-Every native call is wrapped and routed through the throttler/debug log,
-consistent with the display layer's "degrade, don't crash" behavior, and the
-feature defaults off.
-
-**Alternatives Considered**:
-- **Overload `TextSink` to carry coordinates**: breaks the one-signature decision
-  and every existing sink; rejected
-- **A fully click-through, pixel-perfect overlay**: needs per-platform native code
-  (ctypes/pyobjc) with no headless test path; deferred in favor of a best-effort
-  ring that is off by default
-- **Draw the ripple inside the main overlay window**: the overlay is a small fixed
-  rectangle, not full-screen, so it can't host a ring at an arbitrary cursor
-  position; a separate toplevel is required
-
-**Trade-offs**:
-- ✅ Screencast-style click feedback anywhere on screen
-- ✅ `TextSink` contract and all existing sinks untouched
-- ✅ Testable animation math; rendering degrades gracefully
-- ❌ Transparency / click-through are best-effort per platform
-- ❌ A second, transient window per click (kept short-lived to bound cost)
+A mouse click ripple (an expanding ring at the cursor) was prototyped as a
+second listener channel (a `ClickSink` carrying raw `(x, y)`) and then **removed**
+before release. Click-through was solved (`setIgnoresMouseEvents_` on macOS,
+`WS_EX_TRANSPARENT` on Windows), but creating a native window per click caused
+input lag on macOS, which the per-click-window architecture cannot fix without a
+redesign (a single persistent overlay). The full decision, what was tried, and
+the path forward are recorded in [ADR-007](adr/007-click-ripple.md).
 
 ## Performance Decisions
 

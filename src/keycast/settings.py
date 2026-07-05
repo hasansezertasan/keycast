@@ -369,29 +369,6 @@ class MouseSettings(BaseModel):
         default=False,
         description="Whether to show mouse position coordinates",
     )
-    show_click_ripple: bool = Field(
-        default=False,
-        description="Paint an expanding, fading ring at the cursor on each click "
-        "(like a screencast tool's click highlight). Independent of "
-        "show_mouse_clicks. Off by default; the presenter and debug presets enable "
-        "it. Ripple transparency/click-through is best-effort per platform.",
-    )
-    ripple_color: Color = Field(
-        default=Color("yellow"),
-        description="Click-ripple ring color (see show_click_ripple)",
-    )
-    ripple_max_radius: int = Field(
-        default=40,
-        ge=5,
-        le=200,
-        description="Final radius of the click-ripple ring in pixels",
-    )
-    ripple_duration_ms: int = Field(
-        default=400,
-        ge=100,
-        le=2000,
-        description="How long the click ripple animates in milliseconds",
-    )
     # See ``KeyboardSettings.key_mappings``: ``ReadOnlyStrMap`` validates,
     # freezes, and serializes the mapping; ``validate_default`` freezes the
     # empty default too.
@@ -526,7 +503,7 @@ _PRESET_OVERRIDES: dict[str, dict[str, object]] = {
             "max_events": 3,
             "alpha": 0.9,
         },
-        "mouse": {"show_mouse_clicks": True, "show_click_ripple": True},
+        "mouse": {"show_mouse_clicks": True},
         "keyboard": {"group_chords": True},
     },
     # Unobtrusive corner overlay: small, faint, one event, gone quickly.
@@ -542,11 +519,7 @@ _PRESET_OVERRIDES: dict[str, dict[str, object]] = {
     "debug": {
         "debug": True,
         "display": {"max_events": 10, "fade_duration_ms": 5000},
-        "mouse": {
-            "show_mouse_clicks": True,
-            "show_mouse_position": True,
-            "show_click_ripple": True,
-        },
+        "mouse": {"show_mouse_clicks": True, "show_mouse_position": True},
     },
 }
 """Built-in preset name -> override bundle, layered over the loaded config.

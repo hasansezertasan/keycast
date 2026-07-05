@@ -131,10 +131,6 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
   "mouse": {
     "show_mouse_clicks": true,
     "show_mouse_position": false,
-    "show_click_ripple": false,
-    "ripple_color": "yellow",
-    "ripple_max_radius": 40,
-    "ripple_duration_ms": 400,
     "button_names": {
       "Button.left": "Left Click",
       "Button.right": "Right Click"
@@ -143,20 +139,10 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
 }
 ```
 
-> `show_click_ripple` — when `true`, each click paints a short expanding, fading
-> ring at the cursor (like a screencast tool's click highlight), independent of
-> the text overlay: it works whether or not `show_mouse_clicks` is on.
-> `ripple_color` is the ring color, `ripple_max_radius` its final radius in
-> pixels (5–200), and `ripple_duration_ms` how long it animates (100–2000 ms).
-> Defaults to `false`; the `presenter` and `debug` presets turn it on.
->
-> Platform note: the ripple is drawn in a transient, always-on-top window that is
-> made **click-through** so it never intercepts the click it is visualizing —
-> macOS uses `NSWindow.setIgnoresMouseEvents_` (via pyobjc), Windows uses the
-> `WS_EX_TRANSPARENT` extended style. On other platforms (e.g. Linux) click-through
-> is best-effort and the ring may briefly intercept clicks; if it misbehaves on
-> your setup, set `show_click_ripple` to `false`. Background transparency (so only
-> the ring shows, not a filled square) is separately best-effort per platform.
+> A **click ripple** (an expanding ring at the cursor, like a screencast tool's
+> click highlight) was prototyped and then **removed** pending a redesign — the
+> per-click overlay window caused input lag on macOS. See
+> [ADR-007](docs/adr/007-click-ripple.md) for the full rationale.
 
 #### Logging Settings
 

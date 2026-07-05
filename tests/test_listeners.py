@@ -912,100 +912,12 @@ class TestChordGrouping:
         assert captured == []
 
 
-class TestMouseClickRipple:
-    """MouseListener's second channel: on_click_position (drives the ripple)."""
-
-    def test_ripple_sink_called_with_coordinates_on_press(self) -> None:
-        clicks: list[tuple[int, int]] = []
-        settings = MouseSettings(show_click_ripple=True)
-        listener = MouseListener(
-            Mock(), settings, on_click_position=lambda x, y: clicks.append((x, y))
-        )
-
-        listener._on_click(100, 200, mouse.Button.left, pressed=True)
-
-        assert clicks == [(100, 200)]
-
-    def test_ripple_sink_not_called_on_release(self) -> None:
-        clicks: list[tuple[int, int]] = []
-        settings = MouseSettings(show_click_ripple=True)
-        listener = MouseListener(
-            Mock(), settings, on_click_position=lambda x, y: clicks.append((x, y))
-        )
-
-        listener._on_click(100, 200, mouse.Button.left, pressed=False)
-
-        assert clicks == []
-
-    def test_ripple_sink_not_called_when_disabled(self) -> None:
-        clicks: list[tuple[int, int]] = []
-        # Sink provided, but the feature is off: it must not fire.
-        settings = MouseSettings(show_click_ripple=False)
-        listener = MouseListener(
-            Mock(), settings, on_click_position=lambda x, y: clicks.append((x, y))
-        )
-
-        listener._on_click(100, 200, mouse.Button.left, pressed=True)
-
-        assert clicks == []
-
-    def test_ripple_independent_of_show_mouse_clicks(self) -> None:
-        text = Mock()
-        clicks: list[tuple[int, int]] = []
-        # Text label off, ripple on: the ripple fires, the text sink does not.
-        settings = MouseSettings(show_mouse_clicks=False, show_click_ripple=True)
-        listener = MouseListener(
-            text, settings, on_click_position=lambda x, y: clicks.append((x, y))
-        )
-
-        listener._on_click(5, 6, mouse.Button.left, pressed=True)
-
-        assert clicks == [(5, 6)]
-        text.assert_not_called()
-
-    def test_ripple_error_is_isolated_from_text_sink(self) -> None:
-        text = Mock()
-        settings = MouseSettings(show_mouse_clicks=True, show_click_ripple=True)
-        listener = MouseListener(
-            text, settings, on_click_position=Mock(side_effect=RuntimeError("boom"))
-        )
-        listener._error_throttler = Mock()
-
-        listener._on_click(1, 2, mouse.Button.left, pressed=True)  # must not raise
-
-        # The ripple failure is reported under its own event name...
-        assert listener._error_throttler.log.call_args[0][0] == "mouse_ripple_error"
-        # ...and the text channel still ran.
-        text.assert_called_once()
-
-    def test_no_ripple_sink_is_safe(self) -> None:
-        # Default: on_click_position is None; a click with ripple "on" is a no-op
-        # for the ripple channel and must not raise.
-        settings = MouseSettings(show_click_ripple=True)
-        listener = MouseListener(Mock(), settings)
-
-        listener._on_click(1, 2, mouse.Button.left, pressed=True)  # must not raise
-
-
 class TestMouseFractionalCoordinates:
     """pynput can deliver float coordinates on high-DPI (Retina) displays.
 
-    The type hint says int, but the runtime value is a float; both the ripple
-    (Tk geometry rejects non-integers) and the position text must get clean ints.
-    Regression for a TclError: bad geometry specifier "80x80+210.89..+72.42..".
+    The type hint says int, but the runtime value is a float; the position text
+    (show_mouse_position) must render clean integers, not "(210.89453125, 72.4...)".
     """
-
-    def test_fractional_coordinates_rounded_for_ripple(self) -> None:
-        clicks: list[tuple[int, int]] = []
-        settings = MouseSettings(show_click_ripple=True)
-        listener = MouseListener(
-            Mock(), settings, on_click_position=lambda x, y: clicks.append((x, y))
-        )
-
-        listener._on_click(210.89453125, 72.421875, mouse.Button.left, pressed=True)  # type: ignore[arg-type]
-
-        assert clicks == [(211, 72)]
-        assert all(isinstance(v, int) for xy in clicks for v in xy)
 
     def test_fractional_coordinates_rounded_in_position_text(self) -> None:
         captured: list[str] = []
