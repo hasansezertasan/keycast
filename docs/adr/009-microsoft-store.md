@@ -56,8 +56,12 @@ works unchanged.
 - **Package the existing bundle.** A committed `packaging/AppxManifest.xml`
   template wraps the untouched `dist/keycast/` folder; `makeappx pack` (Windows
   SDK, present on `windows-latest` runners) produces `keycast.msix` in
-  `build-windows`, uploaded as a release asset *and* the Partner Center
-  submission artifact. No change to `keycast.spec`.
+  `build-windows` as a **workflow artifact only** — the Partner Center
+  submission input, deliberately **not** a GitHub Release asset. An MSIX must
+  be signed before Windows will install it, and this package is unsigned until
+  the Store signs it, so attaching it to the Release would publish an artifact
+  users cannot install (the zip and installer already cover direct download).
+  No change to `keycast.spec`.
 - **Version mapping: tag → four-part numeric.** MSIX versions are
   `Major.Minor.Build.Revision`, all numeric — no prerelease suffixes. A stable
   tag `vX.Y.Z` maps to `X.Y.Z.0`, injected at pack time (mirrors the ADR-006
@@ -101,10 +105,12 @@ works unchanged.
 
 ## Consequences
 
-- **Release pipeline:** `build-windows` gains a `makeappx pack` step (asset:
-  `keycast.msix`); a new best-effort `submit-store` job (post-`publish-release`,
-  gated on `is_prerelease == false` and on a Partner Center API secret being
-  present — warns and exits 0 otherwise, like `bump-scoop`).
+- **Release pipeline:** `build-windows` gains a `makeappx pack` step producing
+  the `keycast.msix` **workflow artifact** (retained for the submission job /
+  manual upload; never attached to the GitHub Release — see Decision); a new
+  best-effort `submit-store` job (post-`publish-release`, gated on
+  `is_prerelease == false` and on a Partner Center API secret being present —
+  warns and exits 0 otherwise, like `bump-scoop`).
 - **CI:** the PR-level `build-windows` check also runs `makeappx pack` against
   the `0.0.0.0` default and asserts the `.msix` emerged — catching a broken
   manifest on the PR, not at release (mirrors the ADR-006 `iscc` check).
