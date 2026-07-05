@@ -201,6 +201,25 @@ class TestStart:
             call.start(start_minimized=False),
         ]
 
+    def test_startup_status_suppressed_when_disabled(self, keycast: Keycast) -> None:
+        """With the flag off, active listeners produce no status line, only the splash."""
+        keycast.settings.auto_start = True
+        keycast.settings.start_minimized = False
+        keycast.settings.show_startup_status = False
+        keycast.mouse_listener.settings.enabled = True
+        keycast.key_listener.settings.enabled = True
+        manager = Mock()
+        manager.attach_mock(keycast.display_window.show_text, "show_text")
+        manager.attach_mock(keycast.display_window.start, "start")
+
+        with patch("keycast.application.__version__", "9.9.9"):
+            keycast.start()
+
+        assert manager.mock_calls == [
+            call.show_text("keycast 9.9.9"),
+            call.start(start_minimized=False),
+        ]
+
     def test_startup_status_logged_with_structured_fields(
         self, keycast: Keycast, caplog: pytest.LogCaptureFixture
     ) -> None:
@@ -430,19 +449,13 @@ class TestMacOSPermissionPrecheck:
     """The best-effort ctypes precheck behind macOS startup statuses."""
 
     def test_non_darwin_skips_the_macos_check(self, keycast: Keycast) -> None:
-        with (
-            patch("keycast.application.platform.system", return_value="Linux"),
-            patch.object(Keycast, "_macos_permission_precheck") as macos_check,
-        ):
-            assert keycast._startup_permission_precheck() is None
+        with patch.object(Keycast, "_macos_permission_precheck") as macos_check:
+            assert keycast._startup_permission_precheck("Linux") is None
         macos_check.assert_not_called()
 
     def test_darwin_delegates_to_the_macos_check(self, keycast: Keycast) -> None:
-        with (
-            patch("keycast.application.platform.system", return_value="Darwin"),
-            patch.object(Keycast, "_macos_permission_precheck", return_value=True),
-        ):
-            assert keycast._startup_permission_precheck() is True
+        with patch.object(Keycast, "_macos_permission_precheck", return_value=True):
+            assert keycast._startup_permission_precheck("Darwin") is True
 
     def test_granted_when_both_checks_pass(self) -> None:
         lib = _fake_app_services(accessibility=True, input_monitoring=True)

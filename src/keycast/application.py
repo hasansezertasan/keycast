@@ -98,8 +98,11 @@ class Keycast:
         else:
             self.logger.info(format_event("listeners_autostart_disabled"))
         any_source_active = any(started.values())
-        precheck = self._startup_permission_precheck()
-        statuses = self._startup_input_statuses(started=started, precheck=precheck)
+        system = platform.system()
+        precheck = self._startup_permission_precheck(system)
+        statuses = self._startup_input_statuses(
+            started=started, precheck=precheck, system=system
+        )
         self._log_startup_input_status(statuses=statuses, precheck=precheck)
 
         # Only honor start_minimized when an input source is actually live to
@@ -141,9 +144,9 @@ class Keycast:
         # Start the display window last to avoid race conditions.
         self.display_window.start(start_minimized=start_minimized)
 
-    def _startup_permission_precheck(self) -> bool | None:
+    def _startup_permission_precheck(self, system: str) -> bool | None:
         """Return pre-start permission state when the platform can report it."""
-        if platform.system() != "Darwin":
+        if system != "Darwin":
             return None
         return self._macos_permission_precheck()
 
@@ -222,9 +225,9 @@ class Keycast:
         self,
         started: dict[str, bool],
         precheck: bool | None,
+        system: str,
     ) -> dict[str, _InputSourceStatus]:
         """Derive startup status per input source."""
-        system = platform.system()
         return {
             "keyboard": self._resolve_source_status(
                 enabled=self.key_listener.settings.enabled,
