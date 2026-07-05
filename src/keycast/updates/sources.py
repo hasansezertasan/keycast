@@ -39,6 +39,7 @@ class InstallSource(enum.Enum):
     WINDOWS_INSTALLER = "windows-installer"
     SCOOP = "scoop"
     SCOOP_GLOBAL = "scoop-global"
+    MICROSOFT_STORE = "microsoft-store"
     UNKNOWN = "unknown"
 
 
@@ -166,6 +167,18 @@ since a global path also contains :data:`_SCOOP_PATH_MARKER`.
 """
 
 
+_MS_STORE_PATH_MARKER = "/windowsapps/"
+"""Lower-cased POSIX fragment marking a Microsoft Store (MSIX) install.
+
+The Store-signed MSIX (ADR-009) deploys the *same* frozen bundle as every other
+Windows channel — no ``.install-source`` marker, no receipt — under
+``C:\\Program Files\\WindowsApps\\<PackageFamilyName>…``, so, as with Scoop, the
+*location* is the signal. The ``WindowsApps`` tree is ACL-locked and owned by
+the Store's deployment stack; nothing else installs there, which makes the
+fragment a safe location-only predicate.
+"""
+
+
 def _scoop_source(location_posix: str, env: dict[str, str]) -> InstallSource | None:
     """Classify a frozen bundle as a global / per-user Scoop install, or neither.
 
@@ -270,6 +283,14 @@ def detect_install_source(
         scoop = _scoop_source(posix, env)
         if scoop is not None:
             return scoop
+        # A Store-delivered MSIX (ADR-009) also ships the same bundle; it
+        # deploys under the ACL-locked WindowsApps tree, so — like Scoop — the
+        # location alone classifies it. Checked before the GitHub-release
+        # fallback: the Store updates apps itself, and this source is what
+        # keeps the notice from wrongly pointing Store users at the Releases
+        # page.
+        if _MS_STORE_PATH_MARKER in posix:
+            return InstallSource.MICROSOFT_STORE
         return InstallSource.GITHUB_RELEASE
 
     location = Path(__file__) if location is None else location
@@ -300,6 +321,12 @@ _UPGRADE_COMMANDS: dict[InstallSource, str] = {
     InstallSource.HOMEBREW_CASK: "brew upgrade --cask keycast",
     InstallSource.SCOOP: "scoop update keycast",
     InstallSource.SCOOP_GLOBAL: "sudo scoop update keycast -g",
+    # Not a command: the Store updates its apps itself, so the recommended
+    # action is a statement of that fact rather than something to run — and
+    # pointing a Store user at the Releases page would be wrong (ADR-009).
+    InstallSource.MICROSOFT_STORE: (
+        "updates are delivered automatically by the Microsoft Store"
+    ),
 }
 
 _SOURCE_LABELS: dict[InstallSource, str] = {
@@ -312,6 +339,7 @@ _SOURCE_LABELS: dict[InstallSource, str] = {
     InstallSource.WINDOWS_INSTALLER: "Windows installer",
     InstallSource.SCOOP: "Scoop",
     InstallSource.SCOOP_GLOBAL: "Scoop (global)",
+    InstallSource.MICROSOFT_STORE: "Microsoft Store",
     InstallSource.UNKNOWN: "unknown",
 }
 
@@ -336,10 +364,12 @@ def recommended_action(source: InstallSource) -> str:
         source: The detected install source.
 
     Returns:
-        A package-manager command when one fits; otherwise :data:`RELEASES_URL`
-        (for a manual Release download, a Windows-installer copy, or an
-        undetermined source, where guessing a command would be wrong — the user
-        re-downloads the asset / installer from the Releases page).
+        A package-manager command when one fits (for the Microsoft Store, a
+        statement that the Store updates the app itself); otherwise
+        :data:`RELEASES_URL` (for a manual Release download, a
+        Windows-installer copy, or an undetermined source, where guessing a
+        command would be wrong — the user re-downloads the asset / installer
+        from the Releases page).
     """
     return _UPGRADE_COMMANDS.get(source, RELEASES_URL)
 

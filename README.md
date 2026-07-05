@@ -244,6 +244,7 @@ matching action — it never tries to update something your package manager owns
 | Homebrew **cask** (the macOS app) | suggest `brew upgrade --cask keycast` |
 | the **Windows installer** (`keycast-setup.exe`) | point you to the latest release to download the new installer |
 | **Scoop** (`scoop install keycast`) | suggest `scoop update keycast` — or `sudo scoop update keycast -g` for a global (`-g`) install |
+| the **Microsoft Store** | tell you updates are delivered automatically by the Store — nothing to run |
 | a manual [GitHub Release](https://github.com/hasansezertasan/keycast/releases/latest) download (the `.zip`) | point you to the latest release (and, in a future phase, update itself in place) |
 
 - **Automatic, in the background:** keycast checks the GitHub Releases API at

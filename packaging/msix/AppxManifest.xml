@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX manifest template for the Microsoft Store channel (ADR-009).
+
+  CI stages this file (with the Version attribute rewritten from the release
+  tag: vX.Y.Z -> X.Y.Z.0; MSIX versions are four-part numeric, so prerelease
+  tags cannot be expressed and the pack step is skipped for them) next to the
+  untouched PyInstaller dist/keycast/ folder and the committed Assets/ logos,
+  then runs `makeappx pack`. The resulting keycast.msix is UNSIGNED - the
+  Store signs it during submission - so it ships as a workflow artifact for
+  Partner Center only, never as a GitHub Release asset (an unsigned MSIX
+  cannot be installed).
+
+  Identity Name / Publisher are PLACEHOLDERS until the app identity is
+  reserved in Partner Center; they must then be replaced with the exact
+  reserved values ("Package/Identity/Name" and "Package/Identity/Publisher"
+  on the Product identity page) or the Store rejects the upload. The pack
+  step itself accepts the placeholders, so PR checks work before reservation.
+
+  runFullTrust: keycast installs global low-level input hooks (pynput's
+  WH_KEYBOARD_LL / WH_MOUSE_LL) - the product itself - which an AppContainer
+  forbids. The capability is justified in the Partner Center submission notes
+  (visible overlay, open-source repo, no storage or transmission of input).
+-->
+<Package
+    xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+    xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+    xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+    IgnorableNamespaces="uap rescap">
+
+  <Identity
+      Name="hasansezertasan.keycast"
+      Publisher="CN=00000000-0000-0000-0000-000000000000"
+      Version="0.0.0.0"
+      ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>keycast</DisplayName>
+    <PublisherDisplayName>hasansezertasan</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily
+        Name="Windows.Desktop"
+        MinVersion="10.0.17763.0"
+        MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application
+        Id="keycast"
+        Executable="keycast\keycast.exe"
+        EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+          DisplayName="keycast"
+          Description="A cross-platform keystroke and mouse-click visualizer: a transparent overlay that shows input events in real time."
+          BackgroundColor="transparent"
+          Square150x150Logo="Assets\Square150x150Logo.png"
+          Square44x44Logo="Assets\Square44x44Logo.png" />
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>
