@@ -121,6 +121,69 @@ class TestHomebrewCaskReceipt:
         assert sources._homebrew_cask_receipt_exists() is False
 
 
+class TestMacAppStoreReceipt:
+    """The _MASReceipt filesystem probe inside the running bundle.
+
+    ``sys.platform`` is faked to ``"darwin"`` so the receipt path is exercised on
+    every CI OS (coverage uploads from Linux, where the real guard returns early).
+    """
+
+    def _bundle(self, tmp_path: Path) -> Path:
+        # sys.executable is <bundle>/Contents/MacOS/keycast.
+        macos = tmp_path / "keycast.app" / "Contents" / "MacOS"
+        macos.mkdir(parents=True)
+        return macos / "keycast"
+
+    def test_present_when_receipt_in_bundle(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        exe = self._bundle(tmp_path)
+        receipt = tmp_path / "keycast.app" / "Contents" / "_MASReceipt" / "receipt"
+        receipt.parent.mkdir(parents=True)
+        receipt.write_text("mas")
+        monkeypatch.setattr(sources.sys, "platform", "darwin")
+        monkeypatch.setattr(sources.sys, "executable", str(exe))
+        assert sources._mas_receipt_exists() is True
+
+    def test_absent_when_no_receipt(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A cask or drag-install .app has the same layout but no _MASReceipt.
+        exe = self._bundle(tmp_path)
+        monkeypatch.setattr(sources.sys, "platform", "darwin")
+        monkeypatch.setattr(sources.sys, "executable", str(exe))
+        assert sources._mas_receipt_exists() is False
+
+    def test_absent_off_macos_even_with_receipt(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A stray _MASReceipt on another OS must never read as a MAS install —
+        # the probe is gated on the platform, like the Windows installer marker.
+        exe = self._bundle(tmp_path)
+        receipt = tmp_path / "keycast.app" / "Contents" / "_MASReceipt" / "receipt"
+        receipt.parent.mkdir(parents=True)
+        receipt.write_text("mas")
+        monkeypatch.setattr(sources.sys, "platform", "win32")
+        monkeypatch.setattr(sources.sys, "executable", str(exe))
+        assert sources._mas_receipt_exists() is False
+
+    def test_oserror_from_probe_degrades_to_false(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A rare OSError from the filesystem probe must degrade to False (the
+        # intended fall-through) rather than crash detect_install_source —
+        # detection is best-effort, like _read_installer.
+        exe = self._bundle(tmp_path)
+        monkeypatch.setattr(sources.sys, "platform", "darwin")
+        monkeypatch.setattr(sources.sys, "executable", str(exe))
+
+        def _raise(self: Path) -> bool:
+            raise OSError("probe failed")
+
+        monkeypatch.setattr(sources.Path, "exists", _raise)
+        assert sources._mas_receipt_exists() is False
+
+
 class TestInstallerMarker:
     """The Windows-installer marker probe beside the executable."""
 
@@ -221,7 +284,10 @@ class TestDetectInstallSource:
         loc = Path("/Applications/keycast.app/Contents/MacOS/keycast")
         assert (
             sources.detect_install_source(
-                frozen=True, location=loc, cask_receipt_exists=lambda: True
+                frozen=True,
+                location=loc,
+                cask_receipt_exists=lambda: True,
+                mas_receipt_exists=lambda: False,
             )
             == InstallSource.HOMEBREW_CASK
         )
@@ -230,9 +296,57 @@ class TestDetectInstallSource:
         loc = Path("/Applications/keycast.app/Contents/MacOS/keycast")
         assert (
             sources.detect_install_source(
-                frozen=True, location=loc, cask_receipt_exists=lambda: False
+                frozen=True,
+                location=loc,
+                cask_receipt_exists=lambda: False,
+                mas_receipt_exists=lambda: False,
             )
             == InstallSource.GITHUB_RELEASE
+        )
+
+    def test_frozen_with_mas_receipt_is_mac_app_store(self) -> None:
+        # A MAS .app lives in /Applications like a cask; the bundle's
+        # _MASReceipt is what flips it to MAC_APP_STORE (ADR-014).
+        loc = Path("/Applications/keycast.app/Contents/MacOS/keycast")
+        assert (
+            sources.detect_install_source(
+                frozen=True,
+                location=loc,
+                mas_receipt_exists=lambda: True,
+                cask_receipt_exists=lambda: False,
+            )
+            == InstallSource.MAC_APP_STORE
+        )
+
+    def test_mas_receipt_wins_over_cask(self) -> None:
+        # Orthogonal in practice (a MAS install has no Caskroom receipt), but the
+        # MAS probe is checked first — pin that order so the precedence is
+        # intentional, since both key on /Applications.
+        loc = Path("/Applications/keycast.app/Contents/MacOS/keycast")
+        assert (
+            sources.detect_install_source(
+                frozen=True,
+                location=loc,
+                mas_receipt_exists=lambda: True,
+                cask_receipt_exists=lambda: True,
+            )
+            == InstallSource.MAC_APP_STORE
+        )
+
+    def test_mas_receipt_not_detected_when_not_frozen(self) -> None:
+        # The MAS branch lives inside `if frozen:`. A non-frozen install must
+        # classify by the import-path rules even if the receipt predicate would
+        # return True, never as MAC_APP_STORE.
+        loc = Path("/Applications/keycast.app/Contents/Resources/keycast/sources.py")
+        assert (
+            sources.detect_install_source(
+                frozen=False,
+                location=loc,
+                env={},
+                mas_receipt_exists=lambda: True,
+                read_installer=lambda: "pip",
+            )
+            == InstallSource.PIP
         )
 
     def test_frozen_outside_applications_is_release(self) -> None:
@@ -241,6 +355,7 @@ class TestDetectInstallSource:
             sources.detect_install_source(
                 frozen=True,
                 location=loc,
+                mas_receipt_exists=lambda: False,
                 cask_receipt_exists=lambda: True,
                 installer_marker_exists=lambda: False,
             )
@@ -302,6 +417,7 @@ class TestDetectInstallSource:
                 location=loc,
                 env={"SCOOP": r"D:\tools"},
                 cask_receipt_exists=lambda: False,
+                mas_receipt_exists=lambda: False,
                 installer_marker_exists=lambda: False,
             )
             == InstallSource.SCOOP
@@ -565,6 +681,24 @@ class TestRecommendedActionAndLabels:
         for source in InstallSource:
             assert isinstance(sources.install_source_label(source), str)
 
+    def test_only_fallback_sources_point_at_releases(self) -> None:
+        # Exhaustiveness guard mirroring test_labels_cover_every_source: a source
+        # accidentally omitted from _UPGRADE_COMMANDS silently falls through to
+        # RELEASES_URL via the .get() default — exactly the "wrong channel" bug a
+        # store source must never hit. Pin that only the three URL-fallback
+        # sources resolve to the Releases page; every other source (commands and
+        # the store statements alike) must resolve to something else.
+        fallback = {
+            InstallSource.GITHUB_RELEASE,
+            InstallSource.WINDOWS_INSTALLER,
+            InstallSource.UNKNOWN,
+        }
+        for source in InstallSource:
+            points_at_releases = (
+                sources.recommended_action(source) == sources.RELEASES_URL
+            )
+            assert points_at_releases == (source in fallback)
+
     def test_windows_installer_label_is_exact(self) -> None:
         # User-facing string (shown by `keycast info`); pin it so a typo can't
         # ship silently — the cover-every-source test only checks the type.
@@ -591,4 +725,17 @@ class TestRecommendedActionAndLabels:
         assert (
             sources.install_source_label(InstallSource.MICROSOFT_STORE)
             == "Microsoft Store"
+        )
+
+    def test_mac_app_store_action_is_a_statement_not_a_command(self) -> None:
+        # ADR-014: the Mac App Store updates its apps itself, so the recommended
+        # action is that fact stated outright — never a command, never the
+        # Releases page (which would send a MAS user to the wrong channel).
+        assert sources.recommended_action(InstallSource.MAC_APP_STORE) == (
+            "updates are delivered automatically by the Mac App Store"
+        )
+
+    def test_mac_app_store_label_is_exact(self) -> None:
+        assert (
+            sources.install_source_label(InstallSource.MAC_APP_STORE) == "Mac App Store"
         )
