@@ -8,13 +8,27 @@ import pytest
 import keycast.application as application_module
 from keycast.application import Keycast
 
+_InputSourceStatus = application_module._InputSourceStatus
+_PermissionPrecheck = application_module._PermissionPrecheck
+_StartupStatuses = application_module._StartupStatuses
+
+
+def _status_line(keyboard: _InputSourceStatus, mouse: _InputSourceStatus) -> str:
+    """Render the overlay status line the production formatter would produce."""
+    return Keycast._format_startup_status_line(
+        _StartupStatuses(keyboard=keyboard, mouse=mouse)
+    )
+
 
 @pytest.fixture
 def keycast() -> Iterator[Keycast]:
     """Build a Keycast with every collaborator mocked out.
 
     Patches settings/logging/window/listeners so no real config file, tkinter
-    window or input hook is created.
+    window or input hook is created. The macOS permission precheck is stubbed to
+    ``UNKNOWN`` so ``start()`` never dlopens ApplicationServices or calls the
+    real permission APIs on a developer's Mac; the tests that exercise the
+    precheck itself re-patch it explicitly.
 
     Yields:
         A Keycast instance whose components are mocks.
@@ -25,6 +39,11 @@ def keycast() -> Iterator[Keycast]:
         patch("keycast.application.DisplayWindow") as window_cls,
         patch("keycast.application.MouseListener") as mouse_cls,
         patch("keycast.application.KeyListener") as key_cls,
+        patch.object(
+            Keycast,
+            "_macos_permission_precheck",
+            return_value=_PermissionPrecheck.UNKNOWN,
+        ),
         # Neutralize the update check (no config read, no GitHub-bound thread);
         # the wiring is asserted explicitly in TestUpdateCheck.
         patch("keycast.application.notify_pending_update"),
@@ -189,17 +208,48 @@ class TestStart:
         with patch("keycast.application.__version__", "9.9.9"):
             keycast.start()
 
-        expected_status = Keycast._format_startup_status_line(
-            {
-                "keyboard": application_module._InputSourceStatus.ACTIVE,
-                "mouse": application_module._InputSourceStatus.ACTIVE,
-            }
+        expected_status = _status_line(
+            _InputSourceStatus.ACTIVE, _InputSourceStatus.ACTIVE
         )
         assert manager.mock_calls == [
             call.show_text("keycast 9.9.9"),
             call.show_text(expected_status),
             call.start(start_minimized=False),
         ]
+
+    def test_startup_status_renders_disabled_sources_as_off(
+        self, keycast: Keycast
+    ) -> None:
+        """auto_start off ⇒ both sources render "Off", and the line still shows."""
+        keycast.settings.auto_start = False
+        keycast.settings.start_minimized = False
+        keycast.settings.show_startup_status = True
+
+        keycast.start()
+
+        keycast.display_window.show_text.assert_any_call(
+            _status_line(_InputSourceStatus.DISABLED, _InputSourceStatus.DISABLED)
+        )
+        # The literal label the docs promise for a disabled source.
+        keycast.display_window.show_text.assert_any_call(
+            "Input status — Keyboard: Off, Mouse: Off"
+        )
+
+    def test_startup_status_mixes_active_and_disabled_sources(
+        self, keycast: Keycast
+    ) -> None:
+        """A per-listener disable shows "Off" for that source, not a failure."""
+        keycast.settings.auto_start = True
+        keycast.settings.start_minimized = False
+        keycast.settings.show_startup_status = True
+        keycast.key_listener.settings.enabled = True
+        keycast.mouse_listener.settings.enabled = False
+
+        keycast.start()
+
+        keycast.display_window.show_text.assert_any_call(
+            "Input status — Keyboard: OK, Mouse: Off"
+        )
 
     def test_startup_status_suppressed_when_disabled(self, keycast: Keycast) -> None:
         """With the flag off, active listeners produce no status line, only the splash."""
@@ -229,7 +279,11 @@ class TestStart:
         keycast.key_listener.settings.enabled = True
 
         with (
-            patch.object(Keycast, "_startup_permission_precheck", return_value=None),
+            patch.object(
+                Keycast,
+                "_startup_permission_precheck",
+                return_value=_PermissionPrecheck.UNKNOWN,
+            ),
             caplog.at_level("INFO", logger="keycast.application"),
         ):
             keycast.start()
@@ -241,46 +295,62 @@ class TestStart:
 
     @pytest.mark.parametrize(
         ("precheck", "expected"),
-        [(True, "granted"), (False, "denied"), (None, "unknown")],
+        [
+            (_PermissionPrecheck.GRANTED, "granted"),
+            (_PermissionPrecheck.DENIED, "denied"),
+            (_PermissionPrecheck.UNKNOWN, "unknown"),
+        ],
     )
     def test_precheck_states_map_to_log_labels(
         self,
         keycast: Keycast,
         caplog: pytest.LogCaptureFixture,
-        precheck: bool | None,
+        precheck: _PermissionPrecheck,
         expected: str,
     ) -> None:
-        """Each tri-state precheck value gets a stable structured-log label."""
-        statuses = {
-            "keyboard": application_module._InputSourceStatus.ACTIVE,
-            "mouse": application_module._InputSourceStatus.ACTIVE,
-        }
+        """Each tri-state precheck value gets a stable structured-log token."""
+        statuses = _StartupStatuses(
+            keyboard=_InputSourceStatus.ACTIVE, mouse=_InputSourceStatus.ACTIVE
+        )
 
         with caplog.at_level("INFO", logger="keycast.application"):
             keycast._log_startup_input_status(statuses=statuses, precheck=precheck)
 
         assert f"precheck={expected}" in caplog.text
 
-    def test_windows_status_uses_listener_result_on_failure(
+    def test_macos_denied_precheck_overrides_apparently_successful_start(
         self, keycast: Keycast
     ) -> None:
+        """The critical macOS case: start() "succeeds" but permission is denied.
+
+        On macOS ``Listener.start()`` is a thread start that returns without
+        error even when Accessibility / Input Monitoring is denied — the tap
+        fails asynchronously and never raises. So the realistic denied launch is
+        ``started=True`` *and* ``precheck=DENIED``; the overlay must show
+        "Permission needed", not "OK", or the feature actively misleads the very
+        users it exists to help. A regression that checked ``started`` before the
+        precheck would render "OK" here.
+        """
         keycast.settings.auto_start = True
         keycast.settings.start_minimized = False
         keycast.settings.show_startup_status = True
         keycast.mouse_listener.settings.enabled = True
         keycast.key_listener.settings.enabled = True
-        keycast.key_listener.start.side_effect = RuntimeError("permission denied")
+        # Both listeners "start" without raising — the macOS async-failure shape.
 
-        with patch("keycast.application.platform.system", return_value="Windows"):
+        with (
+            patch("keycast.application.platform.system", return_value="Darwin"),
+            patch.object(
+                Keycast,
+                "_macos_permission_precheck",
+                return_value=_PermissionPrecheck.DENIED,
+            ),
+        ):
             keycast.start()
 
-        expected_status = Keycast._format_startup_status_line(
-            {
-                "keyboard": application_module._InputSourceStatus.NO_ACCESS,
-                "mouse": application_module._InputSourceStatus.ACTIVE,
-            }
+        keycast.display_window.show_text.assert_any_call(
+            _status_line(_InputSourceStatus.NO_ACCESS, _InputSourceStatus.NO_ACCESS)
         )
-        keycast.display_window.show_text.assert_any_call(expected_status)
 
     def test_macos_status_uses_precheck_denied_as_permission_needed(
         self, keycast: Keycast
@@ -294,46 +364,75 @@ class TestStart:
 
         with (
             patch("keycast.application.platform.system", return_value="Darwin"),
-            patch.object(Keycast, "_macos_permission_precheck", return_value=False),
+            patch.object(
+                Keycast,
+                "_macos_permission_precheck",
+                return_value=_PermissionPrecheck.DENIED,
+            ),
         ):
             keycast.start()
 
-        expected_status = Keycast._format_startup_status_line(
-            {
-                "keyboard": application_module._InputSourceStatus.NO_ACCESS,
-                "mouse": application_module._InputSourceStatus.ACTIVE,
-            }
+        # Mouse: denied precheck ⇒ NO_ACCESS even though its start succeeded.
+        # Keyboard: also NO_ACCESS (the denial applies to both sources).
+        keycast.display_window.show_text.assert_any_call(
+            _status_line(_InputSourceStatus.NO_ACCESS, _InputSourceStatus.NO_ACCESS)
         )
-        keycast.display_window.show_text.assert_any_call(expected_status)
 
-    def test_macos_status_falls_back_to_unknown_when_precheck_unavailable(
+    def test_macos_failed_start_without_denial_is_not_capturing(
         self, keycast: Keycast
     ) -> None:
+        """macOS start() rarely raises on mere denial, so a raise is a real failure.
+
+        With the precheck unreadable (UNKNOWN) and the keyboard start raising,
+        capture is definitively down but the cause is undetermined — the honest
+        label is "Not capturing", not "Unknown".
+        """
         keycast.settings.auto_start = True
         keycast.settings.start_minimized = False
         keycast.settings.show_startup_status = True
         keycast.mouse_listener.settings.enabled = True
         keycast.key_listener.settings.enabled = True
-        keycast.key_listener.start.side_effect = RuntimeError("permission denied")
+        keycast.key_listener.start.side_effect = RuntimeError("backend import failed")
 
         with (
             patch("keycast.application.platform.system", return_value="Darwin"),
-            patch.object(Keycast, "_macos_permission_precheck", return_value=None),
+            patch.object(
+                Keycast,
+                "_macos_permission_precheck",
+                return_value=_PermissionPrecheck.UNKNOWN,
+            ),
         ):
             keycast.start()
 
-        expected_status = Keycast._format_startup_status_line(
-            {
-                "keyboard": application_module._InputSourceStatus.UNKNOWN,
-                "mouse": application_module._InputSourceStatus.ACTIVE,
-            }
+        keycast.display_window.show_text.assert_any_call(
+            _status_line(_InputSourceStatus.FAILED, _InputSourceStatus.ACTIVE)
         )
-        keycast.display_window.show_text.assert_any_call(expected_status)
 
-    def test_linux_status_falls_back_to_unknown_on_failure(
+    def test_windows_failed_start_is_not_capturing_not_permission_needed(
         self, keycast: Keycast
     ) -> None:
-        """Linux has no permission API to consult, so a failed start is unknown."""
+        """Windows usually needs no permission, so a failed start is "Not capturing".
+
+        Labeling any Windows start failure "Permission needed" would send users
+        hunting for a dialog that likely does not exist; the true cause is in the
+        ``listener_start_failed`` log line.
+        """
+        keycast.settings.auto_start = True
+        keycast.settings.start_minimized = False
+        keycast.settings.show_startup_status = True
+        keycast.mouse_listener.settings.enabled = True
+        keycast.key_listener.settings.enabled = True
+        keycast.key_listener.start.side_effect = RuntimeError("hook install failed")
+
+        with patch("keycast.application.platform.system", return_value="Windows"):
+            keycast.start()
+
+        keycast.display_window.show_text.assert_any_call(
+            _status_line(_InputSourceStatus.FAILED, _InputSourceStatus.ACTIVE)
+        )
+
+    def test_linux_failed_start_is_not_capturing(self, keycast: Keycast) -> None:
+        """Linux has no permission API; a failed start is a known non-capture."""
         keycast.settings.auto_start = True
         keycast.settings.start_minimized = False
         keycast.settings.show_startup_status = True
@@ -344,18 +443,39 @@ class TestStart:
         with patch("keycast.application.platform.system", return_value="Linux"):
             keycast.start()
 
-        expected_status = Keycast._format_startup_status_line(
-            {
-                "keyboard": application_module._InputSourceStatus.UNKNOWN,
-                "mouse": application_module._InputSourceStatus.ACTIVE,
-            }
+        keycast.display_window.show_text.assert_any_call(
+            _status_line(_InputSourceStatus.FAILED, _InputSourceStatus.ACTIVE)
         )
-        keycast.display_window.show_text.assert_any_call(expected_status)
+
+    def test_unrecognized_platform_failed_start_is_unknown(
+        self, keycast: Keycast
+    ) -> None:
+        """A platform we don't recognize at all keeps the honest "Unknown"."""
+        keycast.settings.auto_start = True
+        keycast.settings.start_minimized = False
+        keycast.settings.show_startup_status = True
+        keycast.mouse_listener.settings.enabled = True
+        keycast.key_listener.settings.enabled = True
+        keycast.key_listener.start.side_effect = RuntimeError("who knows")
+
+        with patch("keycast.application.platform.system", return_value="Plan9"):
+            keycast.start()
+
+        keycast.display_window.show_text.assert_any_call(
+            _status_line(_InputSourceStatus.UNKNOWN, _InputSourceStatus.ACTIVE)
+        )
 
     def test_no_version_splash_on_minimized_start(self, keycast: Keycast) -> None:
-        """A minimized start stays fully hidden: no splash to defeat the point."""
+        """A minimized start stays fully hidden: no splash to defeat the point.
+
+        ``show_startup_status`` is forced on so this also guards the status line
+        against leaking onto a minimized start — a regression that moved the
+        status ``show_text`` outside the ``not start_minimized`` guard would
+        surface it here rather than passing silently.
+        """
         keycast.settings.auto_start = True
         keycast.settings.start_minimized = True
+        keycast.settings.show_startup_status = True
         keycast.mouse_listener.settings.enabled = True
         keycast.key_listener.settings.enabled = True
 
@@ -450,17 +570,49 @@ class TestMacOSPermissionPrecheck:
 
     def test_non_darwin_skips_the_macos_check(self, keycast: Keycast) -> None:
         with patch.object(Keycast, "_macos_permission_precheck") as macos_check:
-            assert keycast._startup_permission_precheck("Linux") is None
+            assert (
+                keycast._startup_permission_precheck("Linux")
+                is _PermissionPrecheck.UNKNOWN
+            )
         macos_check.assert_not_called()
 
     def test_darwin_delegates_to_the_macos_check(self, keycast: Keycast) -> None:
-        with patch.object(Keycast, "_macos_permission_precheck", return_value=True):
-            assert keycast._startup_permission_precheck("Darwin") is True
+        with patch.object(
+            Keycast,
+            "_macos_permission_precheck",
+            return_value=_PermissionPrecheck.GRANTED,
+        ):
+            assert (
+                keycast._startup_permission_precheck("Darwin")
+                is _PermissionPrecheck.GRANTED
+            )
+
+    def test_unexpected_precheck_error_degrades_to_unknown(
+        self, keycast: Keycast, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A best-effort precheck must never abort startup on an unforeseen error.
+
+        The inner ``_macos_permission_precheck`` only catches a known set; an
+        unexpected type (a genuine bug) is caught by the outer guard, logged with
+        a traceback, and degraded to ``UNKNOWN`` so ``start()`` keeps going.
+        """
+        with (
+            patch.object(
+                Keycast,
+                "_macos_permission_precheck",
+                side_effect=AttributeError("boom"),
+            ),
+            caplog.at_level("ERROR", logger="keycast.application"),
+        ):
+            result = keycast._startup_permission_precheck("Darwin")
+
+        assert result is _PermissionPrecheck.UNKNOWN
+        assert "macos_permission_precheck_error" in caplog.text
 
     def test_granted_when_both_checks_pass(self) -> None:
         lib = _fake_app_services(accessibility=True, input_monitoring=True)
         with patch("keycast.application.ctypes.CDLL", return_value=lib):
-            assert Keycast._macos_permission_precheck() is True
+            assert Keycast._macos_permission_precheck() is _PermissionPrecheck.GRANTED
 
     @pytest.mark.parametrize(
         ("accessibility", "input_monitoring"),
@@ -473,31 +625,53 @@ class TestMacOSPermissionPrecheck:
             accessibility=accessibility, input_monitoring=input_monitoring
         )
         with patch("keycast.application.ctypes.CDLL", return_value=lib):
-            assert Keycast._macos_permission_precheck() is False
+            assert Keycast._macos_permission_precheck() is _PermissionPrecheck.DENIED
 
     @pytest.mark.parametrize("error", [OSError("dlopen failed"), TypeError("name")])
-    def test_unknown_when_library_cannot_be_loaded(self, error: Exception) -> None:
-        with patch("keycast.application.ctypes.CDLL", side_effect=error):
-            assert Keycast._macos_permission_precheck() is None
+    def test_unknown_when_library_cannot_be_loaded(
+        self, error: Exception, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with (
+            patch("keycast.application.ctypes.CDLL", side_effect=error),
+            caplog.at_level("WARNING", logger="keycast.application"),
+        ):
+            assert Keycast._macos_permission_precheck() is _PermissionPrecheck.UNKNOWN
+        # A failed dlopen on macOS is a genuine anomaly, surfaced above DEBUG.
+        assert "macos_permission_precheck_unavailable" in caplog.text
 
-    def test_unknown_when_symbols_are_missing(self) -> None:
+    def test_unknown_when_symbols_are_missing(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         lib = _fake_app_services()
-        with patch("keycast.application.ctypes.CDLL", return_value=lib):
-            assert Keycast._macos_permission_precheck() is None
+        with (
+            patch("keycast.application.ctypes.CDLL", return_value=lib),
+            caplog.at_level("INFO", logger="keycast.application"),
+        ):
+            assert Keycast._macos_permission_precheck() is _PermissionPrecheck.UNKNOWN
+        # The missing-symbol path is no longer silent (it was, before).
+        assert "macos_permission_precheck_symbol_missing" in caplog.text
 
-    def test_unknown_when_check_calls_raise(self) -> None:
+    def test_unknown_when_check_calls_raise(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         lib = _fake_app_services(
             accessibility=OSError("trust query failed"),
             input_monitoring=OSError("preflight failed"),
         )
-        with patch("keycast.application.ctypes.CDLL", return_value=lib):
-            assert Keycast._macos_permission_precheck() is None
+        with (
+            patch("keycast.application.ctypes.CDLL", return_value=lib),
+            caplog.at_level("INFO", logger="keycast.application"),
+        ):
+            assert Keycast._macos_permission_precheck() is _PermissionPrecheck.UNKNOWN
+        # The read-failure reason is visible at the default level, with detail.
+        assert "macos_permission_precheck_read_failed" in caplog.text
+        assert "detail=" in caplog.text
 
     def test_partial_grant_stays_unknown_not_granted(self) -> None:
         """One granted check plus one unreadable check must not report granted."""
         lib = _fake_app_services(accessibility=True)
         with patch("keycast.application.ctypes.CDLL", return_value=lib):
-            assert Keycast._macos_permission_precheck() is None
+            assert Keycast._macos_permission_precheck() is _PermissionPrecheck.UNKNOWN
 
 
 class TestUpdateCheck:

@@ -109,9 +109,25 @@ On macOS, you'll need to grant accessibility permissions to your terminal or IDE
 
 #### Windows
 
-Windows usually works without an explicit input-permission prompt. On startup,
-keycast reports listener availability in the overlay (`Input status — ...`) so
-you can immediately see whether keyboard/mouse capture is active.
+Windows usually works without an explicit input-permission prompt.
+
+#### Startup input status
+
+On every launch keycast logs a structured `startup_input_status` event, and —
+unless `show_startup_status` is `false` or the app starts minimized — briefly
+shows a one-line summary on the overlay so you can immediately tell whether
+capture is live:
+
+```
+Input status — Keyboard: OK, Mouse: Permission needed
+```
+
+Each source shows one of: `OK` (capturing), `Off` (disabled in settings),
+`Permission needed` (macOS reports the input permission is denied),
+`Not capturing` (the listener failed to start for another reason — see the log),
+or `Unknown`. On macOS the label is informed by a best-effort permission
+precheck; on other platforms it reflects whether the listener started. Suppress
+the overlay line with the `show_startup_status` option below.
 
 ## Configuration
 
@@ -216,8 +232,11 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
 > silently when offline.
 
 > `show_startup_status` — when `true` (default), keycast shows a short startup
-> line on the overlay with keyboard/mouse capture status (e.g. OK, Off,
-> Permission needed, Unknown). Set it to `false` to suppress this message.
+> line on the overlay with keyboard/mouse capture status (`OK`, `Off`,
+> `Permission needed`, `Not capturing`, or `Unknown`). The structured
+> `startup_input_status` log event is written regardless of this flag; setting
+> it to `false` only suppresses the on-overlay line. The line is also skipped on
+> a minimized start.
 
 > `debug` — when `true`, keycast surfaces verbose diagnostics regardless of
 > `logging.level`; a quick switch for troubleshooting without editing the logging

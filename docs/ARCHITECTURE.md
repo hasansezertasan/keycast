@@ -87,6 +87,11 @@ main.py / cli.py / __main__.py are thin entry points that call Keycast().run().
   keycast version and `sys.platform` (so a user-submitted `main.log` identifies
   the build and OS that produced it)
 - Create and connect all components (each listener's `show_text` → the window)
+- Derive a per-source startup input status (active / disabled / no-access /
+  failed / unknown) from each listener's start outcome and, on macOS, a
+  best-effort permission precheck; render it as a one-line overlay summary
+  (gated by `show_startup_status`) and always emit it as a structured
+  `startup_input_status` log event
 - Set up signal handlers for graceful shutdown
 - Coordinate component lifecycle
 - Handle application-level errors
@@ -295,7 +300,13 @@ file is the only override source.
 - **Permission Errors**: A listener that cannot start (e.g. missing
   Accessibility / Input Monitoring permission on macOS) is logged with an
   actionable hint and skipped; the overlay and any other listener keep running
-  rather than aborting startup ("degrade, don't crash")
+  rather than aborting startup ("degrade, don't crash"). The failure is also
+  reflected in the startup input status. On macOS this is subtle: a listener's
+  `start()` succeeds even when permission is denied (the event tap fails
+  asynchronously), so the status resolver believes an explicit *denied*
+  permission precheck over an apparently-successful start rather than reporting
+  "OK" for a source that will never capture. The best-effort ctypes precheck is
+  itself wrapped so it can never abort startup.
 - **Platform Differences**: Cross-platform compatibility issues
 - **Input Errors**: Malformed or unexpected input events
 - **Display Errors**: Tkinter initialization and rendering issues

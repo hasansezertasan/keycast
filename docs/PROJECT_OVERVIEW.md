@@ -13,6 +13,10 @@ keycast is a cross-platform keystroke and mouse click visualizer that displays u
 - **Configurable Display**: Customizable colors, fonts, position, and behavior
 - **Event Filtering**: Show/hide different types of keys and mouse events
 - **Fade Effects**: Events automatically fade out after a configurable duration
+- **Startup Input Status**: A one-line overlay summary on launch (and a matching
+  structured log event) reporting whether keyboard/mouse capture is live, so a
+  missing OS permission is visible immediately instead of the tool just looking
+  broken; opt-out via `show_startup_status`
 
 ### Technical Features
 - **Modular Architecture**: Clean separation of concerns with distinct components

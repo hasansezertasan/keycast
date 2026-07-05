@@ -577,6 +577,60 @@ overrides patch the JSON source.
 - ❌ May hide real issues
 - ❌ More complex error handling
 
+### Startup Input-Status Reporting
+
+**Decision**: On launch, resolve a per-source input status (active / disabled /
+no-access / failed / unknown), show it as a one-line overlay summary (opt-out via
+`show_startup_status`), and always emit it as a structured `startup_input_status`
+log event. On macOS, inform the status with a best-effort permission precheck.
+
+**Rationale**:
+- The single most likely real-world failure — a missing OS input permission —
+  previously surfaced only in the log; a user saw an empty overlay and assumed
+  the tool was broken. A status line makes the cause visible at a glance.
+- **Observed vs. predicted.** On macOS `Listener.start()` is a thread start that
+  returns successfully even when Accessibility / Input Monitoring is denied (the
+  event tap fails asynchronously, off the calling thread). So "started" does not
+  prove capture works. When the precheck explicitly reports *denied*, that is
+  believed over an apparently-successful start — otherwise the overlay would
+  cheerfully report "OK" for a source that will never emit an event, the exact
+  confusion the feature exists to remove.
+- **Honest failure states.** A source that is enabled but not capturing for an
+  undetermined reason is reported as `Not capturing` (`FAILED`), not `Unknown` —
+  the state *is* known, only its cause is not. `Unknown` is reserved for a
+  platform the resolver does not recognize at all. Windows/Linux, which expose
+  no permission precheck, use `Not capturing` for a failed start rather than
+  guessing "permission needed" and sending users after a dialog that may not
+  exist.
+
+**macOS precheck — why raw `ctypes`**:
+- The check calls `AXIsProcessTrusted` (Accessibility) and
+  `CGPreflightListenEventAccess` (Input Monitoring) — both *query without
+  prompting* — resolved from `ApplicationServices` via `ctypes`, deliberately
+  avoiding a `pyobjc` dependency for two symbol lookups. Keeping the dependency
+  surface minimal is a standing project value.
+- It is **best-effort and tri-state**: a partial or unreadable result degrades
+  to `UNKNOWN` (never reported as granted), and the whole precheck is wrapped so
+  an unexpected error can never abort startup. Anomalies (failed `dlopen`,
+  missing symbol, a raising call) are logged above `DEBUG` because on macOS,
+  where these APIs are expected to exist, any of them firing means something is
+  wrong on the host and would otherwise be invisible at the default level.
+
+**Alternatives Considered**:
+- **pyobjc / a permissions library**: a heavy dependency for two non-prompting
+  queries; rejected to keep the install surface small.
+- **Trust the listener start result alone**: fails on macOS (see above), where a
+  denied permission still produces a "successful" start.
+- **Prompt for permission at startup**: intrusive and platform-specific; the
+  precheck intentionally uses the *preflight* (non-prompting) APIs instead.
+
+**Trade-offs**:
+- ✅ Missing permissions are visible immediately, on the overlay and in logs
+- ✅ No new runtime dependency (stdlib `ctypes` only)
+- ✅ Never crashes or blocks startup; degrades to `Unknown`
+- ❌ The macOS precheck is best-effort and can report `Unknown`
+- ❌ One more platform-specific code path to maintain
+
 ### Comprehensive Logging with Settings Integration
 
 **Decision**: Implement comprehensive logging throughout the application with settings-based configuration.

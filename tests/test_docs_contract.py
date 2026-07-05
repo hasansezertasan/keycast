@@ -20,7 +20,11 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from keycast.application import Keycast
+from keycast.application import (
+    Keycast,
+    _InputSourceStatus,
+    _StartupStatuses,
+)
 from keycast.display import DisplayWindow
 from keycast.listeners import KeyListener, MouseListener
 from keycast.settings import (
@@ -116,6 +120,37 @@ class TestAppLevelFlagsAreDocumented:
             "show_startup_status",
         }
         assert set(Settings.model_fields) == documented_sections | scalar_flags
+
+
+class TestDocumentedStartupStatusLabels:
+    """The startup-status labels and line format the docs quote verbatim.
+
+    ``README.md`` promises the labels ``OK`` / ``Off`` / ``Permission needed`` /
+    ``Not capturing`` / ``Unknown`` and the ``Input status — ...`` prefix, and
+    ``docs/API.md`` repeats them. Nothing else pins the user-facing strings, so
+    without this a relabel (or a swapped keyboard/mouse order) would rot the docs
+    silently. This asserts the exact labels and the rendered line shape.
+    """
+
+    def test_status_labels_match_documented_strings(self) -> None:
+        expected = {
+            _InputSourceStatus.ACTIVE: "OK",
+            _InputSourceStatus.DISABLED: "Off",
+            _InputSourceStatus.NO_ACCESS: "Permission needed",
+            _InputSourceStatus.FAILED: "Not capturing",
+            _InputSourceStatus.UNKNOWN: "Unknown",
+        }
+        # Every state has a documented label, and no state lacks one.
+        assert {status: status.label for status in _InputSourceStatus} == expected
+
+    def test_status_line_format_is_stable(self) -> None:
+        line = Keycast._format_startup_status_line(
+            _StartupStatuses(
+                keyboard=_InputSourceStatus.NO_ACCESS,
+                mouse=_InputSourceStatus.DISABLED,
+            )
+        )
+        assert line == "Input status — Keyboard: Permission needed, Mouse: Off"
 
 
 class TestDocumentedDefaultLabels:
