@@ -70,6 +70,21 @@ mirroring the existing macOS permission probe in `application.py`
    argument (defaults to the real macOS probe) so tests drive masking
    deterministically without a real secure field — matching the existing
    sink-injection testing pattern.
+6. **Suppress lone modifiers released during the secure window too.** The
+   press-path check cannot see a modifier that was pressed *before* the secure
+   field gained focus (it is already legitimately held in `_held_modifiers`).
+   `_on_release` therefore re-checks secure input and suppresses the lone-modifier
+   emission while it is active — symmetric with the press path — so releasing a
+   held `Control` inside a password field does not surface even a bare modifier
+   label. The modifier is still popped and chord state still reset, so the window
+   leaves no wedged state behind.
+7. **Log the masking transition, not each masked key.** A per-keystroke log —
+   even at `DEBUG` — would re-leak the password *length* and *cadence* the mask
+   exists to hide, into `~/.keycast/main.log`. `KeyListener` instead logs one
+   `secure_input_masking_started` and one `secure_input_masking_ended` event at
+   the active↔inactive edge, so an operator can confirm masking engaged without
+   reconstructing keystroke timing. The "ended" edge is detected lazily on the
+   first press after secure input clears, so no polling thread is needed.
 
 ## Alternatives considered
 

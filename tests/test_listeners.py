@@ -1,5 +1,6 @@
 """Tests for the listeners module."""
 
+import logging
 import platform
 from unittest.mock import Mock, patch
 
@@ -288,6 +289,57 @@ class TestKeyListener:
         secure = False
         listener._on_press(keyboard.KeyCode.from_char("x"))
         callback.assert_called_once_with("x")  # a lone "x", never "Control + x"
+
+    def test_modifier_released_during_secure_input_is_not_emitted(self) -> None:
+        """A modifier held before secure input, released during it, stays hidden.
+
+        The press-path mask never saw this modifier -- it was pressed while input
+        was visible, so it is legitimately in ``_held_modifiers``. Releasing it
+        *inside* the secure window must not surface even a lone "Control Left",
+        symmetric with the press-path mask. State is still cleaned so a later
+        hold is not wedged.
+        """
+        captured: list[str] = []
+        secure = False
+        listener = KeyListener(
+            captured.append,
+            KeyboardSettings(group_chords=True),
+            is_secure_input=lambda: secure,
+        )
+
+        listener._on_press(keyboard.Key.ctrl_l)  # visible: legitimately held
+        assert listener._held_modifiers != {}
+
+        secure = True
+        listener._on_release(keyboard.Key.ctrl_l)
+
+        assert captured == []  # no lone modifier leaked during the secure window
+        assert listener._held_modifiers == {}  # state still cleaned
+        assert listener._chord_fired is False
+
+    def test_secure_input_masking_logs_once_per_transition(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Masking logs on the active<->inactive edge, never per keystroke.
+
+        A per-press log would re-leak the password length/cadence the mask hides.
+        """
+        secure = True
+        listener = KeyListener(
+            Mock(),
+            KeyboardSettings(),
+            is_secure_input=lambda: secure,
+        )
+
+        with caplog.at_level(logging.INFO, logger="keycast.listeners"):
+            listener._on_press(keyboard.KeyCode.from_char("a"))  # masking starts
+            listener._on_press(keyboard.KeyCode.from_char("b"))  # still masked
+            secure = False
+            listener._on_press(keyboard.KeyCode.from_char("c"))  # masking ends
+
+        messages = [r.getMessage() for r in caplog.records]
+        assert messages.count("secure_input_masking_started") == 1  # not per press
+        assert messages.count("secure_input_masking_ended") == 1
 
     def test_should_show_key_modifier_keys(self) -> None:
         """Test showing modifier keys based on settings."""

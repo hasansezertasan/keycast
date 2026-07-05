@@ -335,7 +335,11 @@ is formatted, stashed as a chord modifier, or handed to the sink, so a typed
 credential never reaches the overlay (full suppression — nothing is shown, not
 even `••••`). It is checked ahead of chord state so a modifier pressed inside a
 secure field is not held (which would otherwise fabricate a phantom chord on the
-next visible key).
+next visible key). A modifier held from *before* the secure field gained focus is
+symmetrically suppressed on release, so a lone modifier label never leaks during
+the secure window either. Masking is logged once per active↔inactive transition
+(`secure_input_masking_started` / `_ended`), never per keystroke — a per-key log
+would re-leak the password length and cadence the mask hides.
 
 Detection is **best-effort and macOS-only** (`IsSecureEventInputEnabled`, in
 `keycast.secure_input`); Windows and Linux/X11 expose no reliable global

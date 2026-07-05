@@ -42,10 +42,13 @@ _load_failed = False
 def _load_probe() -> Callable[[], bool] | None:
     """Resolve ``IsSecureEventInputEnabled`` into a ``() -> bool`` callable.
 
-    Mirrors :meth:`keycast.application.Keycast._read_macos_permission`: load the
-    framework, fetch the symbol, pin its ``restype``/``argtypes``, and degrade to
-    ``None`` (rather than raising) on any failure. Returns ``None`` off macOS and
-    whenever the framework or symbol is unavailable.
+    The framework load mirrors the ``ctypes.CDLL`` load in
+    :meth:`keycast.application.Keycast._macos_permission_precheck`; the
+    symbol-resolution steps (fetch the symbol, pin its ``restype``/``argtypes``,
+    degrade to ``None`` rather than raise) mirror
+    :meth:`keycast.application.Keycast._read_macos_permission`, which receives an
+    already-loaded ``CDLL``. Returns ``None`` off macOS and whenever the
+    framework or symbol is unavailable.
     """
     logger = logging.getLogger(__name__)
     if sys.platform != "darwin":
@@ -94,9 +97,15 @@ def is_secure_input_active() -> bool:
         return False
     try:
         return bool(_probe())
-    except (OSError, TypeError, ValueError, ctypes.ArgumentError) as exc:
-        # A symbol that loaded but raises on call is unexpected on macOS; log at
-        # INFO (not DEBUG) so it is visible, but never let it kill the keystroke.
+    except Exception as exc:
+        # Catch broadly on purpose: this is a ctypes FFI call, whose fault set is
+        # not limited to the load-time tuple (a wrongly pinned or vanished symbol
+        # can surface AttributeError/SystemError, etc.). Catching Exception keeps
+        # the fault named as ``macos_secure_input_read_failed`` instead of letting
+        # it propagate into ``KeyListener._on_press`` -- whose broad catch would
+        # mislabel a detection fault as ``key_format_error``. A symbol that loaded
+        # but raises on call is unexpected on macOS; log at INFO (not DEBUG) so it
+        # is visible, but never let it kill the keystroke.
         logging.getLogger(__name__).info(
             format_event(
                 "macos_secure_input_read_failed",

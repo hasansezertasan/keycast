@@ -511,7 +511,12 @@ active (macOS password/authentication fields), on by default
 - The check lives at the single-sink boundary (`KeyListener._on_press`), ahead of
   chord state, so a secret key is dropped before it can be formatted, held as a
   modifier, or reach the display — the display layer stays unaware, consistent
-  with the TextSink architecture.
+  with the TextSink architecture. `_on_release` re-checks it symmetrically, so a
+  modifier held from before the secure window opened is not emitted alone when
+  released inside it.
+- Masking is logged only on the active↔inactive edge (`secure_input_masking_started`
+  / `_ended`), never per masked key — a per-keystroke log would re-leak the
+  password length and cadence the mask exists to hide.
 
 **Decisions within the decision**:
 - **Full suppression, not `••••`** — showing a mask glyph still leaks length and

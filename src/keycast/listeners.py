@@ -100,6 +100,12 @@ class KeyListener:
         """Currently held modifiers: key name -> HeldModifier(label, pressed_at)."""
         self._chord_fired = False
         """Whether a non-modifier completed a chord during the current hold."""
+        self._secure_input_active = False
+        """Whether the last observed press saw secure input active.
+
+        Tracks the active<->inactive edge so masking is logged once per
+        transition, never per keystroke (see :meth:`_on_press`).
+        """
 
     @staticmethod
     def _is_modifier(key_name: str | None) -> bool:
@@ -269,9 +275,26 @@ class KeyListener:
             # so a modifier pressed inside a secure field is not stashed in
             # _held_modifiers (which would fabricate a phantom chord on the next
             # visible key). Best-effort: is_secure_input is False off macOS.
-            if self.settings.mask_secure_input and self._is_secure_input():
-                self.logger.debug(format_event("key_event_masked_secure_input"))
-                return
+            if self.settings.mask_secure_input:
+                secure = self._is_secure_input()
+                # Edge-triggered logging: one line when masking begins and one
+                # when it ends -- never per keystroke. A per-press log (even at
+                # DEBUG) would re-leak into ~/.keycast/main.log the very password
+                # length/cadence the mask exists to hide. Logging only the
+                # transition still lets an operator confirm masking engaged. The
+                # "ended" edge is picked up lazily on the first press after
+                # secure input clears, so no polling thread is needed.
+                if secure != self._secure_input_active:
+                    self._secure_input_active = secure
+                    self.logger.info(
+                        format_event(
+                            "secure_input_masking_started"
+                            if secure
+                            else "secure_input_masking_ended"
+                        )
+                    )
+                if secure:
+                    return
             if self.settings.group_chords:
                 self._evict_stale_modifiers()
             key_name = self._key_name(key)
@@ -340,8 +363,18 @@ class KeyListener:
             if key_name not in self._held_modifiers:
                 return
             label = self._held_modifiers.pop(key_name).label
-            # Emit a lone modifier only if no chord consumed this hold session.
-            emit_lone = not self._chord_fired and self.settings.show_modifier_keys
+            # Emit a lone modifier only if no chord consumed this hold session,
+            # and not while secure input is active. A modifier pressed *before* a
+            # password field gained focus is legitimately held (the press-path
+            # mask never saw it), but releasing it *during* the secure window
+            # must not surface even a lone modifier label -- symmetric with the
+            # press-path mask. The pop above and the reset below still run, so
+            # chord state stays clean across the secure window.
+            emit_lone = (
+                not self._chord_fired
+                and self.settings.show_modifier_keys
+                and not (self.settings.mask_secure_input and self._is_secure_input())
+            )
             if not self._held_modifiers:
                 # Hold session ended; reset for the next one.
                 self._chord_fired = False
