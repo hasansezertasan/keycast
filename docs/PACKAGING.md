@@ -390,21 +390,75 @@ packaging/msix/Assets/*.png       # committed logos (make_icons.py emits them)
   user updates are delivered automatically by the Store instead of suggesting
   a command or the Releases page.
 
-### One-time setup (Partner Center)
+### Submission runbook (manual, one-time)
 
-1. **Register** (free) at [Partner Center](https://partner.microsoft.com/dashboard)
-   and **reserve the app name** (`keycast`).
-2. **Replace the Identity placeholders** in `packaging/msix/AppxManifest.xml`
-   (`Identity Name` and `Publisher`) with the exact values from the product's
-   identity page — the Store rejects the upload if they differ. The committed
-   placeholders keep the PR pack check working before reservation.
-3. **Submit manually**: download the `keycast-msix` artifact from the release
-   run, upload it in a Partner Center submission, and fill in the listing —
-   including the `runFullTrust` justification (visible overlay, open-source
-   repo, no storage or transmission of input) and the age-rating questionnaire.
-4. **Automation comes later** (per ADR-009): only after a manual submission has
-   survived review once, a best-effort `submit-store` job (msstore-cli / the
-   Store submission API) can mirror `bump-cask`/`bump-scoop`.
+The first Store submission is manual. **Sequencing matters**: the Identity
+values must be in the committed manifest *before* the MSIX you upload is built,
+so the order is **reserve → update manifest → release → submit**.
+
+#### 1. Partner Center account + name reservation
+
+1. Register (free) at
+   [Partner Center](https://partner.microsoft.com/dashboard/registration) —
+   account type **Individual**. Identity verification can take a day or two.
+2. Dashboard → **Apps and games** → **+ New product** → choose
+   **"MSIX or PWA app"** (⚠️ *not* "EXE or MSI app" — that is the Win32 route
+   [ADR-009](adr/009-microsoft-store.md) rejects).
+3. Reserve the name `keycast` (a fallback *display* name is fine; the package
+   name stays `keycast`).
+4. Copy the three values from **Product management → Product identity**:
+   `Package/Identity/Name` (e.g. `12345Publisher.keycast`),
+   `Package/Identity/Publisher` (`CN=<guid>`), and the publisher display name.
+
+#### 2. Update the manifest
+
+Replace the placeholder `Identity` `Name` and `Publisher` in
+`packaging/msix/AppxManifest.xml` with the exact reserved values — the Store
+rejects the upload if they differ. The committed placeholders keep the PR pack
+check working before reservation, so this is a one-line change made once.
+
+> Also add a privacy policy URL somewhere linkable (e.g. a `PRIVACY.md` in the
+> repo): the listing form requires one, and an input visualizer will be held to
+> it. One line suffices — *keystrokes are rendered on screen, never stored or
+> transmitted; no data is collected.*
+
+#### 3. Cut a release, grab the artifact
+
+Merge the release-please PR. The release run's `build-windows` job produces the
+**`keycast-msix`** workflow artifact (Actions → the release run → *Artifacts* →
+download → unzip to get `keycast.msix`). It is deliberately not a release asset
+(unsigned MSIX can't be installed — see above).
+
+#### 4. Submit in Partner Center
+
+| Section | What to do |
+|---|---|
+| Pricing and availability | Free · all markets |
+| Properties | Category: **Utilities & tools** |
+| Age ratings | IARC questionnaire — a utility with no content rates "Everyone / 3+" |
+| Packages | Upload `keycast.msix`; a **restricted-capability justification** box appears for `runFullTrust` — paste the text below |
+| Store listings | Description (crib from `README.md`) + **≥1 screenshot** of the overlay visualizing keystrokes (doubles as "visible, not covert" evidence) + the privacy policy URL |
+
+Paste-ready `runFullTrust` justification:
+
+> keycast is an open-source keystroke and mouse-click visualizer for screencasts
+> and presentations (source: https://github.com/hasansezertasan/keycast). It
+> renders input events in an always-visible on-screen overlay in real time.
+> Capturing global input requires low-level input hooks (WH_KEYBOARD_LL /
+> WH_MOUSE_LL), which are unavailable inside an AppContainer — hence
+> runFullTrust. Keystrokes are displayed on screen only; nothing is stored,
+> logged, or transmitted.
+
+Submit → review typically clears in 24–72 h. A clarification request is possible
+given the input-capture nature; the justification plus the open-source repo link
+usually settles it.
+
+#### 5. Automation comes later
+
+Per [ADR-009](adr/009-microsoft-store.md), only *after* a manual submission has
+survived review once: a best-effort `submit-store` job (msstore-cli / the Store
+submission API) can mirror `bump-cask` / `bump-scoop` to push subsequent version
+bumps automatically.
 
 ## Local reproduction
 
