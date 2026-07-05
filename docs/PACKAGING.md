@@ -502,6 +502,57 @@ survived review once: a best-effort `submit-store` job (msstore-cli / the Store
 submission API) can mirror `bump-cask` / `bump-scoop` to push subsequent version
 bumps automatically.
 
+## Mac App Store (sandboxed)
+
+A planned macOS channel alongside the cask; see
+[ADR-011](adr/011-mac-app-store.md) for the decision and rationale and
+[ADR-010](adr/010-macos-signing-notarization.md) for the signing infrastructure
+it inherits. Unlike the Microsoft Store above, the build side is **not yet
+implemented**: the sandboxed `.pkg` recipe, Apple Distribution signing, and App
+Store Connect submission are gated on the **Apple Developer Program** membership
+(ADR-010) and land in a later change. This section is the contract for what that
+change will add; only the install-source detection below ships today.
+
+- **Why it is possible at all.** The folklore that "a keystroke visualizer
+  can't be sandboxed" is about macOS **Accessibility** (active event taps),
+  which sandboxed apps cannot use. keycast *listens only* — pynput selects a
+  listen-only tap when `suppress=False` (which `listeners.py` never overrides) —
+  so it needs only **Input Monitoring**, which a sandboxed app can request via
+  `CGRequestListenEventAccess`. ADR-011 records this as a load-bearing invariant:
+  any future feature that suppresses or injects events would forfeit MAS
+  eligibility.
+- **Build (planned, ADR-010/011).** The same `keycast.spec` bundle, signed with
+  the **Apple Distribution** certificate against a dedicated
+  `packaging/entitlements-mas.plist` (`com.apple.security.app-sandbox`,
+  `com.apple.security.network.client` for the ADR-002 update check, plus the
+  hardened-runtime pair), packaged as a `.pkg` via `productbuild`. Like the MSIX
+  and cask, the MAS job is a **stable-only** channel (`is_prerelease == false`),
+  and the first upload is manual (Transporter / App Store Connect) before any
+  automation.
+
+### Install-source detection (ships now)
+
+`keycast info` reports `Install source: mac-app-store` when the running bundle
+carries a `Contents/_MASReceipt/receipt` — the App Store's per-app receipt, the
+macOS-store analogue of the Caskroom receipt. A MAS `.app` installs into
+`/Applications` just like a cask or a manual drag-install, so this receipt is the
+only signal that distinguishes it, and the probe is **checked before the cask
+branch** (both key on `/Applications`) so a MAS install never misreports as a
+Homebrew cask. The probe is guarded to macOS, so a stray `_MASReceipt` on another
+OS can never classify as `mac-app-store`. The update notice then tells the user
+updates are delivered automatically by the Mac App Store instead of suggesting a
+command or the Releases page — the same statement-not-a-command shape ADR-009
+established for the Microsoft Store.
+
+### Sandbox note: config and log paths
+
+Under App Sandbox, `Path.home()` resolves to the **container** home, so for a MAS
+install the config and logs documented elsewhere as `~/.keycast/…` live at
+`~/Library/Containers/com.hasansezertasan.keycast/Data/.keycast/…`. The code
+(`settings.py`) is unchanged — this is a path-resolution consequence of the
+sandbox, not a code path — and it applies only to the MAS build; every other
+channel keeps the real-home location.
+
 ## Local reproduction
 
 ```bash
