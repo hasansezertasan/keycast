@@ -33,7 +33,7 @@ young (pre-1.0), and the mature tools below do some things better today.
 | Keystroke overlay | ✅ | ✅ | ✅ | ✅ |
 | Modifier/chord grouping | ✅ (`presenter`) | ✅ | ✅ | ✅ |
 | **Semantic command names** | ❌ (see below) | ❌ | ❌ | ✅ |
-| Mouse click highlight | ❌ (removed — [ADR-010](adr/010-click-ripple.md)) | ✅ (cursor ring) | ✅ | ✅ (click dot) |
+| Mouse click highlight | ❌ (removed — [ADR-012](adr/012-click-ripple.md)) | ✅ (cursor ring) | ✅ | ✅ (click dot) |
 | Mouse position / scroll | ✅ position · ❌ scroll | partial | ✅ scroll | ❌ |
 | Fade / linger control | ✅ | ✅ | ✅ | ✅ (timeout) |
 | Named presets ("modes") | ✅ | ❌ | ~ (styles) | ❌ |
@@ -45,7 +45,7 @@ young (pre-1.0), and the mature tools below do some things better today.
 
 Legend: ✅ yes · ❌ no · ~ partial. keycast rows reflect the current feature set
 (presets, chord grouping in `presenter`, mouse position). A click highlight was
-prototyped and removed — see [ADR-010](adr/010-click-ripple.md).
+prototyped and removed — see [ADR-012](adr/012-click-ripple.md).
 
 ## The one thing keycast cannot do: semantic command names
 

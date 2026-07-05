@@ -382,7 +382,7 @@ before release. Click-through was solved (`setIgnoresMouseEvents_` on macOS,
 `WS_EX_TRANSPARENT` on Windows), but creating a native window per click caused
 input lag on macOS, which the per-click-window architecture cannot fix without a
 redesign (a single persistent overlay). The full decision, what was tried, and
-the path forward are recorded in [ADR-010](adr/010-click-ripple.md).
+the path forward are recorded in [ADR-012](adr/012-click-ripple.md).
 
 ## Performance Decisions
 

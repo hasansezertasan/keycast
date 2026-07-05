@@ -205,7 +205,7 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
 > A **click ripple** (an expanding ring at the cursor, like a screencast tool's
 > click highlight) was prototyped and then **removed** pending a redesign — the
 > per-click overlay window caused input lag on macOS. See
-> [ADR-010](docs/adr/010-click-ripple.md) for the full rationale.
+> [ADR-012](docs/adr/012-click-ripple.md) for the full rationale.
 
 #### Logging Settings
 
