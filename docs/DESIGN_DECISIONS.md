@@ -337,6 +337,16 @@ completing a chord is emitted alone (respecting `show_modifier_keys`). This is t
 only place the listener registers pynput's `on_release`, needed purely to know
 which modifiers are down.
 
+Three subtleties: (1) the "chord fired" flag is set *before* the per-key
+visibility filter, so a chord whose key is hidden (e.g. `Ctrl+F1` with function
+keys off) suppresses the whole chord *and* the lone-modifier fallback rather than
+fabricating a bare `Control`. (2) `Ctrl`+letter arrives from the OS as a control
+character (`Ctrl+S` → `"\x13"`); it is mapped back to the letter so the chord is
+legible. (3) Each held modifier is timestamped and one held longer than 30 s
+without a release is evicted on the next press — pynput can miss release events
+(secure-input fields, screen lock, event-tap timeouts), which would otherwise
+wedge a modifier "down" forever and turn every keystroke into a phantom chord.
+
 **Why default off**: an existing, tested contract is that a modifier press emits
 its label immediately. Chord grouping deliberately *defers* modifier display, so
 turning it on by default would change long-standing behavior. Keeping it opt-in

@@ -15,6 +15,7 @@ from keycast.settings import (
     MouseSettings,
     Settings,
     _default_key_mappings,
+    _PRESET_OVERRIDES,
     is_bare_key_name,
     is_button_string,
 )
@@ -647,13 +648,16 @@ class TestResolvePreset:
         # "custom" applies no overrides, so resolution is identity.
         assert settings.resolve_preset() is settings
 
-    def test_presenter_overrides_display_and_mouse(self) -> None:
+    def test_presenter_overrides_display_mouse_and_keyboard(self) -> None:
         resolved = Settings.model_construct(preset="presenter").resolve_preset()
         assert resolved.display.font_size == 28
         assert resolved.display.fade_duration_ms == 3000
         assert resolved.display.max_events == 3
         assert resolved.display.alpha == 0.9
         assert resolved.mouse.show_mouse_clicks is True
+        # The headline of the presenter preset: chord grouping on. Guards against
+        # the keyboard override being silently dropped from the bundle.
+        assert resolved.keyboard.group_chords is True
 
     def test_minimal_overrides_display(self) -> None:
         resolved = Settings.model_construct(preset="minimal").resolve_preset()
@@ -715,6 +719,30 @@ class TestResolvePreset:
         with pytest.raises(ValidationError):
             resolved.display.font_size = 40  # type: ignore[misc]
 
+    def test_every_override_names_a_real_field(self) -> None:
+        # Guards against a typo'd section/field name in _PRESET_OVERRIDES, which
+        # pydantic's extra="ignore" on sub-models would otherwise drop silently
+        # (a section typo now raises AttributeError in resolve_preset; a field
+        # typo inside a section would be quietly discarded without this check).
+        for preset, overrides in _PRESET_OVERRIDES.items():
+            for key, value in overrides.items():
+                assert key in Settings.model_fields, f"{preset}: unknown field {key!r}"
+                if isinstance(value, dict):
+                    section = Settings.model_fields[key].annotation
+                    for field_name in value:
+                        assert field_name in section.model_fields, (
+                            f"{preset}.{key}: unknown field {field_name!r}"
+                        )
+                else:
+                    # Top-level scalar overrides go through model_copy(update=),
+                    # which does NOT re-validate; a wrong-typed value in the table
+                    # would slip past the section re-validation. Pin the type here.
+                    annotation = Settings.model_fields[key].annotation
+                    if isinstance(annotation, type):
+                        assert isinstance(value, annotation), (
+                            f"{preset}.{key}: {value!r} is not a {annotation}"
+                        )
+
 
 class TestPresetLoading:
     """The ``preset`` field as it is actually loaded from the JSON config file.
@@ -727,14 +755,37 @@ class TestPresetLoading:
         config_path.write_text(json.dumps({"preset": "presenter"}), encoding="utf-8")
         assert Settings().preset == "presenter"
 
-    def test_unknown_preset_in_config_is_rejected(self, config_path: Path) -> None:
+    def test_unknown_preset_in_config_falls_back_to_custom(
+        self, config_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # An unrecognized preset name is a narrow, self-correcting typo. The
+        # before-validator degrades just this field to "custom" (with a stderr
+        # warning) instead of failing the Literal — which, on a top-level field,
+        # would quarantine the whole config file.
         config_path.write_text(json.dumps({"preset": "bogus"}), encoding="utf-8")
-        with pytest.raises(ValidationError):
-            Settings()
+        assert Settings().preset == "custom"
+        assert "Unknown preset 'bogus'" in capsys.readouterr().err
 
-    def test_corrupt_preset_recovers_to_custom_default(self, config_path: Path) -> None:
-        # create_settings_file backs up an invalid config and falls back to
-        # defaults, so a bad preset degrades to "custom" rather than crashing.
-        config_path.write_text(json.dumps({"preset": "bogus"}), encoding="utf-8")
+    def test_unknown_preset_preserves_the_rest_of_the_config(
+        self, config_path: Path
+    ) -> None:
+        # The point of the lenient fallback: a bad preset must not discard the
+        # user's other customizations the way whole-file quarantine would.
+        config_path.write_text(
+            json.dumps({"preset": "bogus", "display": {"font_size": 42}}),
+            encoding="utf-8",
+        )
         settings = Settings.create_settings_file()
         assert settings.preset == "custom"
+        assert settings.display.font_size == 42
+        # No quarantine backup was created — the file validated cleanly.
+        assert not list(config_path.parent.glob("config.json.*.bak"))
+
+    def test_non_string_preset_is_rejected_not_coerced(self, config_path: Path) -> None:
+        # The lenient fallback is only for misspelled *names*. A non-string preset
+        # is a structurally corrupt config: the before-validator passes it through
+        # untouched so the Literal still rejects it (the whole-file quarantine
+        # path), rather than silently masking it as "custom".
+        config_path.write_text(json.dumps({"preset": 123}), encoding="utf-8")
+        with pytest.raises(ValidationError):
+            Settings()

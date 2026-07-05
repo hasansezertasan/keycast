@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from keycast.logging_setup import _ErrorThrottler
+from keycast.logging_setup import _ErrorThrottler, format_event
 
 if TYPE_CHECKING:
     # tkinter is imported lazily in _setup_window so the module stays importable
@@ -53,6 +53,13 @@ class DisplayWindow:
         # and hang shutdown. ``request_stop`` only reads ``root`` and schedules a
         # callback (it never mutates ``events``), so re-entering an interrupted
         # locked section cannot corrupt the state the outer frame is building.
+        #
+        # INVARIANT: never held across a cross-thread ``root.after`` call. On
+        # macOS Tcl is thread-enabled, so ``after`` from a non-main thread blocks
+        # on the main loop, which also takes this lock (``_fade_timer`` /
+        # ``_update_display``) — holding it across ``after`` deadlocks. Callers
+        # (``show_text``, ``request_stop``) capture ``root`` under the lock and
+        # call ``after`` outside it; any future caller must do the same.
         self._lock = threading.RLock()
         # Throttles repeated errors from the Tk callbacks (``_fade_timer`` and
         # ``_update_display``), which fire continuously: the fade tick every
@@ -405,15 +412,21 @@ class DisplayWindow:
             if minimized:
                 root.after(0, self._restore_from_minimized)
             root.after(0, self._update_display)
-        except RuntimeError, tk.TclError:
+        except (RuntimeError, tk.TclError) as exc:
             # The Tk loop can be dead while ``root`` still exists (external app
             # teardown between mainloop() returning and stop() nulling root), or
             # ``stop`` may have destroyed the captured ``root`` after we released
             # the lock. ``after`` then raises RuntimeError ("main thread is not in
-            # main loop") or TclError; tolerate it and drop the event — exactly as
-            # _fade_timer/_update_display tolerate a stale tick — rather than
+            # main loop") or TclError; tolerate it and drop the event rather than
             # surfacing a sink error to the listener's callback handler.
-            self.logger.debug("show_text_dropped_loop_gone")
+            #
+            # Routed through the throttler, not a bare debug line: on a Tcl built
+            # without thread support a cross-thread ``after`` raises on *every*
+            # event while the loop is alive — the overlay would silently show
+            # nothing for the whole session. The throttler escalates that
+            # persistent failure to a visible (throttled) warning, while the
+            # legitimate one-or-two-event teardown race stays quiet in practice.
+            self._error_throttler.log("show_text_dropped_loop_gone", exc)
 
     def _restore_from_minimized(self) -> None:
         """Re-show the overlay after a minimized start, on the Tk main loop.
@@ -493,10 +506,16 @@ class DisplayWindow:
             return
         try:
             root.after(0, root.quit)
-        except RuntimeError, tk.TclError:
+        except (RuntimeError, tk.TclError) as exc:
             # Loop already gone / root destroyed after we released the lock; the
-            # loop is (or is becoming) stopped anyway, so tolerate it.
-            self.logger.debug("request_stop_loop_gone")
+            # loop is (or is becoming) stopped anyway, so tolerate it. Logged at
+            # warning, not debug: unlike the per-event drops in show_text this
+            # fires at most once or twice per session (no noise argument), and a
+            # genuinely failed stop request — e.g. a non-thread-enabled Tcl build
+            # where a live loop rejects the cross-thread ``after`` — means the app
+            # ignores shutdown, which must be visible in the log at the default
+            # level (the user cannot raise verbosity on a process that won't quit).
+            self.logger.warning(format_event("request_stop_loop_gone", error=str(exc)))
 
     def stop(self) -> None:
         """Destroy the window.

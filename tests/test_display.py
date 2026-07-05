@@ -561,6 +561,7 @@ class TestDisplayWindow:
 
         mock_root, _ = mock_tk
         window = DisplayWindow(DisplaySettings())
+        window._error_throttler = Mock()
 
         for exc in (
             RuntimeError("main thread is not in main loop"),
@@ -568,6 +569,36 @@ class TestDisplayWindow:
         ):
             mock_root.after.side_effect = exc
             window.show_text("A")  # must not raise
+
+        # Routed through the throttler (not a silent debug line): a *persistent*
+        # cross-thread after() failure — e.g. a non-thread-enabled Tcl build where
+        # the overlay would otherwise show nothing all session — escalates to a
+        # visible warning. Both attempts are reported with the event + caught exc.
+        assert window._error_throttler.log.call_count == 2
+        event, exc = window._error_throttler.log.call_args.args
+        assert event == "show_text_dropped_loop_gone"
+        assert isinstance(exc, (RuntimeError, tk.TclError))
+
+    def test_request_stop_logs_warning_when_after_fails(
+        self, mock_tk: tuple[Mock, Mock]
+    ) -> None:
+        """A failed stop-schedule is visible at warning, not a silent debug line.
+
+        Unlike per-event show_text drops, request_stop fires once per session, and
+        a genuine failure (e.g. a live but non-thread-enabled Tcl loop rejecting a
+        cross-thread after) means the app ignores shutdown — which must be visible
+        without the user raising verbosity on a process that won't quit. It must
+        also not let the exception escape the signal handler / caller.
+        """
+        mock_root, _ = mock_tk
+        window = DisplayWindow(DisplaySettings())
+        window.logger = Mock()
+        mock_root.after.side_effect = RuntimeError("main thread is not in main loop")
+
+        window.request_stop()  # must not raise
+
+        window.logger.warning.assert_called_once()
+        assert "request_stop_loop_gone" in window.logger.warning.call_args.args[0]
 
     def test_request_stop_racing_stop_is_safe(self, mock_tk: tuple[Mock, Mock]) -> None:
         """request_stop (any thread) racing stop (main thread) must not crash.
@@ -1032,3 +1063,14 @@ class TestSchedulingDoesNotHoldLock:
         self._assert_lock_free_during_after(
             window, mock_root, lambda: window.show_text("A")
         )
+
+    def test_request_stop_schedules_after_outside_lock(
+        self, mock_tk: tuple[Mock, Mock]
+    ) -> None:
+        # request_stop applies the same capture-root-then-schedule pattern and is
+        # called from the signal handler / pynput threads; it must also release
+        # _lock before the cross-thread after(), or Ctrl+C would deadlock at quit.
+        mock_root, _ = mock_tk
+        window = DisplayWindow(DisplaySettings())
+
+        self._assert_lock_free_during_after(window, mock_root, window.request_stop)

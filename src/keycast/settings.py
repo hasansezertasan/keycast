@@ -9,7 +9,7 @@ import time
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 
 from pydantic import (
     BaseModel,
@@ -494,7 +494,15 @@ class LoggingSettings(BaseModel):
         return value
 
 
-_PRESET_OVERRIDES: dict[str, dict[str, object]] = {
+# The named presets. Kept as a dedicated Literal (rather than inlining the
+# names into the ``preset`` field) so ``_PRESET_OVERRIDES`` can be keyed by it:
+# a typo either in the field values or the override table's keys then fails type
+# checking, and the invariant "every non-custom preset has an override bundle"
+# is asserted at import (see below). ``"custom"`` is deliberately not a member —
+# it names no overrides.
+PresetName = Literal["presenter", "minimal", "debug"]
+
+_PRESET_OVERRIDES: dict[PresetName, dict[str, object]] = {
     # Screencast / demo: large, legible, lingers a little longer, clicks shown.
     "presenter": {
         "display": {
@@ -532,6 +540,14 @@ configured value. Every value must stay within its field's declared bounds:
 ``resolve_preset`` re-validates the merged result, so an out-of-range preset would
 raise at load. ``"custom"`` is intentionally absent — it means "no overrides".
 """
+
+# Guard the two-sided coupling between the ``PresetName`` Literal and this table:
+# every named preset must have a bundle here, and vice versa. Catches a name added
+# to one but not the other at import time rather than as a silent runtime no-op.
+assert set(_PRESET_OVERRIDES) == set(get_args(PresetName)), (
+    "PresetName and _PRESET_OVERRIDES have drifted: "
+    f"{set(get_args(PresetName)) ^ set(_PRESET_OVERRIDES)}"
+)
 
 
 class Settings(BaseSettings):
@@ -589,14 +605,46 @@ class Settings(BaseSettings):
         "~/.keycast/update-check.json, not in this config. See keycast.updates.",
     )
     # pyrefly: ignore[bad-assignment]  # Field(default=...) can't be narrowed to the Literal; mypy/pyright/ty accept it.
-    preset: Literal["custom", "presenter", "minimal", "debug"] = Field(
+    preset: Literal["custom"] | PresetName = Field(
         default="custom",
         description="Named settings bundle layered over the config on load. "
         '"custom" (default) uses the file verbatim; "presenter", "minimal" and '
-        '"debug" override a handful of display/mouse fields (and, for "debug", '
-        "verbose logging) for common scenarios. A preset wins over the file only "
-        "for the fields it names; see resolve_preset and _PRESET_OVERRIDES.",
+        '"debug" override a handful of display/mouse/keyboard fields (and, for '
+        '"debug", verbose logging) for common scenarios. A preset wins over the '
+        "file only for the fields it names; see resolve_preset and "
+        '_PRESET_OVERRIDES. An unrecognized name falls back to "custom" with a '
+        "warning rather than rejecting the whole config file.",
     )
+
+    @field_validator("preset", mode="before")
+    @classmethod
+    def _coerce_unknown_preset(cls, value: object) -> object:
+        """Fall back to ``"custom"`` for an unrecognized preset name.
+
+        A misspelled ``preset`` is a single narrow, self-correcting mistake — it
+        would otherwise fail the Literal, and because ``preset`` lives on the
+        top-level config, that failure quarantines the *entire* file (moved to
+        ``.bak``, overwritten with defaults; see ``_recover_from_invalid_config``)
+        and silently discards every other customization. Degrade just this field
+        instead: warn and use ``"custom"``, keeping strict whole-file quarantine
+        for structurally corrupt configs. Non-string values are passed through
+        untouched so the Literal still rejects genuinely wrong types.
+
+        Args:
+            value: The raw ``preset`` value from the config source.
+
+        Returns:
+            ``value`` if it is a known preset name (or not a string); otherwise
+            ``"custom"``.
+        """
+        valid = {"custom", *get_args(PresetName)}
+        if isinstance(value, str) and value not in valid:
+            cls._warn_user(
+                f"Unknown preset {value!r}; falling back to 'custom'. "
+                f"Valid presets: {', '.join(sorted(valid))}."
+            )
+            return "custom"
+        return value
 
     # Note: per-listener enable flags live on `keyboard.enabled` / `mouse.enabled`;
     # auto_start is the app-level master switch layered above them.
@@ -679,15 +727,20 @@ class Settings(BaseSettings):
 
         Returns:
             A new ``Settings`` with the preset applied, or ``self`` when the
-            preset is ``"custom"`` (or otherwise names no overrides).
+            preset is ``"custom"`` (which names no overrides).
         """
-        overrides = _PRESET_OVERRIDES.get(self.preset)
-        if not overrides:
+        if self.preset == "custom":
             return self
+        # Narrowed to a PresetName; the import-time assertion guarantees a bundle
+        # exists for every one, so index directly rather than defaulting to None.
+        overrides = _PRESET_OVERRIDES[self.preset]
 
         updates: dict[str, object] = {}
         for key, value in overrides.items():
-            current = getattr(self, key, None)
+            # No default: a mistyped section/field name in _PRESET_OVERRIDES
+            # raises AttributeError loudly (caught by any preset test) instead of
+            # silently resolving to None and applying a broken override.
+            current = getattr(self, key)
             if isinstance(value, dict) and isinstance(current, BaseModel):
                 # Re-validate the section with the preset's fields merged over its
                 # current values. mode="json" yields JSON-safe primitives (Color

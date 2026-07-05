@@ -6,7 +6,12 @@ from unittest.mock import Mock, patch
 import pytest
 from pynput import keyboard, mouse
 
-from keycast.listeners import KeyListener, MouseListener, _ErrorThrottler
+from keycast.listeners import (
+    _MODIFIER_STALE_SECONDS,
+    KeyListener,
+    MouseListener,
+    _ErrorThrottler,
+)
 from keycast.settings import KeyboardSettings, MouseSettings
 
 
@@ -911,6 +916,101 @@ class TestChordGrouping:
 
         assert captured == []
 
+    def test_repeated_chords_under_one_hold(self) -> None:
+        # The core presenter sequence: Ctrl held across Ctrl+C then Ctrl+V. Both
+        # chords must show, and Ctrl must not leak out as a lone modifier.
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.KeyCode.from_char("c"))
+        listener._on_release(keyboard.KeyCode.from_char("c"))
+        listener._on_press(keyboard.KeyCode.from_char("v"))
+        listener._on_release(keyboard.KeyCode.from_char("v"))
+        listener._on_release(keyboard.Key.ctrl_l)
+
+        assert captured == ["Control Left + c", "Control Left + v"]
+
+    def test_ctrl_letter_control_char_maps_to_letter(self) -> None:
+        # The OS delivers Ctrl+S as the C0 control character "\x13"; it must
+        # render as the letter, not an invisible glyph.
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.KeyCode.from_char("\x13"))  # Ctrl+S
+
+        assert captured == ["Control Left + s"]
+
+    def test_hidden_chord_key_suppresses_chord_and_lone_modifier(self) -> None:
+        # Ctrl+F1 with function keys hidden: the chord is not shown, and the
+        # modifier is NOT fabricated as a lone "Control" on release — it was
+        # consumed by the (hidden) chord.
+        captured: list[str] = []
+        listener = self._listener(captured, show_function_keys=False)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.Key.f1)
+        listener._on_release(keyboard.Key.f1)
+        listener._on_release(keyboard.Key.ctrl_l)
+
+        assert captured == []
+
+    @staticmethod
+    def _backdate(listener: KeyListener, name: str) -> None:
+        """Push a held modifier's press time past the staleness window."""
+        held = listener._held_modifiers[name]
+        listener._held_modifiers[name] = held._replace(
+            pressed_at=held.pressed_at - (_MODIFIER_STALE_SECONDS + 1)
+        )
+
+    def test_stale_held_modifier_is_evicted_on_next_press(self) -> None:
+        # A missed release (secure-input field, screen lock, ...) would otherwise
+        # wedge the modifier "held" forever. Backdate its press time past the
+        # staleness window; the next keypress evicts it and is a plain key, not a
+        # phantom chord.
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        # Key name is platform-dependent (ctrl_l aliases ctrl on macOS), so read
+        # it back rather than assuming which name pynput used.
+        (name,) = listener._held_modifiers
+        self._backdate(listener, name)
+
+        listener._on_press(keyboard.KeyCode.from_char("a"))
+
+        assert captured == ["a"]
+        assert listener._held_modifiers == {}
+
+    def test_partial_stale_eviction_clears_chord_fired(self) -> None:
+        # A stuck modifier (missed release) after a completed chord must not
+        # poison a later, unrelated hold. Ctrl wedges after Ctrl+S; a fresh Shift
+        # is then held. When Ctrl is evicted (Shift survives), _chord_fired must
+        # reset so Shift's lone tap is still emitted on release — not swallowed.
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.KeyCode.from_char("s"))  # fires a chord
+        (ctrl_name,) = listener._held_modifiers
+        self._backdate(listener, ctrl_name)  # Ctrl's release was missed
+
+        listener._on_press(keyboard.Key.shift_l)  # fresh hold; evicts stale Ctrl
+        listener._on_release(keyboard.Key.shift_l)
+
+        assert captured == ["Control Left + s", "Shift Left"]
+
+    def test_ungrouped_ctrl_letter_control_char_maps_to_letter(self) -> None:
+        # The control-char remap lives in _format_key, so it applies even with
+        # grouping off: a raw "\x13" still renders as "s", not an invisible glyph.
+        captured: list[str] = []
+        listener = KeyListener(captured.append, KeyboardSettings())  # group off
+
+        listener._on_press(keyboard.KeyCode.from_char("\x13"))  # Ctrl+S
+
+        assert captured == ["s"]
+
 
 class TestMouseFractionalCoordinates:
     """pynput can deliver float coordinates on high-DPI (Retina) displays.
@@ -927,3 +1027,16 @@ class TestMouseFractionalCoordinates:
         listener._on_click(210.89453125, 72.421875, mouse.Button.left, pressed=True)  # type: ignore[arg-type]
 
         assert captured == ["Left Click (211, 72)"]
+
+    def test_non_numeric_coordinate_does_not_crash_the_listener(self) -> None:
+        # A backend handing back a non-numeric coord must surface as a throttled
+        # mouse_format_error, not an unhandled exception escaping the pynput
+        # callback (which would silently stop the listener thread). The rounding
+        # lives inside the try for exactly this reason.
+        captured: list[str] = []
+        settings = MouseSettings(show_mouse_clicks=True, show_mouse_position=True)
+        listener = MouseListener(captured.append, settings)
+
+        listener._on_click(None, None, mouse.Button.left, pressed=True)  # type: ignore[arg-type]
+
+        assert captured == []  # no event emitted, and no exception raised
