@@ -289,6 +289,28 @@ class TestStart:
         )
         keycast.display_window.show_text.assert_any_call(expected_status)
 
+    def test_linux_status_falls_back_to_unknown_on_failure(
+        self, keycast: Keycast
+    ) -> None:
+        """Linux has no permission API to consult, so a failed start is unknown."""
+        keycast.settings.auto_start = True
+        keycast.settings.start_minimized = False
+        keycast.settings.show_startup_status = True
+        keycast.mouse_listener.settings.enabled = True
+        keycast.key_listener.settings.enabled = True
+        keycast.key_listener.start.side_effect = RuntimeError("no X display")
+
+        with patch("keycast.application.platform.system", return_value="Linux"):
+            keycast.start()
+
+        expected_status = Keycast._format_startup_status_line(
+            {
+                "keyboard": application_module._InputSourceStatus.UNKNOWN,
+                "mouse": application_module._InputSourceStatus.ACTIVE,
+            }
+        )
+        keycast.display_window.show_text.assert_any_call(expected_status)
+
     def test_no_version_splash_on_minimized_start(self, keycast: Keycast) -> None:
         """A minimized start stays fully hidden: no splash to defeat the point."""
         keycast.settings.auto_start = True
@@ -356,6 +378,91 @@ class TestStart:
 
         keycast.display_window.start.assert_called_once_with(start_minimized=False)
         assert "start_minimized_ignored" in caplog.text
+
+
+def _fake_app_services(
+    accessibility: object = ..., input_monitoring: object = ...
+) -> Mock:
+    """Build a stand-in for the ctypes AppServices handle.
+
+    Pass a bool to report that permission state, an exception instance to make
+    the check call raise, or leave the default to omit the symbol entirely
+    (getattr then falls back to None, as on a stripped-down host).
+    """
+    symbols = {}
+    if accessibility is not ...:
+        symbols["AXIsProcessTrusted"] = accessibility
+    if input_monitoring is not ...:
+        symbols["CGPreflightListenEventAccess"] = input_monitoring
+    lib = Mock(spec=list(symbols))
+    for name, behavior in symbols.items():
+        check = Mock(
+            side_effect=behavior if isinstance(behavior, Exception) else None,
+            return_value=behavior,
+        )
+        setattr(lib, name, check)
+    return lib
+
+
+class TestMacOSPermissionPrecheck:
+    """The best-effort ctypes precheck behind macOS startup statuses."""
+
+    def test_non_darwin_skips_the_macos_check(self, keycast: Keycast) -> None:
+        with (
+            patch("keycast.application.platform.system", return_value="Linux"),
+            patch.object(Keycast, "_macos_permission_precheck") as macos_check,
+        ):
+            assert keycast._startup_permission_precheck() is None
+        macos_check.assert_not_called()
+
+    def test_darwin_delegates_to_the_macos_check(self, keycast: Keycast) -> None:
+        with (
+            patch("keycast.application.platform.system", return_value="Darwin"),
+            patch.object(Keycast, "_macos_permission_precheck", return_value=True),
+        ):
+            assert keycast._startup_permission_precheck() is True
+
+    def test_granted_when_both_checks_pass(self) -> None:
+        lib = _fake_app_services(accessibility=True, input_monitoring=True)
+        with patch("keycast.application.ctypes.CDLL", return_value=lib):
+            assert Keycast._macos_permission_precheck() is True
+
+    @pytest.mark.parametrize(
+        ("accessibility", "input_monitoring"),
+        [(False, True), (True, False), (False, False)],
+    )
+    def test_denied_when_any_check_fails(
+        self, accessibility: bool, input_monitoring: bool
+    ) -> None:
+        lib = _fake_app_services(
+            accessibility=accessibility, input_monitoring=input_monitoring
+        )
+        with patch("keycast.application.ctypes.CDLL", return_value=lib):
+            assert Keycast._macos_permission_precheck() is False
+
+    @pytest.mark.parametrize("error", [OSError("dlopen failed"), TypeError("name")])
+    def test_unknown_when_library_cannot_be_loaded(self, error: Exception) -> None:
+        with patch("keycast.application.ctypes.CDLL", side_effect=error):
+            assert Keycast._macos_permission_precheck() is None
+
+    def test_unknown_when_symbols_are_missing(self) -> None:
+        lib = _fake_app_services()
+        with patch("keycast.application.ctypes.CDLL", return_value=lib):
+            assert Keycast._macos_permission_precheck() is None
+
+    def test_unknown_when_check_calls_raise(self) -> None:
+        lib = _fake_app_services(
+            accessibility=OSError("trust query failed"),
+            input_monitoring=OSError("preflight failed"),
+        )
+        with patch("keycast.application.ctypes.CDLL", return_value=lib):
+            assert Keycast._macos_permission_precheck() is None
+
+    def test_partial_grant_stays_unknown_not_granted(self) -> None:
+        """One granted check plus one unreadable check must not report granted."""
+        lib = _fake_app_services(accessibility=True)
+        with patch("keycast.application.ctypes.CDLL", return_value=lib):
+            assert Keycast._macos_permission_precheck() is None
 
 
 class TestUpdateCheck:
