@@ -223,21 +223,10 @@ jobs:
         shell: pwsh
         # A broken AppxManifest.xml would block the atomic release exactly like
         # a broken keycast.iss, so pack it here on every PR with the template's
-        # 0.0.0.0 default version (ADR-009). makeappx.exe ships in the Windows
-        # SDK on the runner image but is not on PATH, so resolve it under
-        # Windows Kits. Assert the package actually emerged.
-        run: |
-          $makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.*\x64\makeappx.exe" |
-            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-          if (-not $makeappx) { Write-Host "::error::makeappx.exe not found in the Windows SDK"; exit 1 }
-          New-Item -ItemType Directory msix-layout | Out-Null
-          Copy-Item -Recurse dist/keycast msix-layout/keycast
-          Copy-Item -Recurse packaging/msix/Assets msix-layout/Assets
-          Copy-Item packaging/msix/AppxManifest.xml msix-layout/AppxManifest.xml
-          & $makeappx pack /d msix-layout /p keycast.msix /o
-          if (-not (Test-Path keycast.msix)) {
-            Write-Host "::error::keycast.msix missing after makeappx"; exit 1
-          }
+        # 0.0.0.0 default version (ADR-009). No -Version -> the manifest is
+        # packed verbatim. Shared with release.yml via pack.ps1 so the makeappx
+        # resolution and layout staging can't drift between the two.
+        run: ./packaging/msix/pack.ps1
       - name: Upload the folder and installer as a preview build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
