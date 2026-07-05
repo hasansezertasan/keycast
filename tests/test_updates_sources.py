@@ -339,6 +339,7 @@ class TestDetectInstallSource:
             sources.detect_install_source(
                 frozen=True,
                 location=loc,
+                mas_receipt_exists=lambda: False,
                 cask_receipt_exists=lambda: True,
                 installer_marker_exists=lambda: False,
             )
