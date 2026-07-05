@@ -322,6 +322,103 @@ self.events: list[tuple[str, float]] = []  # (event_text, timestamp)
 - ❌ More configuration options
 - ❌ Users need to understand key types
 
+### Chord Grouping (Modifier + Key)
+
+**Decision**: Optionally combine a key pressed with held modifiers into one chord
+label (e.g. `Control Left + S`) via `KeyboardSettings.group_chords`
+(default `false`) and `chord_separator` (default `" + "`). The `presenter` preset
+turns it on.
+
+**How it works**: `KeyListener` gains a tiny state machine on the pynput listener
+thread — an insertion-ordered dict of currently-held modifiers and a
+"chord fired this hold" flag. Modifier presses are held silently; a non-modifier
+press while modifiers are held emits one joined label; a modifier released without
+completing a chord is emitted alone (respecting `show_modifier_keys`). This is the
+only place the listener registers pynput's `on_release`, needed purely to know
+which modifiers are down.
+
+**Why default off**: an existing, tested contract is that a modifier press emits
+its label immediately. Chord grouping deliberately *defers* modifier display, so
+turning it on by default would change long-standing behavior. Keeping it opt-in
+(and enabling it through the `presenter` preset) preserves the default experience
+while making the screencast-style behavior one preset away.
+
+**Why in the listener, not the display**: grouping is a property of the *event
+stream* (what was pressed together), not of rendering. Formatting the chord into a
+single string upstream keeps the `TextSink` contract unchanged — the display still
+receives one line — consistent with how mouse coordinates are already formatted
+into the string upstream.
+
+**Alternatives Considered**:
+- **Group in the display layer**: the display would need raw key/modifier state and
+  timing, breaking the "one formatted string" sink contract for no gain
+- **Timing-based sequential chords** (`Ctrl+K` then `Ctrl+S` as one unit, as VS
+  Code shows): needs a timeout window and chord-map knowledge; deferred — the
+  simultaneous modifier+key case is the common one
+- **Default on**: rejected to avoid changing the established default behavior
+
+**Trade-offs**:
+- ✅ Cleaner, presentation-friendly output for shortcuts
+- ✅ Sink contract and display layer untouched
+- ✅ Opt-in; default behavior preserved
+- ❌ Adds per-thread state to the previously stateless listener
+- ❌ Sequential (multi-stroke) chords are not grouped yet
+
+### Click Ripple (Second Listener Channel)
+
+**Decision**: Optionally paint an expanding, fading ring at the cursor on each
+click (`MouseSettings.show_click_ripple`, default `false`). The ripple is fed by a
+**second** listener channel — a `ClickSink` (`Callable[[int, int], None]`) —
+separate from the `TextSink`, because it needs the raw `(x, y)` a formatted string
+cannot carry. `DisplayWindow.show_click` is the production `ClickSink`; the
+`presenter` and `debug` presets enable the feature.
+
+**Why a second channel, not a richer TextSink**: the `TextSink` decision above
+deliberately settled on one signature, `(text: str) -> None`, and noted the
+trade-off that coordinate data is baked into a string — "a consumer needing raw
+`x`/`y` would have to parse or be re-extended." The ripple is exactly that
+consumer. Rather than overload the text sink (and break every existing sink), a
+parallel, optional `ClickSink` is added. `MouseListener` takes it as a
+**keyword-only** argument so the documented positional constructor
+(`show_text, settings`) — pinned by `test_docs_contract.py` — is unchanged.
+
+**Why the appearance lives in `MouseSettings` but rendering in `DisplayWindow`**:
+the ripple is conceptually a mouse-click visualization, so its knobs
+(`ripple_color`, `ripple_max_radius`, `ripple_duration_ms`) sit with the other
+mouse settings. Rendering, however, needs the Tk main loop the `DisplayWindow`
+owns, so the window draws it. The composition root passes the three appearance
+values into `DisplayWindow` as keyword-only constructor args (again keeping the
+pinned `settings`-only positional signature), so the window stays self-contained
+and does not import `MouseSettings`.
+
+**Rendering & platform reality**: the ring is drawn in its own transient,
+borderless, always-on-top toplevel that animates via the same self-rescheduling
+`root.after` pattern as the fade timer, then destroys itself. The animation math
+is factored into a pure `_ripple_frame` helper so it is unit-testable without Tk.
+Full transparency and click-through are **platform-specific and unreliable** from
+Tk alone (Windows `-transparentcolor`, macOS AppKit, X11 input shaping), so they
+are treated as best-effort and degrade rather than crash; the ring is kept brief
+and topmost to minimize interference, and the feature defaults off. Every Tk
+operation is wrapped and routed through the error throttler, consistent with the
+rest of the display layer's "degrade, don't crash" behavior.
+
+**Alternatives Considered**:
+- **Overload `TextSink` to carry coordinates**: breaks the one-signature decision
+  and every existing sink; rejected
+- **A fully click-through, pixel-perfect overlay**: needs per-platform native code
+  (ctypes/pyobjc) with no headless test path; deferred in favor of a best-effort
+  ring that is off by default
+- **Draw the ripple inside the main overlay window**: the overlay is a small fixed
+  rectangle, not full-screen, so it can't host a ring at an arbitrary cursor
+  position; a separate toplevel is required
+
+**Trade-offs**:
+- ✅ Screencast-style click feedback anywhere on screen
+- ✅ `TextSink` contract and all existing sinks untouched
+- ✅ Testable animation math; rendering degrades gracefully
+- ❌ Transparency / click-through are best-effort per platform
+- ❌ A second, transient window per click (kept short-lived to bound cost)
+
 ## Performance Decisions
 
 ### Threading Model
@@ -546,6 +643,68 @@ overrides patch the JSON source.
 - ✅ Good defaults
 - ✅ Easy to reason about and test
 - ❌ No per-invocation overrides without editing the file (or patching the source)
+
+### Named Setting Presets ("Modes")
+
+**Decision**: Ship a small set of built-in presets — `custom` (default),
+`presenter`, `minimal`, and `debug` — selected via a top-level `preset` field.
+A non-`custom` preset layers a fixed bundle of overrides over the loaded config;
+`custom` uses the file verbatim.
+
+**How it works**:
+1. `Settings.create_settings_file()` loads and (on first run) persists the config
+   exactly as before — the on-disk file always records the user's raw values plus
+   their chosen `preset` name, never the resolved overlay.
+2. `Settings.resolve_preset()` then returns a **new** `Settings`: for each
+   overridden section it dumps the current values with `model_dump(mode="json")`,
+   merges the preset's fields on top, and rebuilds the section with that section
+   model's `model_validate(...)`; `model_copy(update=...)` then swaps the rebuilt
+   sections (and any top-level scalar flag) into a new `Settings`.
+   `Keycast.__init__` calls this immediately after loading, so every downstream
+   component sees the resolved settings.
+
+**Precedence**: a preset **wins over the file** for the fields it names, and only
+those fields — everything else keeps its configured/default value. `custom`
+applies nothing, so existing configs behave identically. Users who want a preset
+as a *starting point they can edit* should copy its values into `custom` instead.
+
+**Why re-validate each section instead of `model_copy(update=...)` alone**:
+`model_copy` rebinds fields without running validators, so an internally
+inconsistent bundle (e.g. a mouse override that trips
+`_validate_position_requires_clicks`) would pass silently. Rebuilding each
+overridden section through its `model_validate` re-runs that section's field
+bounds and cross-field validators, exactly as loading the config does; the
+`model_copy` step then only assembles already-validated sections. Note the
+sub-models (`DisplaySettings`, `MouseSettings`, …) are plain `BaseModel`, where
+`model_validate` honours the data passed to it — the top-level `Settings` is a
+`BaseSettings` whose `model_validate` re-runs the configured JSON *source* instead
+of the passed fields, so it deliberately is **not** used to re-assemble here (and
+the preset's Literal is enforced only on the real load path, through that source).
+
+**Rationale**:
+- One-word switch for common scenarios (a screencast, an unobtrusive corner
+  overlay, a troubleshooting session) without hand-editing several fields
+- Layers cleanly on the single-source model above — the file stays authoritative,
+  the preset is a deterministic transform applied after load
+- `custom` default is a no-op, so the feature is additive and backwards-compatible
+
+**Alternatives Considered**:
+- **A `presets` settings source in `settings_customise_sources`**: would reopen
+  the precedence ambiguity the single-source decision exists to remove, and
+  presets are built-in constants, not another external input
+- **Preset-as-defaults (file always wins, preset fills only unset fields)**: more
+  intuitive for power users but needs `model_fields_set` tracking threaded through
+  the JSON source; deferred in favor of the simpler, fully-documented "preset wins
+  for named fields" rule
+- **Free-form user-defined presets in the config**: more flexible but adds a
+  nested schema and validation surface; the built-in set covers the common cases
+
+**Trade-offs**:
+- ✅ Common setups are one field away
+- ✅ File remains the single source of truth; resolution is a pure transform
+- ✅ Re-validation guarantees a preset can never produce invalid settings
+- ❌ A preset's fields can't be partially overridden from the file (use `custom`)
+- ❌ The preset catalog is code, not config (adding one is a code change)
 
 ## Error Handling Decisions
 

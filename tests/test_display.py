@@ -1,7 +1,7 @@
 """Tests for the display module."""
 
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from unittest.mock import Mock, call, patch
 
 import pytest
@@ -982,3 +982,151 @@ class TestWindowIcon:
             window._apply_window_icon()
 
         fake_appkit.NSApplication.sharedApplication.assert_not_called()
+
+
+class TestClickRipple:
+    """DisplayWindow.show_click and the ripple animation."""
+
+    def test_ripple_frame_grows_and_fades(self) -> None:
+        # Pure math: radius grows toward max_radius, alpha fades from 1 to 0.
+        start = DisplayWindow._ripple_frame(0, 400, 40)
+        mid = DisplayWindow._ripple_frame(200, 400, 40)
+        assert start == (1, 1.0)
+        assert mid == (20, 0.5)
+
+    def test_ripple_frame_ends_at_duration(self) -> None:
+        # At/after the duration the animation is complete (caller tears it down).
+        assert DisplayWindow._ripple_frame(400, 400, 40) is None
+        assert DisplayWindow._ripple_frame(500, 400, 40) is None
+
+    def test_ripple_frame_zero_duration_is_complete(self) -> None:
+        # Guard the division: a non-positive duration is immediately "done".
+        assert DisplayWindow._ripple_frame(0, 0, 40) is None
+
+    def test_show_click_marshals_onto_main_loop(
+        self, mock_tk: tuple[Mock, Mock]
+    ) -> None:
+        """show_click hands rendering to the Tk loop via after (pynput thread)."""
+        mock_root, _ = mock_tk
+        window = DisplayWindow(DisplaySettings())
+        mock_root.after.reset_mock()  # ignore the after() from the fade timer
+
+        window.show_click(100, 200)
+
+        # Scheduled with delay 0; the scheduled callable renders the ripple.
+        assert mock_root.after.call_count == 1
+        assert mock_root.after.call_args[0][0] == 0
+
+    def test_show_click_without_root_is_noop(self, mock_tk: tuple[Mock, Mock]) -> None:
+        """show_click after teardown drops the click instead of crashing."""
+        window = DisplayWindow(DisplaySettings())
+        window.root = None
+
+        window.show_click(1, 2)  # must not raise
+
+    def test_render_ripple_creates_and_positions_window(
+        self, mock_tk: tuple[Mock, Mock]
+    ) -> None:
+        """_render_ripple builds a toplevel centered on the click and animates."""
+        mock_root, _ = mock_tk
+        window = DisplayWindow(
+            DisplaySettings(), ripple_max_radius=40, ripple_duration_ms=400
+        )
+
+        with (
+            patch("tkinter.Toplevel") as top_cls,
+            patch("tkinter.Canvas") as canvas_cls,
+            patch.object(window, "_animate_ripple") as animate,
+        ):
+            top = Mock()
+            top_cls.return_value = top
+            canvas_cls.return_value = Mock()
+
+            window._render_ripple(100, 200)
+
+        # A square sized to the diameter, centered on the click (100-40, 200-40).
+        top.geometry.assert_called_once_with("80x80+60+160")
+        animate.assert_called_once()
+
+    def test_render_ripple_error_is_throttled(self, mock_tk: tuple[Mock, Mock]) -> None:
+        """A Tk failure while building the ripple is logged, not raised."""
+        window = DisplayWindow(DisplaySettings())
+        window._error_throttler = Mock()
+
+        with patch("tkinter.Toplevel", side_effect=RuntimeError("boom")):
+            window._render_ripple(1, 2)  # must not raise
+
+        assert window._error_throttler.log.call_args[0][0] == "ripple_render_error"
+
+    def test_ripple_color_normalized_from_pydantic_color(
+        self, mock_tk: tuple[Mock, Mock]
+    ) -> None:
+        """A pydantic Color is normalized to a Tk-usable hex string."""
+        window = DisplayWindow(DisplaySettings(), ripple_color=Color("red"))
+        assert window._ripple_color == Color("red").as_hex()
+
+    def test_ripple_color_string_used_verbatim(
+        self, mock_tk: tuple[Mock, Mock]
+    ) -> None:
+        window = DisplayWindow(DisplaySettings(), ripple_color="cyan")
+        assert window._ripple_color == "cyan"
+
+
+class TestSchedulingDoesNotHoldLock:
+    """Regression: cross-thread ``after`` must not run while holding ``_lock``.
+
+    On macOS a cross-thread ``root.after`` blocks until the main loop services
+    the Tcl queue; if it were called while holding ``_lock`` (which the main
+    loop's ``_fade_timer``/``_update_display`` also take), the main thread would
+    block on the lock while the listener thread blocks on the main thread —
+    deadlock, freezing the overlay. These tests model the main loop grabbing
+    ``_lock`` from another thread *during* the ``after`` call and assert it is
+    free (which would only be true if scheduling happens outside the lock).
+    """
+
+    def _assert_lock_free_during_after(
+        self, window: DisplayWindow, mock_root: Mock, action: Callable[[], None]
+    ) -> None:
+        results: list[bool] = []
+
+        def after_impl(_delay: int, _cb: object) -> None:
+            # Another thread models the Tk main loop taking _lock. A plain Lock
+            # would deadlock across threads; _lock is reentrant only on the SAME
+            # thread, so a separate thread genuinely blocks if the lock is held.
+            def grab() -> None:
+                got = window._lock.acquire(timeout=1.0)
+                results.append(got)
+                if got:
+                    window._lock.release()
+
+            thread = threading.Thread(target=grab)
+            thread.start()
+            thread.join(timeout=2.0)
+
+        mock_root.after.reset_mock()  # drop the fade-timer after() from __init__
+        mock_root.after.side_effect = after_impl
+
+        action()  # triggers root.after -> after_impl, which probes the lock
+
+        assert results, "after() was never called, so the lock was not exercised"
+        assert all(results), "show_* held _lock while scheduling after() (deadlock)"
+
+    def test_show_text_schedules_after_outside_lock(
+        self, mock_tk: tuple[Mock, Mock]
+    ) -> None:
+        mock_root, _ = mock_tk
+        window = DisplayWindow(DisplaySettings())
+
+        self._assert_lock_free_during_after(
+            window, mock_root, lambda: window.show_text("A")
+        )
+
+    def test_show_click_schedules_after_outside_lock(
+        self, mock_tk: tuple[Mock, Mock]
+    ) -> None:
+        mock_root, _ = mock_tk
+        window = DisplayWindow(DisplaySettings())
+
+        self._assert_lock_free_during_after(
+            window, mock_root, lambda: window.show_click(10, 20)
+        )

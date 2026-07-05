@@ -20,19 +20,41 @@ if TYPE_CHECKING:
     # TYPE_CHECKING-only import is enough to satisfy them.
     import tkinter as tk
 
+    from pydantic_extra_types.color import Color
+
     from keycast.settings import DisplaySettings
 
 
 class DisplayWindow:
     """A transparent overlay window that displays events."""
 
-    def __init__(self, settings: DisplaySettings) -> None:
+    def __init__(
+        self,
+        settings: DisplaySettings,
+        *,
+        ripple_color: "Color | str" = "yellow",
+        ripple_max_radius: int = 40,
+        ripple_duration_ms: int = 400,
+    ) -> None:
         """Initialize the display window.
 
         Args:
             settings: Display settings
+            ripple_color: Click-ripple ring color (a pydantic ``Color`` or any Tk
+                color string). Keyword-only so the documented positional signature
+                stays ``(settings,)``.
+            ripple_max_radius: Final ripple radius in pixels.
+            ripple_duration_ms: How long the ripple animates, in milliseconds.
         """
         self.settings = settings
+
+        # Normalize the ripple color to a Tk-usable string once. A plain string
+        # (e.g. "yellow") is used as-is; a pydantic Color is rendered via as_hex().
+        self._ripple_color: str = (
+            ripple_color if isinstance(ripple_color, str) else ripple_color.as_hex()
+        )
+        self._ripple_max_radius = ripple_max_radius
+        self._ripple_duration_ms = ripple_duration_ms
 
         self.logger = logging.getLogger(__name__)
         self.root: tk.Tk | None = None
@@ -375,6 +397,16 @@ class DisplayWindow:
         # lock so ``stop`` cannot null and ``destroy`` ``root`` between the check
         # and the enqueue (which would raise TclError); ``after`` only schedules,
         # so holding the lock briefly here does not block the main loop.
+        # CRITICAL: capture ``root`` under the lock but call ``after`` *outside*
+        # it. On macOS Tcl is thread-enabled, so a cross-thread ``root.after``
+        # blocks until the main loop services the Tcl event queue. Holding
+        # ``_lock`` across that call deadlocks: the main thread's
+        # ``_fade_timer``/``_update_display`` also take ``_lock``, so the main
+        # thread waits for the lock while this thread — holding the lock — waits
+        # for the main thread. Only the state mutation (``events.append``) needs
+        # the lock; the local ``root`` reference keeps the later ``after`` valid
+        # even if ``stop`` nulls ``self.root`` in between (the call then raises
+        # and is tolerated below).
         with self._lock:
             if not self.root:
                 # Normal during shutdown (stop() nulled root); drop the event.
@@ -384,31 +416,26 @@ class DisplayWindow:
                 self.logger.debug("show_text_dropped_no_root")
                 return
             self.events.append((text, time.time()))
-            try:
-                # A minimized start hides the overlay until the first event;
-                # re-show it now. Scheduled on the main loop (not done inline)
-                # because Tk widgets may only be touched from the thread owning
-                # the main loop — the same reason _update_display is marshalled
-                # via after.
-                if self._minimized:
-                    self.root.after(0, self._restore_from_minimized)
-                self.root.after(0, self._update_display)
-            except RuntimeError, tk.TclError:
-                # The ``root is not None`` check above is not enough: the Tk loop
-                # can already be dead while ``root`` still exists, in the gap
-                # between mainloop() returning and stop() nulling root. This
-                # happens when the OS tears the app down out from under us (a
-                # native window close / app-quit, which is *not* the
-                # request_stop -> root.quit path the rest of teardown assumes),
-                # while an in-flight pynput callback is still calling show_text.
-                # ``after`` then raises RuntimeError ("main thread is not in main
-                # loop") or, if the app is already destroyed, TclError. The race
-                # is inherent to external teardown and untimeable, so tolerate it
-                # here — exactly as _fade_timer/_update_display tolerate a stale
-                # tick — and drop the event at debug level rather than letting it
-                # surface as a key_sink_error/mouse_sink_error traceback from the
-                # listener's sink-call handler.
-                self.logger.debug("show_text_dropped_loop_gone")
+            root = self.root
+            minimized = self._minimized
+
+        try:
+            # A minimized start hides the overlay until the first event; re-show
+            # it now. Scheduled on the main loop (not done inline) because Tk
+            # widgets may only be touched from the thread owning the main loop —
+            # the same reason _update_display is marshalled via after.
+            if minimized:
+                root.after(0, self._restore_from_minimized)
+            root.after(0, self._update_display)
+        except RuntimeError, tk.TclError:
+            # The Tk loop can be dead while ``root`` still exists (external app
+            # teardown between mainloop() returning and stop() nulling root), or
+            # ``stop`` may have destroyed the captured ``root`` after we released
+            # the lock. ``after`` then raises RuntimeError ("main thread is not in
+            # main loop") or TclError; tolerate it and drop the event — exactly as
+            # _fade_timer/_update_display tolerate a stale tick — rather than
+            # surfacing a sink error to the listener's callback handler.
+            self.logger.debug("show_text_dropped_loop_gone")
 
     def _restore_from_minimized(self) -> None:
         """Re-show the overlay after a minimized start, on the Tk main loop.
@@ -438,6 +465,185 @@ class DisplayWindow:
             return
         with self._lock:
             self._minimized = False
+
+    def show_click(self, x: int, y: int) -> None:
+        """Paint a click ripple centered at screen position ``(x, y)``.
+
+        The production :class:`~keycast.listeners.ClickSink`. Like
+        :meth:`show_text` it may be called from a pynput listener thread, so it
+        marshals the rendering onto the Tk main loop via ``root.after`` (tkinter
+        widgets may only be touched from the thread that owns the loop).
+
+        Captures ``root`` under the lock and calls ``after`` *outside* it, for the
+        same deadlock reason documented in :meth:`show_text`: a cross-thread
+        ``after`` blocks on the main loop, which must not happen while holding the
+        lock the main loop's fade/update ticks also take.
+
+        Args:
+            x: Click x-coordinate in screen pixels.
+            y: Click y-coordinate in screen pixels.
+        """
+        import tkinter as tk  # noqa: PLC0415  # lazy: see the import note at module top
+
+        with self._lock:
+            if not self.root:
+                self.logger.debug("show_click_dropped_no_root")
+                return
+            root = self.root
+
+        try:
+            root.after(0, lambda: self._render_ripple(x, y))
+        except RuntimeError, tk.TclError:
+            # The loop can be gone between mainloop() returning and stop() nulling
+            # root, or stop may have destroyed the captured root after we released
+            # the lock; tolerate it exactly as show_text does.
+            self.logger.debug("show_click_dropped_loop_gone")
+
+    @staticmethod
+    def _ripple_frame(
+        elapsed_ms: float, duration_ms: int, max_radius: int
+    ) -> tuple[int, float] | None:
+        """Compute one ripple animation frame.
+
+        Pure (no Tk) so the animation curve is unit-testable. The ring grows
+        linearly to ``max_radius`` while its opacity fades from 1 to 0 over
+        ``duration_ms``.
+
+        Args:
+            elapsed_ms: Milliseconds since the ripple started.
+            duration_ms: Total animation length in milliseconds.
+            max_radius: Final ring radius in pixels.
+
+        Returns:
+            A ``(radius_px, alpha)`` pair, or ``None`` once the animation is
+            complete (the caller then tears the ripple down).
+        """
+        if duration_ms <= 0 or elapsed_ms >= duration_ms:
+            return None
+        progress = elapsed_ms / duration_ms
+        radius = max(1, round(max_radius * progress))
+        alpha = round(1.0 - progress, 3)
+        return radius, alpha
+
+    def _render_ripple(self, x: int, y: int) -> None:
+        """Create the transient ripple window and start its animation.
+
+        Runs on the Tk main loop (scheduled by :meth:`show_click`). The ring lives
+        in its own borderless, always-on-top toplevel sized to the final diameter
+        and centered on the click. Best-effort: any failure is routed through the
+        throttler rather than crashing the loop, matching the rest of this layer.
+
+        Args:
+            x: Click x-coordinate in screen pixels.
+            y: Click y-coordinate in screen pixels.
+        """
+        import tkinter as tk  # noqa: PLC0415  # lazy: see the import note at module top
+
+        if not self.root or not self.root.winfo_exists():
+            return
+
+        try:
+            diameter = self._ripple_max_radius * 2
+            top = tk.Toplevel(self.root)
+            top.overrideredirect(boolean=True)
+            top.attributes("-topmost", True)  # noqa: FBT003
+            # A square centered on the click, sized to the final ring.
+            top.geometry(
+                f"{diameter}x{diameter}"
+                f"+{x - self._ripple_max_radius}+{y - self._ripple_max_radius}"
+            )
+            self._make_ripple_click_through(top)
+            canvas = tk.Canvas(
+                top,
+                width=diameter,
+                height=diameter,
+                highlightthickness=0,
+                bg=str(self.settings.background_color),
+            )
+            canvas.pack()
+            self._animate_ripple(top, canvas, start_time=time.time())
+        except Exception as exc:  # noqa: BLE001 — Tk raises many unrelated types
+            self._error_throttler.log("ripple_render_error", exc)
+
+    def _make_ripple_click_through(self, top: "tk.Toplevel") -> None:
+        """Best-effort: make the ripple window transparent / ignore mouse input.
+
+        True click-through is platform-specific and unreliable from Tk alone, so
+        this degrades silently: on failure the ripple is simply a brief topmost
+        window (see the README note). On Windows the window's background color is
+        keyed out; on macOS the toplevel is made transparent.
+
+        Args:
+            top: The transient ripple toplevel.
+        """
+        import tkinter as tk  # noqa: PLC0415  # lazy: see the import note at module top
+
+        try:
+            if sys.platform == "darwin":
+                top.attributes("-transparent", True)  # noqa: FBT003
+            elif sys.platform.startswith("win"):
+                top.attributes("-transparentcolor", str(self.settings.background_color))
+        except tk.TclError as exc:
+            self.logger.debug("ripple_click_through_unsupported: %s", exc)
+
+    def _animate_ripple(
+        self, top: "tk.Toplevel", canvas: "tk.Canvas", start_time: float
+    ) -> None:
+        """Advance the ripple one frame, rescheduling until it completes.
+
+        Self-rescheduling on the Tk loop (~60 fps) like the fade timer. When
+        :meth:`_ripple_frame` reports the animation is done, the transient window
+        is destroyed. A frame error is throttled and the window torn down so a
+        broken ripple cannot linger or spam the log.
+
+        Args:
+            top: The transient ripple toplevel.
+            canvas: The canvas the ring is drawn on.
+            start_time: ``time.time()`` captured when the ripple began.
+        """
+        if not top.winfo_exists():
+            return
+
+        try:
+            elapsed_ms = (time.time() - start_time) * 1000
+            frame = self._ripple_frame(
+                elapsed_ms, self._ripple_duration_ms, self._ripple_max_radius
+            )
+            if frame is None:
+                top.destroy()
+                return
+            radius, alpha = frame
+            top.attributes("-alpha", alpha)
+            center = self._ripple_max_radius
+            canvas.delete("all")
+            canvas.create_oval(
+                center - radius,
+                center - radius,
+                center + radius,
+                center + radius,
+                outline=self._ripple_color,
+                width=3,
+            )
+        except Exception as exc:  # noqa: BLE001 — Tk raises many unrelated types
+            self._error_throttler.log("ripple_animate_error", exc)
+            self._destroy_ripple(top)
+            return
+
+        top.after(16, lambda: self._animate_ripple(top, canvas, start_time))
+
+    @staticmethod
+    def _destroy_ripple(top: "tk.Toplevel") -> None:
+        """Destroy a ripple window, ignoring an already-torn-down one.
+
+        Args:
+            top: The transient ripple toplevel to tear down.
+        """
+        import tkinter as tk  # noqa: PLC0415  # lazy: see the import note at module top
+
+        try:
+            top.destroy()
+        except tk.TclError:
+            pass
 
     def start(self, *, start_minimized: bool = False) -> None:
         """Start the tkinter main loop.
@@ -470,19 +676,28 @@ class DisplayWindow:
         (possibly signal-interrupted) main loop, where calling ``destroy``
         directly would raise Tcl errors.
 
-        The ``after`` call stays inside the lock for the same reason as
-        :meth:`show_text`: this method is contracted to be callable from any
-        thread, so a non-main-thread caller could otherwise race the main-thread
-        :meth:`stop` and let it null and destroy ``root`` between the check and
-        the enqueue (which would raise TclError). ``after`` only schedules, so
-        holding the lock briefly does not block the main loop. The lock is an
-        ``RLock`` so a signal handler invoking this method while the main thread
-        already holds the lock (mid ``_fade_timer``/``_update_display``) re-enters
-        instead of self-deadlocking — see the lock's definition in ``__init__``.
+        Captures ``root`` under the lock and calls ``after`` *outside* it, for the
+        deadlock reason documented in :meth:`show_text`: this method is contracted
+        to be callable from any thread, and a cross-thread ``after`` blocks on the
+        main loop, which must not happen while holding the lock the main loop's
+        fade/update ticks also take. The captured local keeps the call valid even
+        if :meth:`stop` nulls/destroys ``root`` in between (it then raises and is
+        tolerated). The lock is an ``RLock`` so a signal handler invoking this on
+        the main thread mid ``_fade_timer``/``_update_display`` re-enters instead
+        of self-deadlocking — see the lock's definition in ``__init__``.
         """
+        import tkinter as tk  # noqa: PLC0415  # lazy: see the import note at module top
+
         with self._lock:
-            if self.root:
-                self.root.after(0, self.root.quit)
+            root = self.root
+        if root is None:
+            return
+        try:
+            root.after(0, root.quit)
+        except RuntimeError, tk.TclError:
+            # Loop already gone / root destroyed after we released the lock; the
+            # loop is (or is becoming) stopped anyway, so tolerate it.
+            self.logger.debug("request_stop_loop_gone")
 
     def stop(self) -> None:
         """Destroy the window.

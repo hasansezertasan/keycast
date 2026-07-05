@@ -33,6 +33,26 @@ class TextSink(Protocol):
         ...
 
 
+class ClickSink(Protocol):
+    """A sink that receives the raw ``(x, y)`` position of a mouse click.
+
+    The second, optional listener channel alongside :class:`TextSink`, used to
+    drive the click ripple with coordinates a formatted string cannot carry. The
+    same threading contract applies: it is invoked on a **pynput listener
+    thread**, so a GUI implementation must marshal onto its own UI thread (see
+    :meth:`keycast.display.DisplayWindow.show_click`).
+    """
+
+    def __call__(self, x: int, y: int) -> None:
+        """Handle a click at ``(x, y)``.
+
+        Args:
+            x: The click x-coordinate in screen pixels.
+            y: The click y-coordinate in screen pixels.
+        """
+        ...
+
+
 class KeyListener:
     """Keyboard event listener using pynput."""
 
@@ -54,6 +74,31 @@ class KeyListener:
         """The logger instance."""
         self._error_throttler = _ErrorThrottler(self.logger)
         """Throttles repeated errors from the per-keystroke callback."""
+        # Chord-grouping state (only used when settings.group_chords is set).
+        # Insertion-ordered so a chord lists modifiers in the order pressed.
+        # Mutated only on the single pynput listener thread, so no lock is needed.
+        self._held_modifiers: dict[str, str] = {}
+        """Currently held modifiers: key name -> display label."""
+        self._chord_fired = False
+        """Whether a non-modifier completed a chord during the current hold."""
+
+    @staticmethod
+    def _is_modifier(key_name: str | None) -> bool:
+        """Return whether a pynput key name is a modifier keycast tracks for chords.
+
+        Mirrors the modifier prefixes ``_should_show_key`` keys off; the Super key
+        is reported as "cmd" on every platform (never "win"), so there is no "win"
+        prefix here.
+
+        Args:
+            key_name: The pynput key name, or None for character/unknown keys.
+
+        Returns:
+            True if the name is a ctrl/alt/shift/cmd modifier.
+        """
+        return key_name is not None and key_name.startswith(
+            ("ctrl", "alt", "shift", "cmd")
+        )
 
     def _key_name(self, key: keyboard.Key | keyboard.KeyCode) -> str | None:
         """Return the stable pynput name for a special key, or None for others.
@@ -163,15 +208,73 @@ class KeyListener:
                     format_event("key_event_skipped", reason="key_is_none")
                 )
                 return
+            key_name = self._key_name(key)
+            if (
+                self.settings.group_chords
+                and key_name is not None
+                and self._is_modifier(key_name)
+            ):
+                # Hold the modifier silently; its label is resolved now so a later
+                # chord or a lone-release can reuse it.
+                self._held_modifiers[key_name] = self._format_key(key)
+                return
             if not self._should_show_key(key):
                 return
             formatted_key = self._format_key(key)
+            if self.settings.group_chords and self._held_modifiers:
+                # Non-modifier completing a chord: prefix the held modifiers, in
+                # the order pressed. The chord always carries its modifiers, even
+                # when show_modifier_keys is off (a chord without them is useless).
+                parts = [*self._held_modifiers.values(), formatted_key]
+                formatted_key = self.settings.chord_separator.join(parts)
+                self._chord_fired = True
         except Exception as exc:
             self._error_throttler.log("key_format_error", exc, key=key)
             return
 
         try:
             self.show_text(formatted_key)
+        except Exception as exc:
+            self._error_throttler.log("key_sink_error", exc, key=key)
+
+    def _on_release(self, key: keyboard.Key | keyboard.KeyCode | None) -> None:
+        """Handle key release events, used only for chord grouping.
+
+        Tracks which modifiers are currently held so :meth:`_on_press` can build
+        chords. A modifier released without having completed a chord during its
+        hold is emitted alone here (subject to ``show_modifier_keys``), so a lone
+        modifier tap still shows. A no-op unless ``group_chords`` is set.
+
+        Args:
+            key: The released key (pynput may deliver None).
+        """
+        if not self.settings.group_chords:
+            return
+
+        # Formatting/state and the sink call are separate failure domains, mirrored
+        # from _on_press so a broken sink is not mislabeled as a format error.
+        try:
+            if key is None:
+                return
+            key_name = self._key_name(key)
+            if key_name is None or not self._is_modifier(key_name):
+                return
+            if key_name not in self._held_modifiers:
+                return
+            label = self._held_modifiers.pop(key_name)
+            # Emit a lone modifier only if no chord consumed this hold session.
+            emit_lone = not self._chord_fired and self.settings.show_modifier_keys
+            if not self._held_modifiers:
+                # Hold session ended; reset for the next one.
+                self._chord_fired = False
+            if not emit_lone:
+                return
+        except Exception as exc:
+            self._error_throttler.log("key_format_error", exc, key=key)
+            return
+
+        try:
+            self.show_text(label)
         except Exception as exc:
             self._error_throttler.log("key_sink_error", exc, key=key)
 
@@ -182,7 +285,11 @@ class KeyListener:
             return
 
         try:
-            self.listener = keyboard.Listener(on_press=self._on_press)
+            # on_release is registered unconditionally; it early-returns unless
+            # group_chords is set, so it is inert in the default configuration.
+            self.listener = keyboard.Listener(
+                on_press=self._on_press, on_release=self._on_release
+            )
             self.listener.start()
             self.logger.info("keyboard_listener_started")
         except Exception:
@@ -207,16 +314,29 @@ class KeyListener:
 class MouseListener:
     """Mouse event listener using pynput."""
 
-    def __init__(self, show_text: TextSink, settings: MouseSettings) -> None:
+    def __init__(
+        self,
+        show_text: TextSink,
+        settings: MouseSettings,
+        *,
+        on_click_position: ClickSink | None = None,
+    ) -> None:
         """Initialize the mouse listener.
 
         Args:
             show_text: Sink invoked (on a pynput listener thread) with the
                 formatted label each time the mouse is clicked
             settings: Mouse settings
+            on_click_position: Optional second sink invoked with the raw ``(x, y)``
+                of each click, used to drive the click ripple. Keyword-only so the
+                documented positional signature stays ``(show_text, settings)``.
+                The composition root wires this only when
+                ``settings.show_click_ripple`` is set.
         """
         self.show_text = show_text
         """The callback function called when mouse is clicked."""
+        self.on_click_position = on_click_position
+        """Optional sink for the raw click position (drives the click ripple)."""
         self.settings = settings
         """The mouse settings."""
         self.listener: mouse.Listener | None = None
@@ -263,12 +383,33 @@ class MouseListener:
             pressed: Whether the button was pressed (True) or released (False)
 
         """
-        # Formatting and the sink call are separate failure domains; see the
+        # Only presses are visualized (button-up is not an event keycast shows).
+        if not pressed:
+            return
+
+        # pynput may deliver fractional coordinates on high-DPI displays (Retina);
+        # the type hint says int, but the runtime value can be a float. Round once
+        # here, at the capture boundary, so both channels get clean integers: the
+        # ripple's Tk geometry string rejects non-integers, and the position text
+        # would otherwise render "(210.89453125, 72.4...)".
+        x, y = round(x), round(y)
+
+        # The ripple is an independent channel: it fires on any click when
+        # enabled, regardless of show_mouse_clicks (which gates only the text
+        # label). Its own failure domain so a broken ripple sink is not mislabeled
+        # as a text-sink or format error.
+        if self.settings.show_click_ripple and self.on_click_position is not None:
+            try:
+                self.on_click_position(x, y)
+            except Exception as exc:
+                self._error_throttler.log("mouse_ripple_error", exc, button=button)
+
+        # Formatting and the text-sink call are separate failure domains; see the
         # matching note in ``KeyListener._on_press``. They are caught and
         # reported under different event names so a broken display sink is not
         # mislabeled as a mouse-formatting error.
         try:
-            if not (pressed and self.settings.show_mouse_clicks):
+            if not self.settings.show_mouse_clicks:
                 return
             text = self._format_button(button)
             if self.settings.show_mouse_position:

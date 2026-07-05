@@ -30,15 +30,20 @@ Input events flow through a single text sink:
 
 ```
 KeyListener  ─┐
-              ├─►  show_text(text: str)  ─►  DisplayWindow  (Tk overlay)
-MouseListener ┘        (TextSink)
+              ├─►  show_text(text: str)   ─►  DisplayWindow  (Tk overlay)
+MouseListener ┤        (TextSink)
+              └─►  show_click(x, y)       ─►  DisplayWindow  (click ripple)
+                       (ClickSink, optional)
 ```
 
 Each listener formats an event into a single display string and hands it to a
 `TextSink` callable. `DisplayWindow.show_text` is the production sink; it
 marshals the update onto the Tk main loop because listeners invoke the sink
-from pynput listener threads. The `Keycast` class in `application.py` wires
-these components together and owns the application lifecycle.
+from pynput listener threads. The mouse listener additionally has an optional
+second channel — a `ClickSink` (`DisplayWindow.show_click`) carrying the raw
+`(x, y)` — used only when the click ripple is enabled. The `Keycast` class in
+`application.py` wires these components together and owns the application
+lifecycle.
 
 ## Core Classes
 
@@ -95,11 +100,19 @@ mouse clicks. Implements the `TextSink` protocol via its `show_text` method.
 #### Constructor
 
 ```python
-def __init__(self, settings: DisplaySettings) -> None
+def __init__(
+    self,
+    settings: DisplaySettings,
+    *,
+    ripple_color: Color | str = "yellow",
+    ripple_max_radius: int = 40,
+    ripple_duration_ms: int = 400,
+) -> None
 ```
 
 **Parameters**:
 - `settings` (DisplaySettings): Display configuration settings object
+- `ripple_color` / `ripple_max_radius` / `ripple_duration_ms` (keyword-only): Appearance of the click ripple drawn by `show_click`. The `Keycast` orchestrator sources these from `MouseSettings` (`ripple_color`, `ripple_max_radius`, `ripple_duration_ms`) so the ripple's look is configured in the mouse section. They are ignored unless something calls `show_click`.
 
 **DisplaySettings Properties**:
 - `width` (int): Window width in pixels (default: 400, range: 100-2000)
@@ -138,6 +151,20 @@ window = DisplayWindow(settings)
 window.show_text("A")
 window.show_text("Left Click (100, 200)")
 ```
+
+##### show_click(x: int, y: int) -> None
+
+Paints a short expanding, fading ring centered at screen position `(x, y)` — the
+production `ClickSink`. Like `show_text`, it is **thread-safe**: it may be called
+from a pynput listener thread and marshals the actual rendering onto the Tk main
+loop via `root.after`. The ripple is drawn in its own transient, always-on-top,
+borderless window that tears itself down when the animation completes; its
+transparency and click-through are best-effort per platform (see the README note),
+and any rendering error is logged (throttled) rather than raised.
+
+**Parameters**:
+- `x` (int): Click x-coordinate (screen pixels)
+- `y` (int): Click y-coordinate (screen pixels)
 
 ##### start() -> None
 
@@ -182,6 +209,25 @@ wrapper, a test double, etc.
 > thread**, not the main thread. A sink that touches a GUI toolkit must marshal
 > the work onto its own UI thread (as `DisplayWindow.show_text` does).
 
+### ClickSink
+
+**Location**: `keycast.listeners.ClickSink`
+
+**Purpose**: A `typing.Protocol` describing a callable that receives the raw
+`(x, y)` position of a mouse click. This is the second, optional listener channel
+(alongside `TextSink`), used to drive the click ripple with real coordinates that
+a formatted string can't carry. `DisplayWindow.show_click` is the production
+implementation.
+
+```python
+class ClickSink(Protocol):
+    def __call__(self, x: int, y: int) -> None: ...
+```
+
+Any `Callable[[int, int], None]` satisfies it. The same pynput-thread threading
+contract as `TextSink` applies: a GUI implementation must marshal onto its own UI
+thread (as `DisplayWindow.show_click` does).
+
 ### KeyListener
 
 **Location**: `keycast.listeners.KeyListener`
@@ -204,6 +250,8 @@ def __init__(self, show_text: TextSink, settings: KeyboardSettings) -> None
 - `show_modifier_keys` (bool): Whether to show modifier keys (Ctrl, Alt, etc.) (default: True)
 - `show_function_keys` (bool): Whether to show function keys (F1, F2, etc.) (default: True)
 - `show_special_keys` (bool): Whether to show special keys (Enter, Space, etc.) (default: True)
+- `group_chords` (bool): Whether to combine a key pressed with held modifiers into one chord label, e.g. `"Control Left + S"` (default: False). See Chord Grouping below.
+- `chord_separator` (str): String joining the parts of a grouped chord (default: `" + "`, min length 1).
 - `key_mappings` (dict[str, str]): Custom key name mappings. Keys are pynput key names with the "Key." prefix removed (e.g. "ctrl_l", "space"). Ships cross-platform defaults for the modifier, space and enter keys.
 
 **Example**:
@@ -287,6 +335,28 @@ Keys must be bare pynput key names — lowercase, with no `Key.` prefix (e.g.
 `ctrl_l`, `space`, `f1`). A key that carries the prefix or is capitalized can
 never match and is rejected at config load rather than silently doing nothing.
 
+#### Chord Grouping
+
+When `group_chords` is `true`, `KeyListener` combines a key pressed while one or
+more modifiers are held into a **single** chord label rather than emitting the
+modifier and the key as separate events:
+
+- Modifier presses are **held silently** while `group_chords` is on.
+- Pressing a non-modifier key while modifiers are held emits one label joining the
+  held modifier labels and the key, in press order, using `chord_separator`
+  (default `" + "`) — e.g. `"Control Left + Shift Left + S"`. The chord always
+  includes its modifiers, even if `show_modifier_keys` is `false` (a chord without
+  its modifiers would be meaningless).
+- A modifier **pressed and released on its own** (no other key during the hold) is
+  emitted alone on release, subject to `show_modifier_keys`. When several modifiers
+  are held and released without completing a chord, each is emitted on its own
+  release.
+
+`group_chords` defaults to `false` (each key is emitted as its own event, the
+original behavior). The `presenter` preset enables it. Implementation note: this
+is the one place `KeyListener` registers pynput's `on_release` — it needs release
+events to track which modifiers are currently held.
+
 ### MouseListener
 
 **Location**: `keycast.listeners.MouseListener`
@@ -297,22 +367,34 @@ passes it to a `TextSink`.
 #### Constructor
 
 ```python
-def __init__(self, show_text: TextSink, settings: MouseSettings) -> None
+def __init__(
+    self,
+    show_text: TextSink,
+    settings: MouseSettings,
+    *,
+    on_click_position: ClickSink | None = None,
+) -> None
 ```
 
 **Parameters**:
 - `show_text` (TextSink): Sink invoked with the formatted label each time the mouse is clicked
 - `settings` (MouseSettings): Mouse configuration settings object
+- `on_click_position` (ClickSink | None, keyword-only): Optional second sink invoked with the raw `(x, y)` of each click, used to drive the click ripple. Only wired up when `settings.show_click_ripple` is true. `DisplayWindow.show_click` is the production `ClickSink`.
 
-> Unlike earlier versions, the sink receives a **single string**. When
-> `show_mouse_position` is enabled, the coordinates are formatted directly into
-> that string (e.g. `"Left Click (100, 200)"`) — the sink is not passed
-> separate `x`/`y` arguments.
+> The text sink receives a **single string**. When `show_mouse_position` is
+> enabled, the coordinates are formatted directly into that string (e.g.
+> `"Left Click (100, 200)"`) — the text sink is not passed separate `x`/`y`
+> arguments. The raw coordinates instead flow through the separate, optional
+> `on_click_position` (`ClickSink`) channel.
 
 **MouseSettings Properties**:
 - `enabled` (bool): Whether the mouse listener runs (default: True)
 - `show_mouse_clicks` (bool): Whether to show mouse clicks (default: True)
 - `show_mouse_position` (bool): Whether to append the click position to the label (default: False)
+- `show_click_ripple` (bool): Whether each click paints an expanding, fading ring at the cursor (default: False). Independent of `show_mouse_clicks`.
+- `ripple_color` (Color): Ring color (default: "yellow")
+- `ripple_max_radius` (int): Final ring radius in pixels (default: 40, range: 5-200)
+- `ripple_duration_ms` (int): How long the ring animates in milliseconds (default: 400, range: 100-2000)
 - `button_names` (dict[str, str]): Custom button name mappings (default: {})
 
 > `show_mouse_position` only takes effect alongside `show_mouse_clicks` (the
@@ -402,6 +484,7 @@ def create_settings_file(cls) -> Settings
 - `start_minimized` (bool): Start with the overlay hidden; it appears the first time a key or click is captured (default: `false`). Requires `auto_start` (rejected with it off, since nothing would ever re-show the overlay). If no listener is live at startup (all disabled, or all fail to start), the overlay is kept visible instead of hidden.
 - `auto_start` (bool): Start the input listeners on launch (default: `true`). When `false`, no listeners start regardless of `keyboard.enabled` / `mouse.enabled` — an app-level master switch.
 - `check_for_updates` (bool): Gate the automatic update check (default: `true`). When `true`, keycast queries the GitHub Releases API at most once per day and shows a non-blocking notice if a newer version exists; `false` disables all automatic checks. Throttle state lives in `~/.keycast/update-check.json`, not on `Settings`. See `keycast.updates` and [ADR-002](adr/002-update-check.md).
+- `preset` (Literal["custom", "presenter", "minimal", "debug"]): Named settings bundle layered over the config on load (default: `"custom"`). `"custom"` uses the file verbatim; the other presets override a handful of fields for common scenarios (see `resolve_preset` and the table below). A preset wins over the file **only for the fields it names**; everything else keeps its configured value.
 
 > The application version is exposed as `keycast.__version__`, generated at
 > build time from the git tag by hatch-vcs (into `src/keycast/_version.py`),
@@ -428,6 +511,33 @@ settings = Settings.create_settings_file()  # Creates ~/.keycast/config.json on 
 Returns the `LoggingSettings` actually applied at startup, resolving the `debug`
 flag against `logging.level`. `Keycast.__init__` passes the result to
 `setup_logging`. When `debug` is off, the configured `logging` is used unchanged.
+
+##### resolve_preset() -> Settings
+
+Returns the `Settings` to actually apply, with the selected `preset`'s overrides
+layered on top of the loaded config. `Keycast.__init__` calls this right after
+`create_settings_file()`, so every component sees the resolved settings; the
+on-disk config file is unaffected (it keeps the raw values plus the `preset`
+name). When `preset` is `"custom"` the settings are returned unchanged.
+
+Each overridden section is rebuilt through its own `model_validate` (with the
+preset's fields merged over the current values) and the results are assembled with
+`model_copy`, so the merged sections are re-validated against every field bound and
+cross-field validator — a preset can never yield invalid settings. The built-in
+presets:
+
+| Preset | Overrides |
+| --- | --- |
+| `custom` | none — the config file is used verbatim (default) |
+| `presenter` | `display.font_size=28`, `display.fade_duration_ms=3000`, `display.max_events=3`, `display.alpha=0.9`, `mouse.show_mouse_clicks=true` |
+| `minimal` | `display.font_size=12`, `display.fade_duration_ms=1000`, `display.max_events=1`, `display.alpha=0.6` |
+| `debug` | `debug=true`, `display.max_events=10`, `display.fade_duration_ms=5000`, `mouse.show_mouse_clicks=true`, `mouse.show_mouse_position=true` |
+
+```python
+from keycast.settings import Settings
+
+settings = Settings.create_settings_file().resolve_preset()
+```
 
 ### DisplaySettings
 
@@ -462,6 +572,8 @@ flag against `logging.level`. `Keycast.__init__` passes the result to
 - `show_modifier_keys` (bool): Whether to show modifier keys (Ctrl, Alt, etc.) (default: True)
 - `show_function_keys` (bool): Whether to show function keys (F1, F2, etc.) (default: True)
 - `show_special_keys` (bool): Whether to show special keys (Enter, Space, etc.) (default: True)
+- `group_chords` (bool): Combine a key pressed with held modifiers into one chord label (default: False). See Chord Grouping under `KeyListener`.
+- `chord_separator` (str): String joining the parts of a grouped chord (default: `" + "`, min length 1).
 - `key_mappings` (dict[str, str]): Custom key name mappings. Keys are pynput key names with the "Key." prefix removed (e.g. "ctrl_l", "space"). Ships cross-platform defaults for the modifier, space and enter keys.
 
 ### MouseSettings
@@ -474,6 +586,10 @@ flag against `logging.level`. `Keycast.__init__` passes the result to
 - `enabled` (bool): Whether the mouse listener runs (default: True)
 - `show_mouse_clicks` (bool): Whether to show mouse clicks (default: True)
 - `show_mouse_position` (bool): Whether to append the click position coordinates to the label (default: False). Requires `show_mouse_clicks`; the combination `show_mouse_position=True, show_mouse_clicks=False` is rejected at load time (it would otherwise render nothing).
+- `show_click_ripple` (bool): Whether each click paints an expanding, fading ring at the cursor (default: False). Independent of `show_mouse_clicks` — the ripple is a separate visual channel via `on_click_position`.
+- `ripple_color` (Color): Ring color (default: "yellow")
+- `ripple_max_radius` (int): Final ring radius in pixels (default: 40, range: 5-200)
+- `ripple_duration_ms` (int): How long the ring animates in milliseconds (default: 400, range: 100-2000)
 - `button_names` (dict[str, str]): Custom button name mappings (default: {})
 
 ### LoggingSettings
@@ -547,7 +663,9 @@ from keycast.display import DisplayWindow
 from keycast.listeners import KeyListener, MouseListener
 from keycast.settings import Settings
 
-settings = Settings.create_settings_file()
+# resolve_preset() applies the selected preset ("modes"); it is a no-op for the
+# default "custom" preset. The Keycast orchestrator does this for you.
+settings = Settings.create_settings_file().resolve_preset()
 
 window = DisplayWindow(settings.display)
 key_listener = KeyListener(show_text=window.show_text, settings=settings.keyboard)

@@ -29,7 +29,11 @@ def keycast() -> Iterator[Keycast]:
         # the wiring is asserted explicitly in TestUpdateCheck.
         patch("keycast.application.notify_pending_update"),
     ):
-        settings_cls.create_settings_file.return_value = Mock()
+        settings = Mock()
+        # __init__ chains create_settings_file().resolve_preset(); return the same
+        # mock so keycast.settings is one coherent object the tests can configure.
+        settings.resolve_preset.return_value = settings
+        settings_cls.create_settings_file.return_value = settings
         window_cls.return_value = Mock()
         mouse_cls.return_value = Mock()
         key_cls.return_value = Mock()
@@ -110,10 +114,35 @@ class TestInit:
         ):
             settings = Mock()
             settings_cls.create_settings_file.return_value = settings
+            # __init__ applies the preset via create_settings_file().resolve_preset();
+            # return the same mock so the resolved settings are this object.
+            settings.resolve_preset.return_value = settings
             Keycast()
 
         settings.effective_logging.assert_called_once_with()
         setup_logging.assert_called_once_with(settings.effective_logging.return_value)
+
+    def test_preset_is_resolved_on_init(self) -> None:
+        """__init__ applies the selected preset via Settings.resolve_preset().
+
+        The preset overlay only takes effect if resolution runs at startup; a
+        regression that used the raw create_settings_file() result would silently
+        ignore any non-"custom" preset while leaving the rest of the suite green.
+        """
+        with (
+            patch("keycast.application.Settings") as settings_cls,
+            patch("keycast.application.setup_logging"),
+            patch("keycast.application.DisplayWindow"),
+            patch("keycast.application.MouseListener"),
+            patch("keycast.application.KeyListener"),
+        ):
+            loaded = Mock()
+            settings_cls.create_settings_file.return_value = loaded
+            app = Keycast()
+
+        loaded.resolve_preset.assert_called_once_with()
+        # The resolved settings (not the raw loaded ones) are what the app keeps.
+        assert app.settings is loaded.resolve_preset.return_value
 
 
 class TestStart:
@@ -406,3 +435,45 @@ class TestRun:
             keycast.run()  # must not raise
 
         keycast.display_window.stop.assert_called_once()
+
+
+class TestClickRippleWiring:
+    """__init__ wires the click ripple channel only when it is enabled."""
+
+    def _build(self, *, ripple_enabled: bool) -> tuple[Mock, Mock, Mock]:
+        """Construct Keycast with mocked collaborators; return (window_cls, mouse_cls, app)."""
+        with (
+            patch("keycast.application.Settings") as settings_cls,
+            patch("keycast.application.setup_logging"),
+            patch("keycast.application.DisplayWindow") as window_cls,
+            patch("keycast.application.MouseListener") as mouse_cls,
+            patch("keycast.application.KeyListener"),
+        ):
+            settings = Mock()
+            settings.resolve_preset.return_value = settings
+            settings.mouse.show_click_ripple = ripple_enabled
+            settings_cls.create_settings_file.return_value = settings
+            window_cls.return_value = Mock()
+            app = Keycast()
+        return window_cls, mouse_cls, app
+
+    def test_ripple_sink_wired_when_enabled(self) -> None:
+        window_cls, mouse_cls, _ = self._build(ripple_enabled=True)
+
+        on_click = mouse_cls.call_args.kwargs["on_click_position"]
+        # The ripple sink is the window's show_click.
+        assert on_click is window_cls.return_value.show_click
+
+    def test_ripple_sink_omitted_when_disabled(self) -> None:
+        _, mouse_cls, _ = self._build(ripple_enabled=False)
+
+        assert mouse_cls.call_args.kwargs["on_click_position"] is None
+
+    def test_ripple_appearance_passed_to_window(self) -> None:
+        window_cls, _, _ = self._build(ripple_enabled=True)
+
+        # The mouse-section ripple appearance flows into DisplayWindow.
+        kwargs = window_cls.call_args.kwargs
+        assert "ripple_color" in kwargs
+        assert "ripple_max_radius" in kwargs
+        assert "ripple_duration_ms" in kwargs

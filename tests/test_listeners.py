@@ -334,7 +334,11 @@ class TestKeyListener:
             mock_listener_class.return_value = mock_listener
 
             listener.start()
-            mock_listener_class.assert_called_once_with(on_press=listener._on_press)
+            # on_release is registered too (inert unless group_chords is set), so
+            # the listener can track held modifiers for chord grouping.
+            mock_listener_class.assert_called_once_with(
+                on_press=listener._on_press, on_release=listener._on_release
+            )
             mock_listener.start.assert_called_once()
 
             listener.stop()
@@ -775,3 +779,239 @@ class TestErrorThrottler:
         except RuntimeError as exc:
             throttler.log("context", exc)
         assert "repeated=5" in logger.warning.call_args[0][0]
+
+
+class TestChordGrouping:
+    """KeyListener.group_chords: combining held modifiers with a key.
+
+    Uses real pynput ``Key``/``KeyCode`` objects (they resolve headless) and a
+    list sink. ``Key.ctrl_l``/``shift_l`` map to the platform-stable labels
+    ``"Control Left"``/``"Shift Left"`` via ``_default_key_mappings``.
+    """
+
+    def _listener(self, captured: list[str], **overrides: object) -> KeyListener:
+        settings = KeyboardSettings(group_chords=True, **overrides)  # type: ignore[arg-type]
+        return KeyListener(captured.append, settings)
+
+    def test_modifier_press_is_held_silently(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+
+        # Held, not emitted, until a key completes the chord or it is released.
+        assert captured == []
+
+    def test_chord_combines_modifier_and_key(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.KeyCode.from_char("s"))
+
+        assert captured == ["Control Left + s"]
+
+    def test_chord_lists_modifiers_in_press_order(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.Key.shift_l)
+        listener._on_press(keyboard.KeyCode.from_char("a"))
+
+        assert captured == ["Control Left + Shift Left + a"]
+
+    def test_custom_chord_separator(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured, chord_separator="+")
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.KeyCode.from_char("s"))
+
+        assert captured == ["Control Left+s"]
+
+    def test_lone_modifier_is_emitted_on_release(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_release(keyboard.Key.ctrl_l)
+
+        assert captured == ["Control Left"]
+
+    def test_modifier_used_in_chord_is_not_re_emitted_on_release(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.KeyCode.from_char("s"))
+        listener._on_release(keyboard.KeyCode.from_char("s"))
+        listener._on_release(keyboard.Key.ctrl_l)
+
+        # Only the chord shows; the modifier is not repeated on release.
+        assert captured == ["Control Left + s"]
+
+    def test_next_hold_after_chord_can_emit_lone_modifier(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        # First hold completes a chord...
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.KeyCode.from_char("s"))
+        listener._on_release(keyboard.Key.ctrl_l)
+        # ...and the "fired" state resets, so a later lone tap still shows.
+        listener._on_press(keyboard.Key.shift_l)
+        listener._on_release(keyboard.Key.shift_l)
+
+        assert captured == ["Control Left + s", "Shift Left"]
+
+    def test_lone_modifier_respects_show_modifier_keys(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured, show_modifier_keys=False)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_release(keyboard.Key.ctrl_l)
+
+        assert captured == []
+
+    def test_chord_shows_modifiers_even_when_lone_modifiers_hidden(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured, show_modifier_keys=False)
+
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_press(keyboard.KeyCode.from_char("s"))
+
+        # A chord always carries its modifiers; show_modifier_keys only gates
+        # lone modifier taps.
+        assert captured == ["Control Left + s"]
+
+    def test_character_without_modifiers_is_emitted_normally(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_press(keyboard.KeyCode.from_char("a"))
+
+        assert captured == ["a"]
+
+    def test_on_release_is_noop_when_grouping_disabled(self) -> None:
+        captured: list[str] = []
+        listener = KeyListener(captured.append, KeyboardSettings())  # group off
+
+        # Default behavior: press emits immediately, release does nothing.
+        listener._on_press(keyboard.Key.ctrl_l)
+        listener._on_release(keyboard.Key.ctrl_l)
+
+        assert captured == ["Control Left"]
+
+    def test_on_release_none_is_safe(self) -> None:
+        captured: list[str] = []
+        listener = self._listener(captured)
+
+        listener._on_release(None)  # must not raise
+
+        assert captured == []
+
+
+class TestMouseClickRipple:
+    """MouseListener's second channel: on_click_position (drives the ripple)."""
+
+    def test_ripple_sink_called_with_coordinates_on_press(self) -> None:
+        clicks: list[tuple[int, int]] = []
+        settings = MouseSettings(show_click_ripple=True)
+        listener = MouseListener(
+            Mock(), settings, on_click_position=lambda x, y: clicks.append((x, y))
+        )
+
+        listener._on_click(100, 200, mouse.Button.left, pressed=True)
+
+        assert clicks == [(100, 200)]
+
+    def test_ripple_sink_not_called_on_release(self) -> None:
+        clicks: list[tuple[int, int]] = []
+        settings = MouseSettings(show_click_ripple=True)
+        listener = MouseListener(
+            Mock(), settings, on_click_position=lambda x, y: clicks.append((x, y))
+        )
+
+        listener._on_click(100, 200, mouse.Button.left, pressed=False)
+
+        assert clicks == []
+
+    def test_ripple_sink_not_called_when_disabled(self) -> None:
+        clicks: list[tuple[int, int]] = []
+        # Sink provided, but the feature is off: it must not fire.
+        settings = MouseSettings(show_click_ripple=False)
+        listener = MouseListener(
+            Mock(), settings, on_click_position=lambda x, y: clicks.append((x, y))
+        )
+
+        listener._on_click(100, 200, mouse.Button.left, pressed=True)
+
+        assert clicks == []
+
+    def test_ripple_independent_of_show_mouse_clicks(self) -> None:
+        text = Mock()
+        clicks: list[tuple[int, int]] = []
+        # Text label off, ripple on: the ripple fires, the text sink does not.
+        settings = MouseSettings(show_mouse_clicks=False, show_click_ripple=True)
+        listener = MouseListener(
+            text, settings, on_click_position=lambda x, y: clicks.append((x, y))
+        )
+
+        listener._on_click(5, 6, mouse.Button.left, pressed=True)
+
+        assert clicks == [(5, 6)]
+        text.assert_not_called()
+
+    def test_ripple_error_is_isolated_from_text_sink(self) -> None:
+        text = Mock()
+        settings = MouseSettings(show_mouse_clicks=True, show_click_ripple=True)
+        listener = MouseListener(
+            text, settings, on_click_position=Mock(side_effect=RuntimeError("boom"))
+        )
+        listener._error_throttler = Mock()
+
+        listener._on_click(1, 2, mouse.Button.left, pressed=True)  # must not raise
+
+        # The ripple failure is reported under its own event name...
+        assert listener._error_throttler.log.call_args[0][0] == "mouse_ripple_error"
+        # ...and the text channel still ran.
+        text.assert_called_once()
+
+    def test_no_ripple_sink_is_safe(self) -> None:
+        # Default: on_click_position is None; a click with ripple "on" is a no-op
+        # for the ripple channel and must not raise.
+        settings = MouseSettings(show_click_ripple=True)
+        listener = MouseListener(Mock(), settings)
+
+        listener._on_click(1, 2, mouse.Button.left, pressed=True)  # must not raise
+
+
+class TestMouseFractionalCoordinates:
+    """pynput can deliver float coordinates on high-DPI (Retina) displays.
+
+    The type hint says int, but the runtime value is a float; both the ripple
+    (Tk geometry rejects non-integers) and the position text must get clean ints.
+    Regression for a TclError: bad geometry specifier "80x80+210.89..+72.42..".
+    """
+
+    def test_fractional_coordinates_rounded_for_ripple(self) -> None:
+        clicks: list[tuple[int, int]] = []
+        settings = MouseSettings(show_click_ripple=True)
+        listener = MouseListener(
+            Mock(), settings, on_click_position=lambda x, y: clicks.append((x, y))
+        )
+
+        listener._on_click(210.89453125, 72.421875, mouse.Button.left, pressed=True)  # type: ignore[arg-type]
+
+        assert clicks == [(211, 72)]
+        assert all(isinstance(v, int) for xy in clicks for v in xy)
+
+    def test_fractional_coordinates_rounded_in_position_text(self) -> None:
+        captured: list[str] = []
+        settings = MouseSettings(show_mouse_clicks=True, show_mouse_position=True)
+        listener = MouseListener(captured.append, settings)
+
+        listener._on_click(210.89453125, 72.421875, mouse.Button.left, pressed=True)  # type: ignore[arg-type]
+
+        assert captured == ["Left Click (211, 72)"]

@@ -28,7 +28,11 @@ class Keycast:
         # unvalidated model_construct (see Settings._safe_defaults), so the rest
         # of this class must not assume field invariants beyond what defaults
         # provide. That fallback is near-impossible to reach in practice.
-        self.settings = Settings.create_settings_file()
+        # resolve_preset layers the selected preset ("modes") over the loaded
+        # config; "custom" (the default) is a no-op. Applied here so every
+        # component below sees the resolved settings, while the on-disk config
+        # keeps the user's raw values (see Settings.resolve_preset).
+        self.settings = Settings.create_settings_file().resolve_preset()
         # debug mode can widen logging beyond the configured level; resolve the
         # effective logging settings in one place (Settings.effective_logging)
         # rather than branching on settings.debug here.
@@ -48,10 +52,25 @@ class Keycast:
             )
         )
         self._stopped = False
-        self.display_window = DisplayWindow(self.settings.display)
+        # The ripple's appearance lives in the mouse settings (it visualizes
+        # clicks) but is drawn by the window (which owns the Tk loop); pass the
+        # three appearance values through so DisplayWindow stays self-contained.
+        self.display_window = DisplayWindow(
+            self.settings.display,
+            ripple_color=self.settings.mouse.ripple_color,
+            ripple_max_radius=self.settings.mouse.ripple_max_radius,
+            ripple_duration_ms=self.settings.mouse.ripple_duration_ms,
+        )
         self.mouse_listener = MouseListener(
             show_text=self.display_window.show_text,
             settings=self.settings.mouse,
+            # Only wire the ripple channel when enabled, so a disabled ripple costs
+            # nothing per click (MouseListener also guards on show_click_ripple).
+            on_click_position=(
+                self.display_window.show_click
+                if self.settings.mouse.show_click_ripple
+                else None
+            ),
         )
         self.key_listener = KeyListener(
             show_text=self.display_window.show_text,

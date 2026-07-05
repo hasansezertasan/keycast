@@ -626,3 +626,154 @@ class TestEffectiveLogging:
         assert effective.level == "DEBUG"
         assert effective.backup_count == 7
         assert effective.format == logging_settings.format
+
+
+class TestResolvePreset:
+    """The named presets ("modes") layered over the loaded config.
+
+    Settings are built with ``model_construct`` (matching the ``effective_logging``
+    tests above) so a chosen ``preset`` can be exercised without touching disk.
+    ``Settings`` is a ``BaseSettings`` whose ``model_validate`` re-runs the JSON
+    source rather than honouring passed fields, so it cannot be used to inject a
+    preset here — the Literal's enforcement is covered separately through the real
+    load path in :class:`TestPresetLoading`.
+    """
+
+    def test_default_preset_is_custom(self) -> None:
+        assert Settings.model_construct().preset == "custom"
+
+    def test_custom_preset_returns_self_unchanged(self) -> None:
+        settings = Settings.model_construct(preset="custom")
+        # "custom" applies no overrides, so resolution is identity.
+        assert settings.resolve_preset() is settings
+
+    def test_presenter_overrides_display_and_mouse(self) -> None:
+        resolved = Settings.model_construct(preset="presenter").resolve_preset()
+        assert resolved.display.font_size == 28
+        assert resolved.display.fade_duration_ms == 3000
+        assert resolved.display.max_events == 3
+        assert resolved.display.alpha == 0.9
+        assert resolved.mouse.show_mouse_clicks is True
+
+    def test_minimal_overrides_display(self) -> None:
+        resolved = Settings.model_construct(preset="minimal").resolve_preset()
+        assert resolved.display.font_size == 12
+        assert resolved.display.fade_duration_ms == 1000
+        assert resolved.display.max_events == 1
+        assert resolved.display.alpha == 0.6
+
+    def test_debug_preset_sets_flag_and_mouse_position(self) -> None:
+        resolved = Settings.model_construct(preset="debug").resolve_preset()
+        assert resolved.debug is True
+        assert resolved.display.max_events == 10
+        assert resolved.display.fade_duration_ms == 5000
+        assert resolved.mouse.show_mouse_clicks is True
+        assert resolved.mouse.show_mouse_position is True
+
+    def test_debug_preset_widens_effective_logging(self) -> None:
+        # The debug preset sets debug=True, which effective_logging turns into
+        # DEBUG-level logging -- the two features compose.
+        resolved = Settings.model_construct(preset="debug").resolve_preset()
+        assert resolved.effective_logging().level == "DEBUG"
+
+    def test_preset_only_touches_named_fields(self) -> None:
+        # A field the preset does not name keeps its default; presenter never
+        # mentions display.width or font_family.
+        resolved = Settings.model_construct(preset="presenter").resolve_preset()
+        assert resolved.display.width == DisplaySettings().width
+        assert resolved.display.font_family == DisplaySettings().font_family
+        assert resolved.keyboard.show_modifier_keys is True
+
+    def test_preset_wins_over_configured_field_it_names(self) -> None:
+        # font_size is named by presenter, so the preset overrides the file value;
+        # width is not named, so the file value is preserved.
+        settings = Settings.model_construct(
+            preset="presenter",
+            display=DisplaySettings(font_size=10, width=800),
+        )
+        resolved = settings.resolve_preset()
+        assert resolved.display.font_size == 28
+        assert resolved.display.width == 800
+
+    def test_debug_preset_re_validates_mouse_section(self) -> None:
+        # The debug preset enables show_mouse_position, which MouseSettings'
+        # cross-field validator only allows alongside show_mouse_clicks. That the
+        # resolved mouse section constructs at all proves the section was rebuilt
+        # through validation (model_copy alone would skip it).
+        resolved = Settings.model_construct(preset="debug").resolve_preset()
+        assert isinstance(resolved.mouse, MouseSettings)
+        assert resolved.mouse.show_mouse_position is True
+
+    def test_resolve_does_not_mutate_the_original(self) -> None:
+        settings = Settings.model_construct(preset="presenter")
+        settings.resolve_preset()
+        # The source object is unchanged; resolution returns a new instance.
+        assert settings.display.font_size == DisplaySettings().font_size
+
+    def test_resolved_settings_are_frozen(self) -> None:
+        resolved = Settings.model_construct(preset="presenter").resolve_preset()
+        with pytest.raises(ValidationError):
+            resolved.display.font_size = 40  # type: ignore[misc]
+
+
+class TestPresetLoading:
+    """The ``preset`` field as it is actually loaded from the JSON config file.
+
+    ``Settings`` is a ``BaseSettings``, so the Literal is only enforced through
+    the configured JSON source (not ``model_validate``); these drive that path.
+    """
+
+    def test_valid_preset_loads_from_config(self, config_path: Path) -> None:
+        config_path.write_text(json.dumps({"preset": "presenter"}), encoding="utf-8")
+        assert Settings().preset == "presenter"
+
+    def test_unknown_preset_in_config_is_rejected(self, config_path: Path) -> None:
+        config_path.write_text(json.dumps({"preset": "bogus"}), encoding="utf-8")
+        with pytest.raises(ValidationError):
+            Settings()
+
+    def test_corrupt_preset_recovers_to_custom_default(self, config_path: Path) -> None:
+        # create_settings_file backs up an invalid config and falls back to
+        # defaults, so a bad preset degrades to "custom" rather than crashing.
+        config_path.write_text(json.dumps({"preset": "bogus"}), encoding="utf-8")
+        settings = Settings.create_settings_file()
+        assert settings.preset == "custom"
+
+
+class TestClickRippleSettings:
+    """MouseSettings fields for the click ripple, and preset enablement."""
+
+    def test_ripple_defaults(self) -> None:
+        mouse = MouseSettings()
+        assert mouse.show_click_ripple is False
+        assert mouse.ripple_max_radius == 40
+        assert mouse.ripple_duration_ms == 400
+        # Color normalizes; "yellow" is the shipped default.
+        assert mouse.ripple_color.as_hex() == "#ff0"
+
+    def test_ripple_is_independent_of_show_mouse_clicks(self) -> None:
+        # Unlike show_mouse_position, the ripple has no cross-field requirement;
+        # it may be enabled with clicks-text off.
+        mouse = MouseSettings(show_mouse_clicks=False, show_click_ripple=True)
+        assert mouse.show_click_ripple is True
+
+    def test_ripple_radius_out_of_range_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            MouseSettings(ripple_max_radius=1)
+        with pytest.raises(ValidationError):
+            MouseSettings(ripple_max_radius=500)
+
+    def test_ripple_duration_out_of_range_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            MouseSettings(ripple_duration_ms=10)
+        with pytest.raises(ValidationError):
+            MouseSettings(ripple_duration_ms=5000)
+
+    def test_presenter_preset_enables_ripple_and_chords(self) -> None:
+        resolved = Settings.model_construct(preset="presenter").resolve_preset()
+        assert resolved.mouse.show_click_ripple is True
+        assert resolved.keyboard.group_chords is True
+
+    def test_debug_preset_enables_ripple(self) -> None:
+        resolved = Settings.model_construct(preset="debug").resolve_preset()
+        assert resolved.mouse.show_click_ripple is True

@@ -293,6 +293,18 @@ class KeyboardSettings(BaseModel):
         default=True,
         description="Whether to show special keys (Enter, Space, etc.)",
     )
+    group_chords: bool = Field(
+        default=False,
+        description="Combine a key pressed while modifiers are held into a single "
+        'chord label (e.g. "Control Left + S") instead of separate events. A held '
+        "modifier released on its own is still shown alone (subject to "
+        "show_modifier_keys). Off by default; the presenter preset enables it.",
+    )
+    chord_separator: str = Field(
+        default=" + ",
+        min_length=1,
+        description="String joining the parts of a grouped chord (see group_chords).",
+    )
     # ``ReadOnlyStrMap`` validates the dict, freezes it in a read-only
     # ``MappingProxyType`` (``frozen=True`` only blocks rebinding the field, not
     # mutation of the dict it points at), and serializes it back to a plain dict.
@@ -356,6 +368,29 @@ class MouseSettings(BaseModel):
     show_mouse_position: bool = Field(
         default=False,
         description="Whether to show mouse position coordinates",
+    )
+    show_click_ripple: bool = Field(
+        default=False,
+        description="Paint an expanding, fading ring at the cursor on each click "
+        "(like a screencast tool's click highlight). Independent of "
+        "show_mouse_clicks. Off by default; the presenter and debug presets enable "
+        "it. Ripple transparency/click-through is best-effort per platform.",
+    )
+    ripple_color: Color = Field(
+        default=Color("yellow"),
+        description="Click-ripple ring color (see show_click_ripple)",
+    )
+    ripple_max_radius: int = Field(
+        default=40,
+        ge=5,
+        le=200,
+        description="Final radius of the click-ripple ring in pixels",
+    )
+    ripple_duration_ms: int = Field(
+        default=400,
+        ge=100,
+        le=2000,
+        description="How long the click ripple animates in milliseconds",
     )
     # See ``KeyboardSettings.key_mappings``: ``ReadOnlyStrMap`` validates,
     # freezes, and serializes the mapping; ``validate_default`` freezes the
@@ -482,6 +517,50 @@ class LoggingSettings(BaseModel):
         return value
 
 
+_PRESET_OVERRIDES: dict[str, dict[str, object]] = {
+    # Screencast / demo: large, legible, lingers a little longer, clicks shown.
+    "presenter": {
+        "display": {
+            "font_size": 28,
+            "fade_duration_ms": 3000,
+            "max_events": 3,
+            "alpha": 0.9,
+        },
+        "mouse": {"show_mouse_clicks": True, "show_click_ripple": True},
+        "keyboard": {"group_chords": True},
+    },
+    # Unobtrusive corner overlay: small, faint, one event, gone quickly.
+    "minimal": {
+        "display": {
+            "font_size": 12,
+            "fade_duration_ms": 1000,
+            "max_events": 1,
+            "alpha": 0.6,
+        },
+    },
+    # Troubleshooting: verbose logging plus everything visible, kept on screen.
+    "debug": {
+        "debug": True,
+        "display": {"max_events": 10, "fade_duration_ms": 5000},
+        "mouse": {
+            "show_mouse_clicks": True,
+            "show_mouse_position": True,
+            "show_click_ripple": True,
+        },
+    },
+}
+"""Built-in preset name -> override bundle, layered over the loaded config.
+
+Each override is a partial settings tree: a top-level scalar flag (e.g. ``debug``)
+or a section name (``display`` / ``mouse`` / ``keyboard``) mapped to the fields it
+replaces. :meth:`Settings.resolve_preset` applies these on top of the file /
+defaults, so a preset only touches the fields it names; everything else keeps its
+configured value. Every value must stay within its field's declared bounds:
+``resolve_preset`` re-validates the merged result, so an out-of-range preset would
+raise at load. ``"custom"`` is intentionally absent — it means "no overrides".
+"""
+
+
 class Settings(BaseSettings):
     """Main settings class for the keycast application."""
 
@@ -536,6 +615,15 @@ class Settings(BaseSettings):
         "automatic update checks (offline / privacy). Throttle state is kept in "
         "~/.keycast/update-check.json, not in this config. See keycast.updates.",
     )
+    # pyrefly: ignore[bad-assignment]  # Field(default=...) can't be narrowed to the Literal; mypy/pyright/ty accept it.
+    preset: Literal["custom", "presenter", "minimal", "debug"] = Field(
+        default="custom",
+        description="Named settings bundle layered over the config on load. "
+        '"custom" (default) uses the file verbatim; "presenter", "minimal" and '
+        '"debug" override a handful of display/mouse fields (and, for "debug", '
+        "verbose logging) for common scenarios. A preset wins over the file only "
+        "for the fields it names; see resolve_preset and _PRESET_OVERRIDES.",
+    )
 
     # Note: per-listener enable flags live on `keyboard.enabled` / `mouse.enabled`;
     # auto_start is the app-level master switch layered above them.
@@ -589,6 +677,54 @@ class Settings(BaseSettings):
         if not self.debug:
             return self.logging
         return self.logging.model_copy(update={"level": "DEBUG"})
+
+    def resolve_preset(self) -> "Settings":
+        """Return the settings to apply, with the selected ``preset`` layered on.
+
+        ``preset`` names a built-in override bundle (see :data:`_PRESET_OVERRIDES`)
+        that is merged on top of the loaded config. ``"custom"`` (the default)
+        applies nothing, so the settings are returned unchanged. Called by
+        ``Keycast.__init__`` right after :meth:`create_settings_file`, so every
+        component sees the resolved settings while the on-disk config keeps the
+        user's raw values plus the ``preset`` name.
+
+        Each overridden **section** is re-validated the same way loading the
+        config does: its current values are dumped with ``model_dump(mode="json")``,
+        the preset's fields are merged on top, and the section model's
+        ``model_validate`` rebuilds it — re-running that section's field bounds and
+        cross-field validators (e.g. ``MouseSettings``' position-requires-clicks
+        rule), so a preset can never produce invalid section settings.
+        ``model_copy`` then swaps the rebuilt sections (and any top-level scalar
+        flags) into a new ``Settings``. Note the sub-models are plain
+        ``BaseModel``, where ``model_validate`` honours the passed data; the
+        top-level ``Settings`` is a ``BaseSettings`` whose ``model_validate``
+        re-runs the configured sources instead, so it deliberately is *not* used
+        to re-assemble here.
+
+        A preset wins over the file for the fields it names, and only those; every
+        other field keeps its configured value.
+
+        Returns:
+            A new ``Settings`` with the preset applied, or ``self`` when the
+            preset is ``"custom"`` (or otherwise names no overrides).
+        """
+        overrides = _PRESET_OVERRIDES.get(self.preset)
+        if not overrides:
+            return self
+
+        updates: dict[str, object] = {}
+        for key, value in overrides.items():
+            current = getattr(self, key, None)
+            if isinstance(value, dict) and isinstance(current, BaseModel):
+                # Re-validate the section with the preset's fields merged over its
+                # current values. mode="json" yields JSON-safe primitives (Color
+                # -> str, read-only mappings -> dict) that model_validate accepts.
+                merged = {**current.model_dump(mode="json"), **value}
+                updates[key] = type(current).model_validate(merged)
+            else:
+                # A top-level scalar flag (e.g. debug=True).
+                updates[key] = value
+        return self.model_copy(update=updates)
 
     @classmethod
     def settings_customise_sources(
