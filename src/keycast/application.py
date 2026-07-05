@@ -121,7 +121,9 @@ class Keycast:
         if not start_minimized:
             self.display_window.show_text(f"keycast {__version__}")
             if self.settings.show_startup_status:
-                self.display_window.show_text(self._format_startup_status_line(statuses))
+                self.display_window.show_text(
+                    self._format_startup_status_line(statuses)
+                )
             # Surface a cached "update available" notice through the same sink, so
             # it shares the fade timer and needs no special rendering path. The
             # network refresh runs on a background daemon thread; any notice it
