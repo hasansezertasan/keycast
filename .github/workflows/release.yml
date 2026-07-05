@@ -200,25 +200,13 @@ jobs:
         # *workflow artifact* for Partner Center — deliberately NOT a release
         # asset: an unsigned MSIX cannot be installed, so attaching it would
         # publish a file users can't use (publish-release only collects dist-*
-        # artifacts for the same reason). makeappx.exe ships in the Windows SDK
-        # on the runner image but is not on PATH, so resolve it under Windows
-        # Kits. The manifest's Identity Version is rewritten from the release
-        # tag: vX.Y.Z -> X.Y.Z.0 (the tag exists at build time thanks to
-        # release-please's force-tag-creation, same guarantee hatch-vcs relies
-        # on).
-        run: |
-          $makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.*\x64\makeappx.exe" |
-            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-          if (-not $makeappx) { Write-Host "::error::makeappx.exe not found in the Windows SDK"; exit 1 }
-          New-Item -ItemType Directory msix-layout | Out-Null
-          Copy-Item -Recurse dist/keycast msix-layout/keycast
-          Copy-Item -Recurse packaging/msix/Assets msix-layout/Assets
-          (Get-Content packaging/msix/AppxManifest.xml) -replace 'Version="0\.0\.0\.0"', 'Version="${{ needs.release-please.outputs.version }}.0"' |
-            Set-Content msix-layout/AppxManifest.xml
-          & $makeappx pack /d msix-layout /p keycast.msix /o
-          if (-not (Test-Path keycast.msix)) {
-            Write-Host "::error::keycast.msix missing after makeappx"; exit 1
-          }
+        # artifacts for the same reason). Shared with ci.yml via pack.ps1
+        # (makeappx resolution + layout staging live there so they can't drift).
+        # -Version rewrites the manifest's Identity Version from the tag:
+        # vX.Y.Z -> X.Y.Z.0 (the tag exists at build time thanks to
+        # release-please's force-tag-creation, the same guarantee hatch-vcs
+        # relies on).
+        run: ./packaging/msix/pack.ps1 -Version '${{ needs.release-please.outputs.version }}'
       - name: Upload the MSIX (not a dist-* name — stays off the release)
         if: ${{ needs.release-please.outputs.is_prerelease != 'true' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
