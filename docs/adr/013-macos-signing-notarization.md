@@ -1,4 +1,4 @@
-# ADR-010: Sign and notarize macOS builds with Developer ID
+# ADR-013: Sign and notarize macOS builds with Developer ID
 
 ## Status
 
@@ -11,7 +11,7 @@ to *Accepted*; until then it is a design on the shelf. **Supersedes the
 ("acquiring an Apple Developer account … should be recorded as a follow-up ADR")
 — and **reopens #4** (signing + notarization) and **#5** (hardened-runtime
 entitlements), both previously closed as cost-gated. Prerequisite for
-[ADR-011](011-mac-app-store.md) (Mac App Store), which reuses the Program
+[ADR-014](014-mac-app-store.md) (Mac App Store), which reuses the Program
 membership and signing infrastructure established here.
 
 ## Context
@@ -44,7 +44,7 @@ paid channel in keycast's distribution.
 
 - **Join the Apple Developer Program** (individual). Certificates: **Developer
   ID Application** for this ADR; the Program also unlocks the Apple Distribution
-  certificate ADR-011 needs.
+  certificate ADR-014 needs.
 - **Sign inside-out with hardened runtime.** All nested Mach-O binaries in the
   PyInstaller bundle, then the `.app`, are signed with the Developer ID identity
   and `--options runtime`. PyInstaller 6 performs nested signing itself when
@@ -81,7 +81,7 @@ paid channel in keycast's distribution.
   one source of truth, consistent with ADR-001.
 - **Why now:** three independent motivations converged — Sequoia broke the
   documented workaround, per-update permission loss contradicts the bundle's
-  purpose, and ADR-011 needs the Program membership anyway. The $99/yr buys all
+  purpose, and ADR-014 needs the Program membership anyway. The $99/yr buys all
   three. (The design and CI wiring can land *before* enrolling — identity unset
   means builds stay unsigned, exactly as today — so the fee gates the *cutover*,
   not the work.)

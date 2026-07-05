@@ -1,12 +1,12 @@
-# ADR-011: Distribute keycast on the Mac App Store (sandboxed)
+# ADR-014: Distribute keycast on the Mac App Store (sandboxed)
 
 ## Status
 
 Proposed — 2026-07-05. Recorded **ahead of implementation** (DDD: this ADR is
 the design contract), and explicitly **experimental**: it carries a bail-out
-condition (see Consequences). Inherits ADR-010's **Apple Developer Program
+condition (see Consequences). Inherits ADR-013's **Apple Developer Program
 gate** — it cannot ship until that fee is accepted — and builds on
-[ADR-010](010-macos-signing-notarization.md) (signing infrastructure) and
+[ADR-013](013-macos-signing-notarization.md) (signing infrastructure) and
 [ADR-001](001-desktop-app-packaging.md) (the PyInstaller `.app`). The cask and
 formula channels are unaffected — the Mac App Store (MAS) is an **additional**
 channel, as ADR-009's Microsoft Store now is on Windows. Supersedes nothing.
@@ -50,14 +50,14 @@ non-MAS builds it actually tests.
 
 ## Decision
 
-- **Pursue MAS in parallel with the notarized Developer ID channel** (ADR-010),
+- **Pursue MAS in parallel with the notarized Developer ID channel** (ADR-013),
   which remains the primary macOS distribution and the fallback if MAS fails.
 - **A separate MAS build variant** in `release.yml`: same `keycast.spec`
   bundle, signed with the **Apple Distribution** certificate and a dedicated
   `packaging/entitlements-mas.plist` — `com.apple.security.app-sandbox` (true),
   `com.apple.security.network.client` (the ADR-002 update check; harmless, and
   removing it would silently break `keycast info`), plus the PyInstaller
-  hardened-runtime pair from ADR-010. Packaged as a `.pkg` via `productbuild`
+  hardened-runtime pair from ADR-013. Packaged as a `.pkg` via `productbuild`
   with an installer-signing certificate.
 - **Upload manual first, automated later** — the same staging as ADR-009's
   Partner Center: first submission (listing, screenshots, privacy labels,
@@ -89,7 +89,7 @@ non-MAS builds it actually tests.
 
 ## Rationale
 
-- **Parallel, not sequential.** ADR-010 stands alone and ships first regardless;
+- **Parallel, not sequential.** ADR-013 stands alone and ships first regardless;
   the MAS experiment reuses its Program membership and signing plumbing at the
   marginal cost of a second entitlements file and a `.pkg` step. If MAS fails,
   nothing is stranded.
@@ -110,7 +110,7 @@ non-MAS builds it actually tests.
 - **Bail-out condition:** if the sandboxed bundle cannot pass upload validation
   or App Review after a bounded effort (child-process entitlement inheritance,
   Tk-under-sandbox, or TCC-prompt failures being the expected failure modes),
-  this ADR is marked **Rejected** with the findings appended, and ADR-010's
+  this ADR is marked **Rejected** with the findings appended, and ADR-013's
   notarized channel remains the sole macOS distribution. The findings stay
   valuable — that is the point of recording the experiment.
 - **Release pipeline:** `build-macos` gains (or a sibling job adds) the MAS
@@ -122,7 +122,7 @@ non-MAS builds it actually tests.
   (before `HOMEBREW_CASK` — a MAS install is not in the Caskroom, but the
   receipt is the more specific signal and costs one `Path.exists`).
 - **Docs (DDD):** `README.md` gains the MAS badge/link; `docs/PACKAGING.md` a
-  "Mac App Store" section (entitlements diff vs ADR-010, `.pkg` recipe, review
+  "Mac App Store" section (entitlements diff vs ADR-013, `.pkg` recipe, review
   notes); the settings/logging docs gain the container-path note for MAS
   installs described in Context.
 - **App Review is a recurring gate:** every release waits on review (typically

@@ -505,12 +505,12 @@ bumps automatically.
 ## Mac App Store (sandboxed)
 
 A planned macOS channel alongside the cask; see
-[ADR-011](adr/011-mac-app-store.md) for the decision and rationale and
-[ADR-010](adr/010-macos-signing-notarization.md) for the signing infrastructure
+[ADR-014](adr/014-mac-app-store.md) for the decision and rationale and
+[ADR-013](adr/013-macos-signing-notarization.md) for the signing infrastructure
 it inherits. Unlike the Microsoft Store above, the build side is **not yet
 implemented**: the sandboxed `.pkg` recipe, Apple Distribution signing, and App
 Store Connect submission are gated on the **Apple Developer Program** membership
-(ADR-010) and land in a later change. This section is the contract for what that
+(ADR-013) and land in a later change. This section is the contract for what that
 change will add; only the install-source detection below ships today.
 
 - **Why it is possible at all.** The folklore that "a keystroke visualizer
@@ -518,10 +518,10 @@ change will add; only the install-source detection below ships today.
   which sandboxed apps cannot use. keycast *listens only* — pynput selects a
   listen-only tap when `suppress=False` (which `listeners.py` never overrides) —
   so it needs only **Input Monitoring**, which a sandboxed app can request via
-  `CGRequestListenEventAccess`. ADR-011 records this as a load-bearing invariant:
+  `CGRequestListenEventAccess`. ADR-014 records this as a load-bearing invariant:
   any future feature that suppresses or injects events would forfeit MAS
   eligibility.
-- **Build (planned, ADR-010/011).** The same `keycast.spec` bundle, signed with
+- **Build (planned, ADR-013/014).** The same `keycast.spec` bundle, signed with
   the **Apple Distribution** certificate against a dedicated
   `packaging/entitlements-mas.plist` (`com.apple.security.app-sandbox`,
   `com.apple.security.network.client` for the ADR-002 update check, plus the

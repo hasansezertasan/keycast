@@ -120,7 +120,7 @@ def _mas_receipt_exists() -> bool:
     A MAS-distributed ``.app`` carries ``Contents/_MASReceipt/receipt``. App
     Store apps install into ``/Applications`` — the same place as a cask or a
     manual drag-install — so this receipt is the only reliable signal that
-    distinguishes it from a cask / drag-install (ADR-011), the macOS-store
+    distinguishes it from a cask / drag-install (ADR-014), the macOS-store
     analogue of the Caskroom receipt. ``sys.executable`` is
     ``<bundle>/Contents/MacOS/keycast``, so the receipt is one level up from
     ``MacOS`` under ``Contents``.
@@ -306,7 +306,7 @@ def detect_install_source(
         # manual drag-install; the bundle's _MASReceipt is the only signal, and
         # it is checked first — before the cask branch (which also keys on
         # /Applications) — so a MAS install never misclassifies as a cask
-        # (ADR-011).
+        # (ADR-014).
         if mas_receipt_exists():
             return InstallSource.MAC_APP_STORE
         # Either a Caskroom-path bundle, or the app moved to /Applications by a
@@ -372,7 +372,7 @@ _UPGRADE_COMMANDS: dict[InstallSource, str] = {
     ),
     # Same statement-not-a-command shape as the Microsoft Store: the Mac App
     # Store updates its apps itself, and pointing a MAS user at the Releases
-    # page would be wrong (ADR-011).
+    # page would be wrong (ADR-014).
     InstallSource.MAC_APP_STORE: (
         "updates are delivered automatically by the Mac App Store"
     ),
