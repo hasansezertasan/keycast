@@ -158,9 +158,11 @@ Paints a short expanding, fading ring centered at screen position `(x, y)` — t
 production `ClickSink`. Like `show_text`, it is **thread-safe**: it may be called
 from a pynput listener thread and marshals the actual rendering onto the Tk main
 loop via `root.after`. The ripple is drawn in its own transient, always-on-top,
-borderless window that tears itself down when the animation completes; its
-transparency and click-through are best-effort per platform (see the README note),
-and any rendering error is logged (throttled) rather than raised.
+borderless window that tears itself down when the animation completes. The window
+is made **click-through** so it never intercepts the click it visualizes
+(`NSWindow.setIgnoresMouseEvents_` on macOS via pyobjc, `WS_EX_TRANSPARENT` on
+Windows; best-effort elsewhere). Background transparency is separately best-effort
+per platform, and any rendering error is logged (throttled) rather than raised.
 
 **Parameters**:
 - `x` (int): Click x-coordinate (screen pixels)

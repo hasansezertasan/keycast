@@ -543,6 +543,9 @@ class DisplayWindow:
             return
 
         try:
+            # Snapshot native windows *before* creating the ripple so the
+            # click-through step can pick out the one we just added (macOS).
+            existing = self._native_window_ids()
             diameter = self._ripple_max_radius * 2
             top = tk.Toplevel(self.root)
             top.overrideredirect(boolean=True)
@@ -552,7 +555,7 @@ class DisplayWindow:
                 f"{diameter}x{diameter}"
                 f"+{x - self._ripple_max_radius}+{y - self._ripple_max_radius}"
             )
-            self._make_ripple_click_through(top)
+            self._make_ripple_transparent(top)
             canvas = tk.Canvas(
                 top,
                 width=diameter,
@@ -561,17 +564,22 @@ class DisplayWindow:
                 bg=str(self.settings.background_color),
             )
             canvas.pack()
+            # Realize the OS-level window before making it click-through: the
+            # native handle must exist for the ignore-mouse call to find it.
+            top.update_idletasks()
+            self._make_ripple_click_through(top, existing)
             self._animate_ripple(top, canvas, start_time=time.time())
         except Exception as exc:  # noqa: BLE001 — Tk raises many unrelated types
             self._error_throttler.log("ripple_render_error", exc)
 
-    def _make_ripple_click_through(self, top: "tk.Toplevel") -> None:
-        """Best-effort: make the ripple window transparent / ignore mouse input.
+    def _make_ripple_transparent(self, top: "tk.Toplevel") -> None:
+        """Best-effort: make the ripple window's background transparent.
 
-        True click-through is platform-specific and unreliable from Tk alone, so
-        this degrades silently: on failure the ripple is simply a brief topmost
-        window (see the README note). On Windows the window's background color is
-        keyed out; on macOS the toplevel is made transparent.
+        This is *visual* transparency only (separate from click-through, handled by
+        :meth:`_make_ripple_click_through`). Platform-specific and degrades
+        silently: on failure the ripple is a brief translucent square behind the
+        ring. On Windows the background color is keyed out; on macOS the toplevel
+        is marked transparent.
 
         Args:
             top: The transient ripple toplevel.
@@ -581,9 +589,74 @@ class DisplayWindow:
         try:
             if sys.platform == "darwin":
                 top.attributes("-transparent", True)  # noqa: FBT003
-            elif sys.platform.startswith("win"):
+            elif sys.platform == "win32":
                 top.attributes("-transparentcolor", str(self.settings.background_color))
         except tk.TclError as exc:
+            self.logger.debug("ripple_transparency_unsupported: %s", exc)
+
+    def _native_window_ids(self) -> frozenset[int]:
+        """Return the set of current native window numbers (macOS only).
+
+        Used to diff before/after creating the ripple so
+        :meth:`_make_ripple_click_through` can find the new window. Empty on
+        non-macOS platforms and best-effort (any failure yields an empty set).
+
+        Returns:
+            A frozenset of ``NSWindow`` window numbers, or empty.
+        """
+        if sys.platform != "darwin":
+            return frozenset()
+        try:
+            # AppKit is importable on macOS because pynput pulls in pyobjc; load it
+            # dynamically since it ships no stubs (see _apply_window_icon).
+            appkit = importlib.import_module("AppKit")
+            ns_application = appkit.NSApplication  # ty: ignore[unresolved-attribute]
+            windows = ns_application.sharedApplication().windows()
+            return frozenset(int(window.windowNumber()) for window in windows)
+        except Exception as exc:  # noqa: BLE001 — pyobjc raises many unrelated types
+            self.logger.debug("ripple_window_enum_failed: %s", exc)
+            return frozenset()
+
+    def _make_ripple_click_through(
+        self, top: "tk.Toplevel", existing_window_ids: frozenset[int]
+    ) -> None:
+        """Make the ripple window ignore mouse input so clicks pass through.
+
+        Without this the transient topmost ripple *catches* the very click it is
+        visualizing (e.g. over an Electron app), which is worse than not showing it
+        at all. Uses native APIs Tk does not expose: ``setIgnoresMouseEvents_`` on
+        macOS (via pyobjc) and the ``WS_EX_TRANSPARENT`` extended style on Windows.
+        Best-effort and platform-specific; degrades silently on other platforms or
+        on failure (the ring may then intercept clicks — the README notes this).
+
+        Args:
+            top: The transient ripple toplevel (its native handle is used).
+            existing_window_ids: Native window numbers present before this ripple
+                was created, so the new one can be identified (macOS).
+        """
+        try:
+            if sys.platform == "darwin":
+                appkit = importlib.import_module("AppKit")
+                ns_application = appkit.NSApplication  # ty: ignore[unresolved-attribute]
+                for window in ns_application.sharedApplication().windows():
+                    if int(window.windowNumber()) not in existing_window_ids:
+                        # The ripple window(s) we just added: let clicks fall
+                        # through to whatever is underneath.
+                        window.setIgnoresMouseEvents_(True)  # noqa: FBT003
+            elif sys.platform == "win32":
+                import ctypes  # noqa: PLC0415
+
+                gwl_exstyle = -20
+                ws_ex_layered = 0x00080000
+                ws_ex_transparent = 0x00000020
+                user32 = ctypes.windll.user32
+                # winfo_id() is the child HWND; its parent is the toplevel window.
+                hwnd = user32.GetParent(top.winfo_id())
+                current = user32.GetWindowLongW(hwnd, gwl_exstyle)
+                user32.SetWindowLongW(
+                    hwnd, gwl_exstyle, current | ws_ex_layered | ws_ex_transparent
+                )
+        except Exception as exc:  # noqa: BLE001 — pyobjc/ctypes raise many types
             self.logger.debug("ripple_click_through_unsupported: %s", exc)
 
     def _animate_ripple(

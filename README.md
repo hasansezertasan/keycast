@@ -150,11 +150,13 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
 > pixels (5–200), and `ripple_duration_ms` how long it animates (100–2000 ms).
 > Defaults to `false`; the `presenter` and `debug` presets turn it on.
 >
-> Platform note: the ripple window's transparency and click-through are
-> **best-effort per platform** — where the windowing system can't make it fully
-> click-through, keycast keeps the ring brief and always-on-top to minimize any
-> interference. If it ever misbehaves on your setup, set `show_click_ripple` to
-> `false`.
+> Platform note: the ripple is drawn in a transient, always-on-top window that is
+> made **click-through** so it never intercepts the click it is visualizing —
+> macOS uses `NSWindow.setIgnoresMouseEvents_` (via pyobjc), Windows uses the
+> `WS_EX_TRANSPARENT` extended style. On other platforms (e.g. Linux) click-through
+> is best-effort and the ring may briefly intercept clicks; if it misbehaves on
+> your setup, set `show_click_ripple` to `false`. Background transparency (so only
+> the ring shows, not a filled square) is separately best-effort per platform.
 
 #### Logging Settings
 

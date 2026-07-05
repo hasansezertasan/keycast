@@ -1037,6 +1037,10 @@ class TestClickRipple:
             patch("tkinter.Toplevel") as top_cls,
             patch("tkinter.Canvas") as canvas_cls,
             patch.object(window, "_animate_ripple") as animate,
+            # Isolate the native (pyobjc/ctypes) helpers from this unit test.
+            patch.object(window, "_native_window_ids", return_value=frozenset()),
+            patch.object(window, "_make_ripple_click_through") as click_through,
+            patch.object(window, "_make_ripple_transparent"),
         ):
             top = Mock()
             top_cls.return_value = top
@@ -1047,6 +1051,9 @@ class TestClickRipple:
         # A square sized to the diameter, centered on the click (100-40, 200-40).
         top.geometry.assert_called_once_with("80x80+60+160")
         animate.assert_called_once()
+        # The window is realized then made click-through so clicks pass through.
+        top.update_idletasks.assert_called_once()
+        click_through.assert_called_once()
 
     def test_render_ripple_error_is_throttled(self, mock_tk: tuple[Mock, Mock]) -> None:
         """A Tk failure while building the ripple is logged, not raised."""
@@ -1070,6 +1077,52 @@ class TestClickRipple:
     ) -> None:
         window = DisplayWindow(DisplaySettings(), ripple_color="cyan")
         assert window._ripple_color == "cyan"
+
+    def test_macos_ripple_is_made_click_through(
+        self, mock_tk: tuple[Mock, Mock], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """On macOS the newly-created ripple window is set to ignore mouse events.
+
+        Without this the topmost ripple catches the click it visualizes (the
+        Superset desktop app / Electron windows were a real victim). The new
+        window is identified by diffing NSWindow numbers before/after creation.
+        """
+        monkeypatch.setattr("keycast.display.sys.platform", "darwin")
+        window = DisplayWindow(DisplaySettings())
+
+        pre_existing = Mock()
+        pre_existing.windowNumber.return_value = 1
+        ripple_window = Mock()
+        ripple_window.windowNumber.return_value = 2
+
+        fake_appkit = Mock()
+        fake_appkit.NSApplication.sharedApplication.return_value.windows.return_value = [
+            pre_existing,
+            ripple_window,
+        ]
+        monkeypatch.setattr(
+            "keycast.display.importlib.import_module", lambda _name: fake_appkit
+        )
+
+        # Window 1 already existed; only the new window 2 should be made passthrough.
+        window._make_ripple_click_through(Mock(), existing_window_ids=frozenset({1}))
+
+        ripple_window.setIgnoresMouseEvents_.assert_called_once_with(True)
+        pre_existing.setIgnoresMouseEvents_.assert_not_called()
+
+    def test_click_through_failure_is_swallowed(
+        self, mock_tk: tuple[Mock, Mock], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A failure making the window click-through is logged, never raised."""
+        monkeypatch.setattr("keycast.display.sys.platform", "darwin")
+        window = DisplayWindow(DisplaySettings())
+        monkeypatch.setattr(
+            "keycast.display.importlib.import_module",
+            Mock(side_effect=RuntimeError("no AppKit")),
+        )
+
+        # Must not raise even though the native call blows up.
+        window._make_ripple_click_through(Mock(), existing_window_ids=frozenset())
 
 
 class TestSchedulingDoesNotHoldLock:

@@ -395,12 +395,23 @@ and does not import `MouseSettings`.
 borderless, always-on-top toplevel that animates via the same self-rescheduling
 `root.after` pattern as the fade timer, then destroys itself. The animation math
 is factored into a pure `_ripple_frame` helper so it is unit-testable without Tk.
-Full transparency and click-through are **platform-specific and unreliable** from
-Tk alone (Windows `-transparentcolor`, macOS AppKit, X11 input shaping), so they
-are treated as best-effort and degrade rather than crash; the ring is kept brief
-and topmost to minimize interference, and the feature defaults off. Every Tk
-operation is wrapped and routed through the error throttler, consistent with the
-rest of the display layer's "degrade, don't crash" behavior.
+
+Two distinct concerns, both needing native APIs Tk does not expose:
+
+- **Click-through (input)** — critical: a topmost window at the cursor otherwise
+  *catches the click it is visualizing* (an Electron app like the Superset desktop
+  app was a real victim). Fixed with `NSWindow.setIgnoresMouseEvents_(True)` on
+  macOS (via pyobjc; the new window is found by diffing `NSApplication.windows()`
+  before/after creation) and the `WS_EX_TRANSPARENT | WS_EX_LAYERED` extended
+  style on Windows. Reliable on macOS/Windows; best-effort elsewhere (X11 input
+  shaping is not implemented), where the ring may intercept clicks.
+- **Background transparency (visual)** — so only the ring shows, not a filled
+  square: `-transparent` on macOS, `-transparentcolor` on Windows. Genuinely
+  unreliable from Tk, so best-effort; a failure leaves a brief translucent square.
+
+Every native call is wrapped and routed through the throttler/debug log,
+consistent with the display layer's "degrade, don't crash" behavior, and the
+feature defaults off.
 
 **Alternatives Considered**:
 - **Overload `TextSink` to carry coordinates**: breaks the one-signature decision
