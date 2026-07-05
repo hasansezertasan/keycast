@@ -604,6 +604,12 @@ class Settings(BaseSettings):
         "automatic update checks (offline / privacy). Throttle state is kept in "
         "~/.keycast/update-check.json, not in this config. See keycast.updates.",
     )
+    show_startup_status: bool = Field(
+        default=True,
+        description="Show a one-line startup summary about keyboard/mouse input "
+        "capture availability on the overlay. Set false to suppress this launch "
+        "status message.",
+    )
     # pyrefly: ignore[bad-assignment]  # Field(default=...) can't be narrowed to the Literal; mypy/pyright/ty accept it.
     preset: Literal["custom"] | PresetName = Field(
         default="custom",

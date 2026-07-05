@@ -64,7 +64,10 @@ calls `setup_logging`, and constructs the `DisplayWindow`, `MouseListener`, and
 ##### start() -> None
 
 Starts the mouse and keyboard listeners, then starts the display window last
-(its `start()` blocks on the Tk main loop). Prefer `run()` for normal use.
+(its `start()` blocks on the Tk main loop). It always logs the startup input
+status as a structured `startup_input_status` event; additionally, on a
+non-minimized launch with `show_startup_status=true`, it shows that status as a
+one-line overlay message. Prefer `run()` for normal use.
 
 ##### stop() -> None
 
@@ -436,6 +439,7 @@ def create_settings_file(cls) -> Settings
 - `start_minimized` (bool): Start with the overlay hidden; it appears the first time a key or click is captured (default: `false`). Requires `auto_start` (rejected with it off, since nothing would ever re-show the overlay). If no listener is live at startup (all disabled, or all fail to start), the overlay is kept visible instead of hidden.
 - `auto_start` (bool): Start the input listeners on launch (default: `true`). When `false`, no listeners start regardless of `keyboard.enabled` / `mouse.enabled` — an app-level master switch.
 - `check_for_updates` (bool): Gate the automatic update check (default: `true`). When `true`, keycast queries the GitHub Releases API at most once per day and shows a non-blocking notice if a newer version exists; `false` disables all automatic checks. Throttle state lives in `~/.keycast/update-check.json`, not on `Settings`. See `keycast.updates` and [ADR-002](adr/002-update-check.md).
+- `show_startup_status` (bool): Show a one-line startup input-status summary on the overlay (default: `true`). This line reports keyboard/mouse capture as `OK` (capturing), `Off` (disabled), `Permission needed` (macOS reports the input permission denied), `Not capturing` (the listener failed to start for another reason), or `Unknown` (an unrecognized platform). It is gated by this flag and skipped on a minimized start; the mirrored structured `startup_input_status` log event is written on every launch regardless. On macOS, a best-effort permission precheck (via `AXIsProcessTrusted` and `CGPreflightListenEventAccess`, neither of which prompts) distinguishes `Permission needed` from other failures — and, because a macOS listener start "succeeds" even when permission is denied, a denied precheck is believed over an apparently-successful start. On Windows and Linux, which expose no such precheck, a failed start is reported as `Not capturing` rather than guessed as a permission problem.
 - `preset` (Literal["custom", "presenter", "minimal", "debug"]): Named settings bundle layered over the config on load (default: `"custom"`). `"custom"` uses the file verbatim; the other presets override a handful of fields for common scenarios (see `resolve_preset` and the table below). A preset wins over the file **only for the fields it names**; everything else keeps its configured value. An unrecognized preset name is not fatal: it falls back to `"custom"` with a warning, rather than quarantining the whole config file.
 
 > The application version is exposed as `keycast.__version__`, generated at

@@ -219,6 +219,14 @@ jobs:
           if (-not (Test-Path packaging/keycast-setup.exe)) {
             Write-Host "::error::keycast-setup.exe missing after iscc"; exit 1
           }
+      - name: Pack the MSIX (Microsoft Store)
+        shell: pwsh
+        # A broken AppxManifest.xml would block the atomic release exactly like
+        # a broken keycast.iss, so pack it here on every PR with the template's
+        # 0.0.0.0 default version (ADR-009). No -Version -> the manifest is
+        # packed verbatim. Shared with release.yml via pack.ps1 so the makeappx
+        # resolution and layout staging can't drift between the two.
+        run: ./packaging/msix/pack.ps1
       - name: Upload the folder and installer as a preview build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:

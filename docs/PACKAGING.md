@@ -184,20 +184,19 @@ release-please ─┬─ build-package  (sdist + wheel,  ubuntu)
   publishes via PyPI Trusted Publishing (`id-token: write`, no other scope).
 - **`publish-release`** downloads every artifact, attaches them to the release
   tag, and un-drafts it (`contents: write`), marking it `--prerelease` (and not
-  "Latest") for betas. The GitHub Release **intentionally mirrors the PyPI
-  sdist/wheel** alongside the `.dmg`/`.zip`, for a complete, offline-installable
-  release page.
+  "Latest") for prereleases (a no-op while the beta channel is off — see below).
+  The GitHub Release **intentionally mirrors the PyPI sdist/wheel** alongside the
+  `.dmg`/`.zip`, for a complete, offline-installable release page.
 - **`reconcile`** closes the phantom release PR and re-dispatches the workflow
   (`pull-requests` + `actions` write).
 
-**Beta channel.** Mainline is a rolling prerelease (`prerelease: true` in
-`release-please-config.json`): merges cut `0.2.0-beta.N` tags that hatch-vcs
-normalizes to PEP 440 `0.2.0bN` and ship to **PyPI and the GitHub release only** —
-`pip install keycast` hides them without `--pre`, and the cask/Scoop bumps are
-gated off for prereleases (those channels have no prerelease notion). Graduate to
-stable with a `Release-As: X.Y.Z` commit footer; the stable tag then flows through
-every channel as before. See `CLAUDE.md` → *Release pipeline* for the full
-mechanics.
+**Beta channel (designed, currently disabled).** The pipeline *can* run mainline
+as a rolling prerelease that ships `0.2.0-beta.N` (→ PEP 440 `0.2.0bN`) to **PyPI
+and the GitHub release only**, holding it back from the cask/Scoop buckets. It is
+**not active**: the `prerelease` keys are absent from `release-please-config.json`,
+so mainline cuts stable, and the `is_prerelease` guards above are inert. See
+[ADR-007](adr/007-prerelease-release-channels.md) for the full design, rationale,
+and how to re-enable it.
 
 Each write scope lives on exactly one job (least privilege). Because the release
 is **atomic**, a flaky platform build blocks the PyPI release too — the trade
@@ -294,9 +293,10 @@ stanza ever changes (caveats, signing later), edit it in the tap directly.
 ## Scoop bucket
 
 keycast is also distributed through a [Scoop](https://scoop.sh) bucket
-(`hasansezertasan/scoop-bucket`). Mirroring the tap's **formula + cask** split,
-the bucket carries **two manifests** — Scoop has no formula/cask namespace, so
-each is a distinct installable name:
+(`hasansezertasan/scoop-bucket`); see
+[ADR-008](adr/008-scoop-bucket.md) for the decision and rationale. Mirroring the
+tap's **formula + cask** split, the bucket carries **two manifests** — Scoop has
+no formula/cask namespace, so each is a distinct installable name:
 
 | Manifest | Mirrors | Install | `checkver` source | `keycast info` reports |
 |---|---|---|---|---|
@@ -354,6 +354,153 @@ next scheduled run still bumps the manifests.
 After this, the manifests are edited only by the bucket's updater; users install
 with `scoop bucket add keycast https://github.com/hasansezertasan/scoop-bucket`
 then `scoop install keycast` (or `keycast-pipx`).
+
+## Microsoft Store (MSIX)
+
+The fourth Windows channel; see [ADR-009](adr/009-microsoft-store.md) for the
+decision and rationale. The Store route is **MSIX with `runFullTrust`**: the
+Store signs and hosts the package, so no Authenticode certificate is involved
+(unlike a Win32 EXE/MSI listing), and the full-trust capability lets pynput's
+global input hooks work exactly as in every other channel.
+
+The recipe wraps the untouched `dist/keycast/` PyInstaller folder:
+
+```text
+packaging/msix/AppxManifest.xml   # committed template (Version="0.0.0.0")
+packaging/msix/Assets/*.png       # committed logos (make_icons.py emits them)
+```
+
+- **CI (`ci.yml` `build-windows`)** stages `dist/keycast/` + the manifest +
+  assets into a layout folder and runs `makeappx pack` on every PR with the
+  template's `0.0.0.0` default — a broken manifest fails the PR, not the
+  release (mirrors the `iscc` compile check). `makeappx.exe` ships in the
+  Windows SDK on the runner image but is **not on `PATH`**; both workflows
+  resolve it under `Windows Kits`.
+- **Release (`release.yml` `build-windows`)** does the same but rewrites the
+  manifest's `Version` from the release tag (`vX.Y.Z` → `X.Y.Z.0` — MSIX
+  versions are four-part numeric with **no prerelease form**, so the step is
+  skipped for prerelease tags, matching the Store's stable-only gating).
+- **The `keycast.msix` is a workflow artifact only** (`keycast-msix`), the
+  input for the Partner Center submission. It is **never** attached to the
+  GitHub Release: the package is unsigned until the Store signs it, and an
+  unsigned MSIX cannot be installed — `publish-release` collects only `dist-*`
+  artifacts to enforce this declaratively.
+- **`keycast info`** reports `Install source: microsoft-store` (the ACL-locked
+  `WindowsApps` install path is the signal), and the update notice tells the
+  user updates are delivered automatically by the Store instead of suggesting
+  a command or the Releases page.
+
+### Versioning
+
+release-please is the single version authority; every channel's format is
+derived from it, and the MSIX-specific quirks are absorbed inside `pack.ps1`
+(the `-Version` argument) so the rest of the pipeline stays format-agnostic.
+
+- **Mapping: `X.Y.Z` → `X.Y.Z.0`.** `pack.ps1 -Version` rewrites the manifest's
+  placeholder `Version="0.0.0.0"` to the release version with a fourth
+  component of `0` (e.g. `0.3.0` → `0.3.0.0`).
+- **Why four parts, and why the trailing `0`.** MSIX versions are
+  `Major.Minor.Build.Revision` — four-part, **all-numeric**, no `v` prefix and
+  no suffixes. The **fourth component is reserved for the Store** and must be
+  `0` in a submitted package; mapping to `X.Y.Z.0` satisfies that by
+  construction.
+- **Monotonic by construction.** The Store requires each submission's version
+  to be strictly greater than the last. Because the source is release-please's
+  monotonic SemVer, `0.3.0.0 < 0.4.0.0 < …` holds automatically — including for
+  hotfixes (`0.3.1` → `0.3.1.0`).
+- **Prereleases are skipped, not mapped.** MSIX cannot express `0.3.0-beta.1`,
+  so the release pack step is guarded by `is_prerelease != 'true'` — the Store
+  is a stable-only channel (betas still reach PyPI via `pip install --pre`).
+- **Three representations, one source.** The same release stamps three version
+  strings by three mechanisms, all tracing to the release-please version:
+
+  | Artifact | Version | Computed by |
+  |---|---|---|
+  | PyPI wheel / app `__version__` | `0.3.0` (PEP 440) | hatch-vcs, from the git tag |
+  | Windows installer (`keycast-setup.exe`) | `0.3.0` | `iscc /DMyAppVersion=…` |
+  | MSIX manifest | `0.3.0.0` | `pack.ps1 -Version` |
+
+  The MSIX manifest version and the *app's internal* `__version__` are computed
+  **independently** (the manifest from release-please's output string; the
+  `__version__` from hatch-vcs reading the git tag) and converge only because
+  both trace to the same release. This is why `force-tag-creation: true`
+  matters: it makes the tag exist during the draft-release window so hatch-vcs
+  stamps `0.3.0` into the very bundle the `0.3.0.0` manifest wraps — otherwise a
+  `0.3.0.0` package could ship around a `0.0.0`-versioned app.
+- **You never type a version into Partner Center.** The Store reads it from the
+  manifest inside the uploaded `keycast.msix`, which the release run already
+  baked in; higher-versioned submissions are what trigger the automatic updates
+  `keycast info` promises for a Store install.
+
+### Submission runbook (manual, one-time)
+
+The first Store submission is manual. **Sequencing matters**: the Identity
+values must be in the committed manifest *before* the MSIX you upload is built,
+so the order is **reserve → update manifest → release → submit**.
+
+#### 1. Partner Center account + name reservation
+
+1. Register (free) at
+   [Partner Center](https://partner.microsoft.com/dashboard/registration) —
+   account type **Individual**. Identity verification can take a day or two.
+2. Dashboard → **Apps and games** → **+ New product** → choose
+   **"MSIX or PWA app"** (⚠️ *not* "EXE or MSI app" — that is the Win32 route
+   [ADR-009](adr/009-microsoft-store.md) rejects).
+3. Reserve the name `keycast` (a fallback *display* name is fine; the package
+   name stays `keycast`).
+4. Copy the three values from **Product management → Product identity**:
+   `Package/Identity/Name` (e.g. `12345Publisher.keycast`),
+   `Package/Identity/Publisher` (`CN=<guid>`), and the publisher display name.
+
+#### 2. Update the manifest
+
+Replace the placeholder `Identity` `Name` and `Publisher` in
+`packaging/msix/AppxManifest.xml` with the exact reserved values — the Store
+rejects the upload if they differ. The committed placeholders keep the PR pack
+check working before reservation, so this is a one-line change made once.
+
+> Also add a privacy policy URL somewhere linkable (e.g. a `PRIVACY.md` in the
+> repo): the listing form requires one, and an input visualizer will be held to
+> it. One line suffices — *keystrokes are rendered on screen, never stored or
+> transmitted; no data is collected.*
+
+#### 3. Cut a release, grab the artifact
+
+Merge the release-please PR. The release run's `build-windows` job produces the
+**`keycast-msix`** workflow artifact (Actions → the release run → *Artifacts* →
+download → unzip to get `keycast.msix`). It is deliberately not a release asset
+(unsigned MSIX can't be installed — see above).
+
+#### 4. Submit in Partner Center
+
+| Section | What to do |
+|---|---|
+| Pricing and availability | Free · all markets |
+| Properties | Category: **Utilities & tools** |
+| Age ratings | IARC questionnaire — a utility with no content rates "Everyone / 3+" |
+| Packages | Upload `keycast.msix`; a **restricted-capability justification** box appears for `runFullTrust` — paste the text below |
+| Store listings | Description (crib from `README.md`) + **≥1 screenshot** of the overlay visualizing keystrokes (doubles as "visible, not covert" evidence) + the privacy policy URL |
+
+Paste-ready `runFullTrust` justification:
+
+> keycast is an open-source keystroke and mouse-click visualizer for screencasts
+> and presentations (source: https://github.com/hasansezertasan/keycast). It
+> renders input events in an always-visible on-screen overlay in real time.
+> Capturing global input requires low-level input hooks (WH_KEYBOARD_LL /
+> WH_MOUSE_LL), which are unavailable inside an AppContainer — hence
+> runFullTrust. Keystrokes are displayed on screen only; nothing is stored,
+> logged, or transmitted.
+
+Submit → review typically clears in 24–72 h. A clarification request is possible
+given the input-capture nature; the justification plus the open-source repo link
+usually settles it.
+
+#### 5. Automation comes later
+
+Per [ADR-009](adr/009-microsoft-store.md), only *after* a manual submission has
+survived review once: a best-effort `submit-store` job (msstore-cli / the Store
+submission API) can mirror `bump-cask` / `bump-scoop` to push subsequent version
+bumps automatically.
 
 ## Local reproduction
 

@@ -189,6 +189,30 @@ jobs:
           path: |
             keycast-windows.zip
             packaging/keycast-setup.exe
+      - name: Pack the MSIX (Microsoft Store submission artifact)
+        # Skipped for prereleases: MSIX versions are four-part numeric with no
+        # prerelease form, and the Store is a stable-only channel (ADR-007 /
+        # ADR-009) — the guard is inert while the beta channel is disabled, but
+        # binding if it is re-enabled.
+        if: ${{ needs.release-please.outputs.is_prerelease != 'true' }}
+        shell: pwsh
+        # The Store signs and hosts the package (ADR-009), so keycast.msix is a
+        # *workflow artifact* for Partner Center — deliberately NOT a release
+        # asset: an unsigned MSIX cannot be installed, so attaching it would
+        # publish a file users can't use (publish-release only collects dist-*
+        # artifacts for the same reason). Shared with ci.yml via pack.ps1
+        # (makeappx resolution + layout staging live there so they can't drift).
+        # -Version rewrites the manifest's Identity Version from the tag:
+        # vX.Y.Z -> X.Y.Z.0 (the tag exists at build time thanks to
+        # release-please's force-tag-creation, the same guarantee hatch-vcs
+        # relies on).
+        run: ./packaging/msix/pack.ps1 -Version '${{ needs.release-please.outputs.version }}'
+      - name: Upload the MSIX (not a dist-* name — stays off the release)
+        if: ${{ needs.release-please.outputs.is_prerelease != 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: keycast-msix
+          path: keycast.msix
 
   publish-pypi:
     # Atomic gate: requires ALL builds. A failed .app/.exe build blocks the PyPI
@@ -223,10 +247,15 @@ jobs:
     permissions:
       contents: write # IMPORTANT: Mandatory to upload assets and un-draft the release
     steps:
-      - name: Download all artifacts
+      - name: Download the release-asset artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: artifacts
+          # Only dist-* artifacts become release assets. The unsigned
+          # keycast.msix (ADR-009) is intentionally outside the pattern: it is
+          # the Partner Center submission input, and an unsigned MSIX cannot be
+          # installed, so attaching it would publish a file users can't use.
+          pattern: dist-*
       - name: Attach artifacts and publish the release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

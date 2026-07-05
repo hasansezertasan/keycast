@@ -12,7 +12,9 @@ glyph) whenever the icon needs regenerating:
     uv run --with pillow packaging/make_icons.py
 
 Outputs ``packaging/keycast.icns`` (macOS BUNDLE), ``packaging/keycast.ico``
-(Windows EXE), and ``src/keycast/assets/keycast.png`` -- a runtime icon shipped
+(Windows EXE), ``packaging/msix/Assets/*.png`` (the MSIX visual assets the
+Microsoft Store manifest references -- ADR-009), and
+``src/keycast/assets/keycast.png`` -- a runtime icon shipped
 *inside* the package so ``keycast`` run from source (``uv run keycast``, no
 PyInstaller bundle) can brand its Tk taskbar / macOS dock icon (see
 ``DisplayWindow._apply_window_icon``). Pillow is pulled in only for this run via
@@ -64,6 +66,14 @@ ICONSET = [
 ]
 # Windows .ico embeds several sizes; the OS picks per display context.
 ICO_SIZES = [16, 32, 48, 64, 128, 256]
+
+# MSIX visual assets referenced by packaging/msix/AppxManifest.xml (ADR-009):
+# (filename, pixel size), baseline scale only -- Windows derives the rest.
+MSIX_ASSETS = [
+    ("Square44x44Logo.png", 44),
+    ("Square150x150Logo.png", 150),
+    ("StoreLogo.png", 50),
+]
 
 
 def _load_font(px: int) -> ImageFont.FreeTypeFont:
@@ -138,6 +148,14 @@ def write_assets(here: Path) -> None:
     ico_path = here / "keycast.ico"
     master.save(ico_path, sizes=[(n, n) for n in ICO_SIZES])
     print(f"wrote {ico_path.relative_to(here.parent)}")
+
+    # MSIX assets (ADR-009). Committed like the rest, so the CI makeappx step
+    # only stages files -- it never needs Pillow or this script.
+    msix_dir = here / "msix" / "Assets"
+    msix_dir.mkdir(parents=True, exist_ok=True)
+    for name, size in MSIX_ASSETS:
+        master.resize((size, size), Image.LANCZOS).save(msix_dir / name)
+        print(f"wrote {(msix_dir / name).relative_to(here.parent)}")
 
     # Runtime icon shipped in the package (PhotoImage/AppKit read PNG, not the
     # .ico/.icns above, which are build-time only). here.parent is the repo root.

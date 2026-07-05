@@ -1,10 +1,12 @@
 """Main entry point for the keycast application."""
 
+import ctypes
 import logging
 import platform
 import signal
 import sys
-from typing import TYPE_CHECKING
+from enum import StrEnum
+from typing import TYPE_CHECKING, NamedTuple
 
 from keycast import __version__
 from keycast.display import DisplayWindow
@@ -15,6 +17,65 @@ from keycast.updates import notify_pending_update
 
 if TYPE_CHECKING:
     import types
+
+_MACOS_APP_SERVICES_FRAMEWORK = (
+    "/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices"
+)
+
+
+class _InputSourceStatus(StrEnum):
+    """Startup status for one input source.
+
+    Each member carries both its stable ``value`` (used verbatim as the
+    structured-log token, e.g. ``keyboard=active``) and its user-facing
+    ``label`` (shown on the overlay). Co-locating the two means adding a state
+    forces its label to be supplied here, rather than in a separate mapping that
+    could silently fall out of sync.
+    """
+
+    ACTIVE = ("active", "OK")
+    DISABLED = ("disabled", "Off")
+    NO_ACCESS = ("no_access", "Permission needed")
+    FAILED = ("failed", "Not capturing")
+    UNKNOWN = ("unknown", "Unknown")
+
+    label: str
+
+    def __new__(cls, value: str, label: str) -> "_InputSourceStatus":
+        """Build a StrEnum member that also carries an overlay ``label``."""
+        member = str.__new__(cls, value)
+        member._value_ = value
+        member.label = label
+        return member
+
+
+class _PermissionPrecheck(StrEnum):
+    """Tri-state outcome of a platform input-permission precheck.
+
+    ``UNKNOWN`` is a first-class value, not the absence of one: it means the
+    platform cannot report permission state (every non-macOS platform) or the
+    macOS query could not be read. Callers compare against members explicitly
+    rather than leaning on truthiness, so "denied" and "indeterminate" never
+    collapse together. The value doubles as the structured-log token.
+    """
+
+    GRANTED = "granted"
+    DENIED = "denied"
+    UNKNOWN = "unknown"
+
+
+class _ListenersStarted(NamedTuple):
+    """Whether each input listener is actively capturing after startup."""
+
+    keyboard: bool
+    mouse: bool
+
+
+class _StartupStatuses(NamedTuple):
+    """Resolved startup status per input source."""
+
+    keyboard: _InputSourceStatus
+    mouse: _InputSourceStatus
 
 
 class Keycast:
@@ -79,16 +140,23 @@ class Keycast:
         """
         # auto_start is the app-level master switch: when off, no listeners start
         # regardless of the per-listener keyboard.enabled / mouse.enabled flags.
-        any_source_active = False
         if self.settings.auto_start:
             # Attempt both regardless of either's outcome (degrade, don't crash).
-            started = [
-                self._start_listener("mouse", self.mouse_listener),
-                self._start_listener("keyboard", self.key_listener),
-            ]
-            any_source_active = any(started)
+            # Mouse is started before keyboard; keep that order so the wiring
+            # test that pins listener start ordering stays meaningful.
+            mouse_started = self._start_listener("mouse", self.mouse_listener)
+            keyboard_started = self._start_listener("keyboard", self.key_listener)
+            started = _ListenersStarted(keyboard=keyboard_started, mouse=mouse_started)
         else:
+            started = _ListenersStarted(keyboard=False, mouse=False)
             self.logger.info(format_event("listeners_autostart_disabled"))
+        any_source_active = any(started)
+        system = platform.system()
+        precheck = self._startup_permission_precheck(system)
+        statuses = self._startup_input_statuses(
+            started=started, precheck=precheck, system=system
+        )
+        self._log_startup_input_status(statuses=statuses, precheck=precheck)
 
         # Only honor start_minimized when an input source is actually live to
         # re-show the overlay. The restore path is driven by show_text, so with no
@@ -108,6 +176,10 @@ class Keycast:
         # splash would defeat that.
         if not start_minimized:
             self.display_window.show_text(f"keycast {__version__}")
+            if self.settings.show_startup_status:
+                self.display_window.show_text(
+                    self._format_startup_status_line(statuses)
+                )
             # Surface a cached "update available" notice through the same sink, so
             # it shares the fade timer and needs no special rendering path. The
             # network refresh runs on a background daemon thread; any notice it
@@ -124,6 +196,189 @@ class Keycast:
             )
         # Start the display window last to avoid race conditions.
         self.display_window.start(start_minimized=start_minimized)
+
+    def _startup_permission_precheck(self, system: str) -> _PermissionPrecheck:
+        """Return the platform's current input-permission state without prompting.
+
+        Only macOS can report this (via :meth:`_macos_permission_precheck`);
+        every other platform returns ``UNKNOWN``. This runs *after* the listener
+        start attempts — the query never prompts, so ordering is safe, and if
+        the first listener start triggered the OS permission dialog we read the
+        post-grant state rather than a stale pre-grant one.
+
+        The macOS query is best-effort: it must never abort startup, so any
+        unexpected error degrades to ``UNKNOWN`` (logged with a traceback,
+        because reaching here means a real bug rather than a missing symbol,
+        which :meth:`_macos_permission_precheck` already handles).
+        """
+        if system != "Darwin":
+            return _PermissionPrecheck.UNKNOWN
+        try:
+            return self._macos_permission_precheck()
+        except Exception:
+            self.logger.exception(format_event("macos_permission_precheck_error"))
+            return _PermissionPrecheck.UNKNOWN
+
+    @staticmethod
+    def _macos_permission_precheck() -> _PermissionPrecheck:
+        """Return a best-effort macOS input-permission precheck.
+
+        Queries the two System Settings > Privacy & Security panes this kind of
+        tool needs, using APIs that report state without triggering a prompt:
+        Accessibility via ``AXIsProcessTrusted`` and Input Monitoring via
+        ``CGPreflightListenEventAccess``.
+
+        Returns:
+            ``GRANTED`` when both panes are explicitly granted, ``DENIED`` when
+            at least one is explicitly denied, and ``UNKNOWN`` when the host
+            APIs are unavailable or cannot be read (including a partial read,
+            which must never be reported as granted).
+        """
+        logger = logging.getLogger(__name__)
+        try:
+            app_services = ctypes.CDLL(_MACOS_APP_SERVICES_FRAMEWORK)
+        except (OSError, TypeError, ValueError, ctypes.ArgumentError) as exc:
+            # Failing to load ApplicationServices on macOS is a genuine anomaly
+            # (broken install / exotic sandbox), so surface it above DEBUG.
+            logger.warning(
+                format_event(
+                    "macos_permission_precheck_unavailable",
+                    reason=type(exc).__name__,
+                    detail=str(exc),
+                )
+            )
+            return _PermissionPrecheck.UNKNOWN
+
+        accessibility_ok = Keycast._read_macos_permission(
+            app_services, "AXIsProcessTrusted"
+        )
+        input_ok = Keycast._read_macos_permission(
+            app_services, "CGPreflightListenEventAccess"
+        )
+
+        if accessibility_ok is False or input_ok is False:
+            return _PermissionPrecheck.DENIED
+        if accessibility_ok is True and input_ok is True:
+            return _PermissionPrecheck.GRANTED
+        return _PermissionPrecheck.UNKNOWN
+
+    @staticmethod
+    def _read_macos_permission(app_services: ctypes.CDLL, symbol: str) -> bool | None:
+        """Read one macOS permission symbol, or ``None`` when it can't be read.
+
+        Both the missing-symbol and call-raising paths log at INFO (not DEBUG):
+        they only ever fire on macOS, where these symbols are expected to exist,
+        so either firing means something is wrong on the host and would
+        otherwise be invisible at the default log level.
+        """
+        logger = logging.getLogger(__name__)
+        check = getattr(app_services, symbol, None)
+        if check is None:
+            logger.info(
+                format_event("macos_permission_precheck_symbol_missing", symbol=symbol)
+            )
+            return None
+        check.restype = ctypes.c_bool
+        check.argtypes = []
+        try:
+            return bool(check())
+        except (OSError, TypeError, ValueError, ctypes.ArgumentError) as exc:
+            logger.info(
+                format_event(
+                    "macos_permission_precheck_read_failed",
+                    symbol=symbol,
+                    reason=type(exc).__name__,
+                    detail=str(exc),
+                )
+            )
+            return None
+
+    def _startup_input_statuses(
+        self,
+        started: _ListenersStarted,
+        precheck: _PermissionPrecheck,
+        system: str,
+    ) -> _StartupStatuses:
+        """Derive startup status per input source."""
+        return _StartupStatuses(
+            keyboard=self._resolve_source_status(
+                enabled=self.key_listener.settings.enabled,
+                started=started.keyboard,
+                precheck=precheck,
+                system=system,
+            ),
+            mouse=self._resolve_source_status(
+                enabled=self.mouse_listener.settings.enabled,
+                started=started.mouse,
+                precheck=precheck,
+                system=system,
+            ),
+        )
+
+    def _resolve_source_status(
+        self,
+        *,
+        enabled: bool,
+        started: bool,
+        precheck: _PermissionPrecheck,
+        system: str,
+    ) -> _InputSourceStatus:
+        """Resolve one source into a user-facing startup status.
+
+        The overlay must never lie that capture works when it doesn't. On macOS
+        that is the whole point of the precheck: ``Listener.start()`` there is a
+        thread start that succeeds even when Accessibility / Input Monitoring is
+        denied — the tap fails *asynchronously* on the listener thread and never
+        raises back to us. So an explicit ``DENIED`` precheck overrides an
+        apparently-successful start; the observed ``started`` flag is trusted
+        only in the absence of that contradiction.
+
+        When a source is enabled but not capturing and the cause is not a known
+        permission denial, the honest status is ``FAILED`` ("not capturing"),
+        not ``UNKNOWN`` — we know capture failed, only the cause is undetermined.
+        ``UNKNOWN`` is reserved for a platform we don't recognize at all.
+        """
+        if not self.settings.auto_start or not enabled:
+            return _InputSourceStatus.DISABLED
+        # Observed-vs-predicted: a macOS denial is believed over a "successful"
+        # start, because that start does not prove the event tap was installed.
+        if system == "Darwin" and precheck is _PermissionPrecheck.DENIED:
+            return _InputSourceStatus.NO_ACCESS
+        if started:
+            return _InputSourceStatus.ACTIVE
+        # started is False here: the listener genuinely failed to start.
+        if system in ("Darwin", "Windows", "Linux"):
+            return _InputSourceStatus.FAILED
+        return _InputSourceStatus.UNKNOWN
+
+    @staticmethod
+    def _format_startup_status_line(statuses: _StartupStatuses) -> str:
+        """Build the one-line startup status for the overlay."""
+        return (
+            f"Input status — Keyboard: {statuses.keyboard.label}, "
+            f"Mouse: {statuses.mouse.label}"
+        )
+
+    def _log_startup_input_status(
+        self,
+        *,
+        statuses: _StartupStatuses,
+        precheck: _PermissionPrecheck,
+    ) -> None:
+        """Log startup input status as a structured event.
+
+        Fires unconditionally on every launch (regardless of
+        ``show_startup_status`` or a minimized start), so the machine-readable
+        record can never be configured away with the overlay line.
+        """
+        self.logger.info(
+            format_event(
+                "startup_input_status",
+                keyboard=statuses.keyboard,
+                mouse=statuses.mouse,
+                precheck=precheck,
+            )
+        )
 
     def _start_listener(self, name: str, listener: MouseListener | KeyListener) -> bool:
         """Start one input listener, degrading to a logged hint on failure.

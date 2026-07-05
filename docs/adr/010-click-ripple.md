@@ -1,4 +1,4 @@
-# ADR-007: Mouse click ripple — prototyped, then removed pending redesign
+# ADR-010: Mouse click ripple — prototyped, then removed pending redesign
 
 ## Status
 
