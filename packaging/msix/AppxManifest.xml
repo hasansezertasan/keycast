@@ -5,7 +5,7 @@
   CI stages this file (with the Version attribute rewritten from the release
   tag: vX.Y.Z -> X.Y.Z.0; MSIX versions are four-part numeric, so prerelease
   tags cannot be expressed and the pack step is skipped for them) next to the
-  untouched PyInstaller dist/keycast/ folder and the committed Assets/ PNGs,
+  untouched PyInstaller dist/keycast/ folder and the committed Assets/ logos,
   then runs `makeappx pack`. The resulting keycast.msix is UNSIGNED - the
   Store signs it during submission - so it ships as a workflow artifact for
   Partner Center only, never as a GitHub Release asset (an unsigned MSIX
