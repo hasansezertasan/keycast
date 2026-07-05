@@ -390,6 +390,48 @@ packaging/msix/Assets/*.png       # committed logos (make_icons.py emits them)
   user updates are delivered automatically by the Store instead of suggesting
   a command or the Releases page.
 
+### Versioning
+
+release-please is the single version authority; every channel's format is
+derived from it, and the MSIX-specific quirks are absorbed inside `pack.ps1`
+(the `-Version` argument) so the rest of the pipeline stays format-agnostic.
+
+- **Mapping: `X.Y.Z` → `X.Y.Z.0`.** `pack.ps1 -Version` rewrites the manifest's
+  placeholder `Version="0.0.0.0"` to the release version with a fourth
+  component of `0` (e.g. `0.3.0` → `0.3.0.0`).
+- **Why four parts, and why the trailing `0`.** MSIX versions are
+  `Major.Minor.Build.Revision` — four-part, **all-numeric**, no `v` prefix and
+  no suffixes. The **fourth component is reserved for the Store** and must be
+  `0` in a submitted package; mapping to `X.Y.Z.0` satisfies that by
+  construction.
+- **Monotonic by construction.** The Store requires each submission's version
+  to be strictly greater than the last. Because the source is release-please's
+  monotonic SemVer, `0.3.0.0 < 0.4.0.0 < …` holds automatically — including for
+  hotfixes (`0.3.1` → `0.3.1.0`).
+- **Prereleases are skipped, not mapped.** MSIX cannot express `0.3.0-beta.1`,
+  so the release pack step is guarded by `is_prerelease != 'true'` — the Store
+  is a stable-only channel (betas still reach PyPI via `pip install --pre`).
+- **Three representations, one source.** The same release stamps three version
+  strings by three mechanisms, all tracing to the release-please version:
+
+  | Artifact | Version | Computed by |
+  |---|---|---|
+  | PyPI wheel / app `__version__` | `0.3.0` (PEP 440) | hatch-vcs, from the git tag |
+  | Windows installer (`keycast-setup.exe`) | `0.3.0` | `iscc /DMyAppVersion=…` |
+  | MSIX manifest | `0.3.0.0` | `pack.ps1 -Version` |
+
+  The MSIX manifest version and the *app's internal* `__version__` are computed
+  **independently** (the manifest from release-please's output string; the
+  `__version__` from hatch-vcs reading the git tag) and converge only because
+  both trace to the same release. This is why `force-tag-creation: true`
+  matters: it makes the tag exist during the draft-release window so hatch-vcs
+  stamps `0.3.0` into the very bundle the `0.3.0.0` manifest wraps — otherwise a
+  `0.3.0.0` package could ship around a `0.0.0`-versioned app.
+- **You never type a version into Partner Center.** The Store reads it from the
+  manifest inside the uploaded `keycast.msix`, which the release run already
+  baked in; higher-versioned submissions are what trigger the automatic updates
+  `keycast info` promises for a Store install.
+
 ### Submission runbook (manual, one-time)
 
 The first Store submission is manual. **Sequencing matters**: the Identity
