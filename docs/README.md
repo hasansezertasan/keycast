@@ -41,6 +41,12 @@ Comprehensive design rationale including:
 - Error handling and future considerations
 - Trade-offs and rationale for each decision
 
+### ⚖️ [Comparison / Alternatives](COMPARISON.md)
+How keycast compares to other keystroke/mouse visualizers:
+- Feature matrix vs KeyCastr, Keyviz, and VS Code Screencast Mode
+- Why keycast can't show semantic command names system-wide
+- Honest "when to choose what" guidance
+
 ## Quick Start
 
 ### For Users
