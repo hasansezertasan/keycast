@@ -40,6 +40,7 @@ class InstallSource(enum.Enum):
     SCOOP = "scoop"
     SCOOP_GLOBAL = "scoop-global"
     MICROSOFT_STORE = "microsoft-store"
+    MAC_APP_STORE = "mac-app-store"
     UNKNOWN = "unknown"
 
 
@@ -111,6 +112,28 @@ def _homebrew_cask_receipt_exists() -> bool:
     if custom:
         prefixes.append(custom)
     return any((Path(prefix) / "Caskroom" / "keycast").exists() for prefix in prefixes)
+
+
+def _mas_receipt_exists() -> bool:
+    """Return whether a Mac App Store receipt sits in the running bundle.
+
+    A MAS-distributed ``.app`` carries ``Contents/_MASReceipt/receipt``. App
+    Store apps install into ``/Applications`` — the same place as a cask or a
+    manual drag-install — so this receipt is the only reliable signal (ADR-011),
+    the macOS-store analogue of the Caskroom receipt. ``sys.executable`` is
+    ``<bundle>/Contents/MacOS/keycast``, so the receipt is one level up from
+    ``MacOS`` under ``Contents``.
+
+    Guarded by a macOS platform check: only a MAS build carries this receipt, so
+    a stray ``_MASReceipt`` on another OS must never classify as
+    :data:`InstallSource.MAC_APP_STORE`.
+
+    Returns:
+        True if running on macOS and the receipt exists inside the bundle.
+    """
+    if sys.platform != "darwin":
+        return False
+    return (Path(sys.executable).parent.parent / "_MASReceipt" / "receipt").exists()
 
 
 _INSTALLER_MARKER_NAME = ".install-source"
@@ -234,6 +257,7 @@ def detect_install_source(
     location: Path | None = None,
     env: dict[str, str] | None = None,
     cask_receipt_exists: Callable[[], bool] = _homebrew_cask_receipt_exists,
+    mas_receipt_exists: Callable[[], bool] = _mas_receipt_exists,
     installer_marker_exists: Callable[[], bool] = _installer_marker_exists,
     read_installer: Callable[[], str | None] = _read_installer,
 ) -> InstallSource:
@@ -242,7 +266,9 @@ def detect_install_source(
     Resolution is a first-match-wins tree (see ADR-002 / ADR-005). ``sys.frozen``
     splits "Python import" from "PyInstaller bundle"; past that the signals are
     heuristic. A Homebrew **cask** ships the *same* frozen bundle as a manual
-    Release download, so it is disambiguated by a Caskroom receipt.
+    Release download, so it is disambiguated by a Caskroom receipt; a **Mac App
+    Store** build shares the ``/Applications`` location too and is disambiguated
+    by its ``_MASReceipt`` (checked first).
 
     Args:
         frozen: Override for ``sys.frozen`` (defaults to the real value).
@@ -251,6 +277,8 @@ def detect_install_source(
         env: Override for the process environment (defaults to ``os.environ``).
         cask_receipt_exists: Predicate for a Homebrew cask receipt (injectable;
             defaults to a filesystem check).
+        mas_receipt_exists: Predicate for a Mac App Store receipt (injectable;
+            defaults to a filesystem check inside the running bundle).
         installer_marker_exists: Predicate for the Windows-installer marker
             (injectable; defaults to a filesystem check beside the executable).
         read_installer: Reader for the ``INSTALLER`` record (injectable; defaults
@@ -266,6 +294,13 @@ def detect_install_source(
     if frozen:
         location = Path(sys.executable) if location is None else location
         posix = location.as_posix().lower()
+        # A Mac App Store .app installs into /Applications just like a cask or a
+        # manual drag-install; the bundle's _MASReceipt is the only signal, and
+        # it is checked first — before the cask branch (which also keys on
+        # /Applications) — so a MAS install never misclassifies as a cask
+        # (ADR-011).
+        if mas_receipt_exists():
+            return InstallSource.MAC_APP_STORE
         # Either a Caskroom-path bundle, or the app moved to /Applications by a
         # cask (same path as a manual drag — disambiguated by the cask receipt).
         if _looks_homebrew(posix) or (
@@ -327,6 +362,12 @@ _UPGRADE_COMMANDS: dict[InstallSource, str] = {
     InstallSource.MICROSOFT_STORE: (
         "updates are delivered automatically by the Microsoft Store"
     ),
+    # Same statement-not-a-command shape as the Microsoft Store: the Mac App
+    # Store updates its apps itself, and pointing a MAS user at the Releases
+    # page would be wrong (ADR-011).
+    InstallSource.MAC_APP_STORE: (
+        "updates are delivered automatically by the Mac App Store"
+    ),
 }
 
 _SOURCE_LABELS: dict[InstallSource, str] = {
@@ -340,6 +381,7 @@ _SOURCE_LABELS: dict[InstallSource, str] = {
     InstallSource.SCOOP: "Scoop",
     InstallSource.SCOOP_GLOBAL: "Scoop (global)",
     InstallSource.MICROSOFT_STORE: "Microsoft Store",
+    InstallSource.MAC_APP_STORE: "Mac App Store",
     InstallSource.UNKNOWN: "unknown",
 }
 
@@ -364,8 +406,8 @@ def recommended_action(source: InstallSource) -> str:
         source: The detected install source.
 
     Returns:
-        A package-manager command when one fits (for the Microsoft Store, a
-        statement that the Store updates the app itself); otherwise
+        A package-manager command when one fits (for the Microsoft Store or Mac
+        App Store, a statement that the store updates the app itself); otherwise
         :data:`RELEASES_URL` (for a manual Release download, a
         Windows-installer copy, or an undetermined source, where guessing a
         command would be wrong — the user re-downloads the asset / installer

@@ -221,7 +221,10 @@ class TestDetectInstallSource:
         loc = Path("/Applications/keycast.app/Contents/MacOS/keycast")
         assert (
             sources.detect_install_source(
-                frozen=True, location=loc, cask_receipt_exists=lambda: True
+                frozen=True,
+                location=loc,
+                cask_receipt_exists=lambda: True,
+                mas_receipt_exists=lambda: False,
             )
             == InstallSource.HOMEBREW_CASK
         )
@@ -230,9 +233,57 @@ class TestDetectInstallSource:
         loc = Path("/Applications/keycast.app/Contents/MacOS/keycast")
         assert (
             sources.detect_install_source(
-                frozen=True, location=loc, cask_receipt_exists=lambda: False
+                frozen=True,
+                location=loc,
+                cask_receipt_exists=lambda: False,
+                mas_receipt_exists=lambda: False,
             )
             == InstallSource.GITHUB_RELEASE
+        )
+
+    def test_frozen_with_mas_receipt_is_mac_app_store(self) -> None:
+        # A MAS .app lives in /Applications like a cask; the bundle's
+        # _MASReceipt is what flips it to MAC_APP_STORE (ADR-011).
+        loc = Path("/Applications/keycast.app/Contents/MacOS/keycast")
+        assert (
+            sources.detect_install_source(
+                frozen=True,
+                location=loc,
+                mas_receipt_exists=lambda: True,
+                cask_receipt_exists=lambda: False,
+            )
+            == InstallSource.MAC_APP_STORE
+        )
+
+    def test_mas_receipt_wins_over_cask(self) -> None:
+        # Orthogonal in practice (a MAS install has no Caskroom receipt), but the
+        # MAS probe is checked first — pin that order so the precedence is
+        # intentional, since both key on /Applications.
+        loc = Path("/Applications/keycast.app/Contents/MacOS/keycast")
+        assert (
+            sources.detect_install_source(
+                frozen=True,
+                location=loc,
+                mas_receipt_exists=lambda: True,
+                cask_receipt_exists=lambda: True,
+            )
+            == InstallSource.MAC_APP_STORE
+        )
+
+    def test_mas_receipt_not_detected_when_not_frozen(self) -> None:
+        # The MAS branch lives inside `if frozen:`. A non-frozen install must
+        # classify by the import-path rules even if the receipt predicate would
+        # return True, never as MAC_APP_STORE.
+        loc = Path("/Applications/keycast.app/Contents/Resources/keycast/sources.py")
+        assert (
+            sources.detect_install_source(
+                frozen=False,
+                location=loc,
+                env={},
+                mas_receipt_exists=lambda: True,
+                read_installer=lambda: "pip",
+            )
+            == InstallSource.PIP
         )
 
     def test_frozen_outside_applications_is_release(self) -> None:
@@ -302,6 +353,7 @@ class TestDetectInstallSource:
                 location=loc,
                 env={"SCOOP": r"D:\tools"},
                 cask_receipt_exists=lambda: False,
+                mas_receipt_exists=lambda: False,
                 installer_marker_exists=lambda: False,
             )
             == InstallSource.SCOOP
@@ -591,4 +643,17 @@ class TestRecommendedActionAndLabels:
         assert (
             sources.install_source_label(InstallSource.MICROSOFT_STORE)
             == "Microsoft Store"
+        )
+
+    def test_mac_app_store_action_is_a_statement_not_a_command(self) -> None:
+        # ADR-011: the Mac App Store updates its apps itself, so the recommended
+        # action is that fact stated outright — never a command, never the
+        # Releases page (which would send a MAS user to the wrong channel).
+        assert sources.recommended_action(InstallSource.MAC_APP_STORE) == (
+            "updates are delivered automatically by the Mac App Store"
+        )
+
+    def test_mac_app_store_label_is_exact(self) -> None:
+        assert (
+            sources.install_source_label(InstallSource.MAC_APP_STORE) == "Mac App Store"
         )
