@@ -536,6 +536,12 @@ class Settings(BaseSettings):
         "automatic update checks (offline / privacy). Throttle state is kept in "
         "~/.keycast/update-check.json, not in this config. See keycast.updates.",
     )
+    show_startup_status: bool = Field(
+        default=True,
+        description="Show a one-line startup summary about keyboard/mouse input "
+        "capture availability on the overlay. Set false to suppress this launch "
+        "status message.",
+    )
 
     # Note: per-listener enable flags live on `keyboard.enabled` / `mouse.enabled`;
     # auto_start is the app-level master switch layered above them.

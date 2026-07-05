@@ -107,6 +107,28 @@ On macOS, you'll need to grant accessibility permissions to your terminal or IDE
 2. Add your terminal application (Terminal.app, iTerm2, etc.) or IDE to the list.
 3. Make sure the checkbox is checked.
 
+#### Windows
+
+Windows usually works without an explicit input-permission prompt.
+
+#### Startup input status
+
+On every launch keycast logs a structured `startup_input_status` event, and —
+unless `show_startup_status` is `false` or the app starts minimized — briefly
+shows a one-line summary on the overlay so you can immediately tell whether
+capture is live:
+
+```
+Input status — Keyboard: OK, Mouse: Permission needed
+```
+
+Each source shows one of: `OK` (capturing), `Off` (disabled in settings),
+`Permission needed` (macOS reports the input permission is denied),
+`Not capturing` (the listener failed to start for another reason — see the log),
+or `Unknown`. On macOS the label is informed by a best-effort permission
+precheck; on other platforms it reflects whether the listener started. Suppress
+the overlay line with the `show_startup_status` option below.
+
 ## Configuration
 
 keycast uses a JSON configuration file with Pydantic-based settings validation. You do not need to manually create this file—the application will automatically create it if it doesn't exist.
@@ -196,7 +218,8 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
   "debug": false,
   "start_minimized": false,
   "auto_start": true,
-  "check_for_updates": true
+  "check_for_updates": true,
+  "show_startup_status": true
 }
 ```
 
@@ -207,6 +230,13 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
 > version exists (see [Updates](#updates)). Set it to `false` to disable all
 > automatic update checks (offline and privacy-respecting). The check fails
 > silently when offline.
+
+> `show_startup_status` — when `true` (default), keycast shows a short startup
+> line on the overlay with keyboard/mouse capture status (`OK`, `Off`,
+> `Permission needed`, `Not capturing`, or `Unknown`). The structured
+> `startup_input_status` log event is written regardless of this flag; setting
+> it to `false` only suppresses the on-overlay line. The line is also skipped on
+> a minimized start.
 
 > `debug` — when `true`, keycast surfaces verbose diagnostics regardless of
 > `logging.level`; a quick switch for troubleshooting without editing the logging
