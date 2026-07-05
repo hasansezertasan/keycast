@@ -51,7 +51,14 @@ def _load_probe() -> Callable[[], bool] | None:
     framework or symbol is unavailable.
     """
     logger = logging.getLogger(__name__)
-    if sys.platform != "darwin":
+    # Read the platform into a plainly-typed local before branching. mypy/pyright/
+    # ty treat ``sys.platform != "darwin"`` as a compile-time-known platform guard
+    # and correctly analyze the macOS-only body below; pyrefly instead prunes that
+    # body as dead code on non-darwin targets and then false-positives on the
+    # (now "unreachable") ``carbon``/``probe`` bindings. Widening to ``str`` here
+    # defeats that literal-narrowing so every checker analyzes the body uniformly.
+    host_platform: str = sys.platform
+    if host_platform != "darwin":
         return None
     try:
         carbon = ctypes.CDLL(_MACOS_CARBON_FRAMEWORK)
