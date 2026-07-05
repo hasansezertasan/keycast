@@ -333,6 +333,52 @@ class TestDetectInstallSource:
             == InstallSource.PIP
         )
 
+    def test_frozen_under_windowsapps_is_microsoft_store(self) -> None:
+        # Same frozen bundle again, no marker, no Scoop path; the ACL-locked
+        # WindowsApps deployment tree is what flips it to MICROSOFT_STORE
+        # (ADR-009).
+        loc = Path(
+            "C:/Program Files/WindowsApps/keycast_0.3.0.0_x64__abc/keycast/keycast.exe"
+        )
+        assert (
+            sources.detect_install_source(
+                frozen=True,
+                location=loc,
+                cask_receipt_exists=lambda: False,
+                installer_marker_exists=lambda: False,
+            )
+            == InstallSource.MICROSOFT_STORE
+        )
+
+    def test_installer_marker_wins_over_microsoft_store(self) -> None:
+        # Orthogonal in practice (the Store never deploys the Inno marker into
+        # WindowsApps), but the marker is checked first — pin that order so the
+        # precedence is intentional, like the Scoop one above.
+        loc = Path(
+            "C:/Program Files/WindowsApps/keycast_0.3.0.0_x64__abc/keycast/keycast.exe"
+        )
+        assert (
+            sources.detect_install_source(
+                frozen=True,
+                location=loc,
+                cask_receipt_exists=lambda: False,
+                installer_marker_exists=lambda: True,
+            )
+            == InstallSource.WINDOWS_INSTALLER
+        )
+
+    def test_microsoft_store_not_detected_when_not_frozen(self) -> None:
+        # Like the Scoop branch, the WindowsApps probe lives inside `if frozen:`.
+        # A non-frozen install whose path happens to contain /windowsapps/ must
+        # classify by the import-path rules, never as MICROSOFT_STORE.
+        loc = Path("/home/u/windowsapps/keycast/lib/keycast/updates/sources.py")
+        assert (
+            sources.detect_install_source(
+                frozen=False, location=loc, env={}, read_installer=lambda: "pip"
+            )
+            == InstallSource.PIP
+        )
+
     def test_cask_wins_over_installer_marker(self) -> None:
         # macOS cask is decided before the installer marker is even consulted.
         loc = Path("/Applications/keycast.app/Contents/MacOS/keycast")
@@ -531,4 +577,18 @@ class TestRecommendedActionAndLabels:
         assert sources.install_source_label(InstallSource.SCOOP) == "Scoop"
         assert (
             sources.install_source_label(InstallSource.SCOOP_GLOBAL) == "Scoop (global)"
+        )
+
+    def test_microsoft_store_action_is_a_statement_not_a_command(self) -> None:
+        # ADR-009: the Store updates its apps itself, so the recommended action
+        # is that fact stated outright — never a command to run and never the
+        # Releases page (which would send a Store user to the wrong channel).
+        assert sources.recommended_action(InstallSource.MICROSOFT_STORE) == (
+            "updates are delivered automatically by the Microsoft Store"
+        )
+
+    def test_microsoft_store_label_is_exact(self) -> None:
+        assert (
+            sources.install_source_label(InstallSource.MICROSOFT_STORE)
+            == "Microsoft Store"
         )

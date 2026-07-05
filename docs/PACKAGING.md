@@ -355,6 +355,57 @@ After this, the manifests are edited only by the bucket's updater; users install
 with `scoop bucket add keycast https://github.com/hasansezertasan/scoop-bucket`
 then `scoop install keycast` (or `keycast-pipx`).
 
+## Microsoft Store (MSIX)
+
+The fourth Windows channel; see [ADR-009](adr/009-microsoft-store.md) for the
+decision and rationale. The Store route is **MSIX with `runFullTrust`**: the
+Store signs and hosts the package, so no Authenticode certificate is involved
+(unlike a Win32 EXE/MSI listing), and the full-trust capability lets pynput's
+global input hooks work exactly as in every other channel.
+
+The recipe wraps the untouched `dist/keycast/` PyInstaller folder:
+
+```text
+packaging/msix/AppxManifest.xml   # committed template (Version="0.0.0.0")
+packaging/msix/Assets/*.png       # committed logos (make_icons.py emits them)
+```
+
+- **CI (`ci.yml` `build-windows`)** stages `dist/keycast/` + the manifest +
+  assets into a layout folder and runs `makeappx pack` on every PR with the
+  template's `0.0.0.0` default — a broken manifest fails the PR, not the
+  release (mirrors the `iscc` compile check). `makeappx.exe` ships in the
+  Windows SDK on the runner image but is **not on `PATH`**; both workflows
+  resolve it under `Windows Kits`.
+- **Release (`release.yml` `build-windows`)** does the same but rewrites the
+  manifest's `Version` from the release tag (`vX.Y.Z` → `X.Y.Z.0` — MSIX
+  versions are four-part numeric with **no prerelease form**, so the step is
+  skipped for prerelease tags, matching the Store's stable-only gating).
+- **The `keycast.msix` is a workflow artifact only** (`keycast-msix`), the
+  input for the Partner Center submission. It is **never** attached to the
+  GitHub Release: the package is unsigned until the Store signs it, and an
+  unsigned MSIX cannot be installed — `publish-release` collects only `dist-*`
+  artifacts to enforce this declaratively.
+- **`keycast info`** reports `Install source: microsoft-store` (the ACL-locked
+  `WindowsApps` install path is the signal), and the update notice tells the
+  user updates are delivered automatically by the Store instead of suggesting
+  a command or the Releases page.
+
+### One-time setup (Partner Center)
+
+1. **Register** (free) at [Partner Center](https://partner.microsoft.com/dashboard)
+   and **reserve the app name** (`keycast`).
+2. **Replace the Identity placeholders** in `packaging/msix/AppxManifest.xml`
+   (`Identity Name` and `Publisher`) with the exact values from the product's
+   identity page — the Store rejects the upload if they differ. The committed
+   placeholders keep the PR pack check working before reservation.
+3. **Submit manually**: download the `keycast-msix` artifact from the release
+   run, upload it in a Partner Center submission, and fill in the listing —
+   including the `runFullTrust` justification (visible overlay, open-source
+   repo, no storage or transmission of input) and the age-rating questionnaire.
+4. **Automation comes later** (per ADR-009): only after a manual submission has
+   survived review once, a best-effort `submit-store` job (msstore-cli / the
+   Store submission API) can mirror `bump-cask`/`bump-scoop`.
+
 ## Local reproduction
 
 ```bash
