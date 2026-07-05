@@ -209,7 +209,10 @@ class TestStart:
         keycast.mouse_listener.settings.enabled = True
         keycast.key_listener.settings.enabled = True
 
-        with caplog.at_level("INFO", logger="keycast.application"):
+        with (
+            patch.object(Keycast, "_startup_permission_precheck", return_value=None),
+            caplog.at_level("INFO", logger="keycast.application"),
+        ):
             keycast.start()
 
         assert "startup_input_status" in caplog.text
