@@ -317,6 +317,36 @@ class TestKeyListener:
         assert listener._held_modifiers == {}  # state still cleaned
         assert listener._chord_fired is False
 
+    def test_modifier_released_during_secure_input_emits_when_masking_disabled(
+        self,
+    ) -> None:
+        """mask_secure_input off: the release-path guard must not suppress.
+
+        Mirror of test_modifier_released_during_secure_input_is_not_emitted with
+        masking disabled. The release-path ``emit_lone`` guard is a separate
+        clause from the press path; this pins that dropping the
+        ``settings.mask_secure_input`` term would regress users who turned
+        masking off -- the lone modifier must still surface even when
+        ``is_secure_input()`` reports active.
+        """
+        captured: list[str] = []
+        secure = False
+        listener = KeyListener(
+            captured.append,
+            KeyboardSettings(mask_secure_input=False, group_chords=True),
+            is_secure_input=lambda: secure,
+        )
+
+        listener._on_press(keyboard.Key.ctrl_l)  # visible: legitimately held
+        assert listener._held_modifiers != {}
+
+        secure = True
+        listener._on_release(keyboard.Key.ctrl_l)
+
+        assert captured == ["Control Left"]  # masking off: lone modifier surfaces
+        assert listener._held_modifiers == {}  # state still cleaned
+        assert listener._chord_fired is False
+
     def test_secure_input_masking_logs_once_per_transition(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:

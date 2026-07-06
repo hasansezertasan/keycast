@@ -107,9 +107,13 @@ driven entirely by Conventional Commit messages on `main`:
   (`[tool.tox]`) on Linux/macOS/Windows; the Linux job needs `xvfb` because `pynput`
   imports an X backend at import time. **PR titles** are linted as Conventional
   Commits (`check-pr-title.yml`) since release-please derives versions from them.
-- `pyrefly` is installed but intentionally **not** in the `style` gate: its strict
-  mode rejects pydantic `Field(default=...)` against `Literal` types. mypy, pyright,
-  and ty cover `src` instead.
+- `src` is type-checked by four checkers in the `style` gate: **mypy, pyright, ty,
+  and pyrefly** (`[tool.tox]` runs `pyrefly check`). pyrefly is the strictest: it
+  prunes platform-guarded bodies (`if sys.platform != "darwin": return`) as dead
+  code on non-darwin CI targets, then false-positives on the "unreachable"
+  bindings. Where a macOS-only body must stay analyzable everywhere, widen the
+  guard to a plainly-typed local (`host_platform: str = sys.platform`) to defeat
+  its literal-narrowing — see `secure_input.py` and commit `f6ac111`.
 
 ### Prerelease channel — operational quick reference (currently disabled)
 
