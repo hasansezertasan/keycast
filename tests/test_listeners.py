@@ -1,5 +1,6 @@
 """Tests for the listeners module."""
 
+import logging
 import platform
 from unittest.mock import Mock, patch
 
@@ -231,6 +232,144 @@ class TestKeyListener:
         listener._on_press(keyboard.Key.ctrl_l)
 
         callback.assert_called_once_with("Control Left")
+
+    def test_on_press_masks_keystroke_when_secure_input_active(self) -> None:
+        """No label reaches the sink while secure input is reported active."""
+        callback = Mock()
+        listener = KeyListener(
+            callback, KeyboardSettings(), is_secure_input=lambda: True
+        )
+
+        listener._on_press(keyboard.KeyCode.from_char("s"))
+
+        callback.assert_not_called()
+
+    def test_on_press_shows_keystroke_when_secure_input_inactive(self) -> None:
+        """A normal keystroke is unaffected when secure input is not active."""
+        callback = Mock()
+        listener = KeyListener(
+            callback, KeyboardSettings(), is_secure_input=lambda: False
+        )
+
+        listener._on_press(keyboard.KeyCode.from_char("s"))
+
+        callback.assert_called_once_with("s")
+
+    def test_on_press_ignores_secure_input_when_masking_disabled(self) -> None:
+        """mask_secure_input off: keystrokes show even during secure input."""
+        callback = Mock()
+        listener = KeyListener(
+            callback,
+            KeyboardSettings(mask_secure_input=False),
+            is_secure_input=lambda: True,
+        )
+
+        listener._on_press(keyboard.KeyCode.from_char("s"))
+
+        callback.assert_called_once_with("s")
+
+    def test_masked_modifier_is_not_stashed_as_chord(self) -> None:
+        """A modifier pressed under secure input must not wedge chord state.
+
+        If a masked Ctrl press were stashed in ``_held_modifiers``, the next
+        visible key (after secure input clears) would be fabricated into a
+        phantom "Control + x" chord. The mask must drop it before it is held.
+        """
+        callback = Mock()
+        secure = True
+        listener = KeyListener(
+            callback,
+            KeyboardSettings(group_chords=True),
+            is_secure_input=lambda: secure,
+        )
+
+        listener._on_press(keyboard.Key.ctrl_l)  # masked: must not be held
+        assert listener._held_modifiers == {}
+
+        secure = False
+        listener._on_press(keyboard.KeyCode.from_char("x"))
+        callback.assert_called_once_with("x")  # a lone "x", never "Control + x"
+
+    def test_modifier_released_during_secure_input_is_not_emitted(self) -> None:
+        """A modifier held before secure input, released during it, stays hidden.
+
+        The press-path mask never saw this modifier -- it was pressed while input
+        was visible, so it is legitimately in ``_held_modifiers``. Releasing it
+        *inside* the secure window must not surface even a lone "Control Left",
+        symmetric with the press-path mask. State is still cleaned so a later
+        hold is not wedged.
+        """
+        captured: list[str] = []
+        secure = False
+        listener = KeyListener(
+            captured.append,
+            KeyboardSettings(group_chords=True),
+            is_secure_input=lambda: secure,
+        )
+
+        listener._on_press(keyboard.Key.ctrl_l)  # visible: legitimately held
+        assert listener._held_modifiers != {}
+
+        secure = True
+        listener._on_release(keyboard.Key.ctrl_l)
+
+        assert captured == []  # no lone modifier leaked during the secure window
+        assert listener._held_modifiers == {}  # state still cleaned
+        assert listener._chord_fired is False
+
+    def test_modifier_released_during_secure_input_emits_when_masking_disabled(
+        self,
+    ) -> None:
+        """mask_secure_input off: the release-path guard must not suppress.
+
+        Mirror of test_modifier_released_during_secure_input_is_not_emitted with
+        masking disabled. The release-path ``emit_lone`` guard is a separate
+        clause from the press path; this pins that dropping the
+        ``settings.mask_secure_input`` term would regress users who turned
+        masking off -- the lone modifier must still surface even when
+        ``is_secure_input()`` reports active.
+        """
+        captured: list[str] = []
+        secure = False
+        listener = KeyListener(
+            captured.append,
+            KeyboardSettings(mask_secure_input=False, group_chords=True),
+            is_secure_input=lambda: secure,
+        )
+
+        listener._on_press(keyboard.Key.ctrl_l)  # visible: legitimately held
+        assert listener._held_modifiers != {}
+
+        secure = True
+        listener._on_release(keyboard.Key.ctrl_l)
+
+        assert captured == ["Control Left"]  # masking off: lone modifier surfaces
+        assert listener._held_modifiers == {}  # state still cleaned
+        assert listener._chord_fired is False
+
+    def test_secure_input_masking_logs_once_per_transition(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Masking logs on the active<->inactive edge, never per keystroke.
+
+        A per-press log would re-leak the password length/cadence the mask hides.
+        """
+        secure = True
+        listener = KeyListener(
+            Mock(),
+            KeyboardSettings(),
+            is_secure_input=lambda: secure,
+        )
+
+        with caplog.at_level(logging.INFO, logger="keycast.listeners"):
+            listener._on_press(keyboard.KeyCode.from_char("a"))  # masking starts
+            listener._on_press(keyboard.KeyCode.from_char("b"))  # still masked
+            secure = False
+            listener._on_press(keyboard.KeyCode.from_char("c"))  # masking ends
+
+        messages = [r.getMessage() for r in caplog.records]
+        assert messages.count("secure_input_masking_started") == 1  # not per press
+        assert messages.count("secure_input_masking_ended") == 1
 
     def test_should_show_key_modifier_keys(self) -> None:
         """Test showing modifier keys based on settings."""

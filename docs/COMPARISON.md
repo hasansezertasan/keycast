@@ -38,7 +38,7 @@ young (pre-1.0), and the mature tools below do some things better today.
 | Fade / linger control | ✅ | ✅ | ✅ | ✅ (timeout) |
 | Named presets ("modes") | ✅ | ❌ | ~ (styles) | ❌ |
 | Config format | JSON (validated) | GUI prefs | GUI | `settings.json` |
-| Password/secret masking | ❌ (not yet) | ✅ | ✅ (filters) | n/a |
+| Password/secret masking | ~ (✅ macOS · ❌ Win/Linux) | ✅ | ✅ (filters) | n/a |
 | Language | Python | Objective-C | Dart/Flutter + C++ | TypeScript (built-in) |
 | License | open source | open source | open source | bundled w/ VS Code |
 | Maturity | young (0.x) | mature | mature | mature |
@@ -61,6 +61,25 @@ ceiling is **pretty key labels + chord grouping** (`Command Left + S`), not
 semantic names. This is a fundamental trade-off of system-wide capture, not a
 missing feature we plan to add. See [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md)
 ("Chord Grouping").
+
+## Password/secret masking (macOS)
+
+keycast suppresses keystrokes typed while the OS reports **secure input** is
+active — the mode macOS enables for password and authentication fields. Nothing
+is rendered to the overlay (full suppression, not even `••••`), so a credential
+typed during a live demo never appears on screen or in a recording. This is
+**on by default** (`keyboard.mask_secure_input`): a leaked password on camera is
+worse than a missed keystroke.
+
+Coverage is **best-effort and macOS-only**, because the underlying signal is:
+
+- **macOS** — `IsSecureEventInputEnabled()` reports secure-input mode reliably,
+  the same OS mechanism that already causes pynput to miss key releases here.
+- **Windows / Linux (X11)** — no reliable global "secure field" signal exists, so
+  the flag is a no-op. On those platforms treat masking as unavailable today.
+
+See [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) ("Secure-input masking") and
+[ADR-015](adr/015-secure-input-masking.md).
 
 ## Per-tool notes
 

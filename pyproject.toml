@@ -195,7 +195,14 @@ datas = "datas"
 # Callables registered via these decorators are invoked by the framework, not by
 # our code, so vulture cannot see the call site. Suppress by decorator (precise)
 # rather than naming each validator.
-ignore_decorators = ["@app.command", "@field_validator", "@model_validator"]
+ignore_decorators = [
+  "@app.command",
+  "@field_validator",
+  "@model_validator",
+  # pytest invokes fixtures by the framework; an autouse fixture used only for
+  # its side effect has no call site vulture can see.
+  "@pytest.fixture",
+]
 # Names that are intentionally unused but required by a framework/library
 # signature, so vulture cannot see why they exist.
 ignore_names = [

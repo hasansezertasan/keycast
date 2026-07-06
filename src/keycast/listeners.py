@@ -2,6 +2,7 @@
 
 import logging
 import time
+from collections.abc import Callable
 from typing import TYPE_CHECKING, NamedTuple, Protocol
 
 from pynput import keyboard, mouse
@@ -11,6 +12,7 @@ from pynput import keyboard, mouse
 # listener callbacks. Imported into this namespace so existing references to
 # ``keycast.listeners._ErrorThrottler`` keep resolving.
 from keycast.logging_setup import _ErrorThrottler, format_event
+from keycast.secure_input import is_secure_input_active
 
 if TYPE_CHECKING:
     from keycast.settings import KeyboardSettings, MouseSettings
@@ -59,18 +61,32 @@ class TextSink(Protocol):
 class KeyListener:
     """Keyboard event listener using pynput."""
 
-    def __init__(self, show_text: TextSink, settings: KeyboardSettings) -> None:
+    def __init__(
+        self,
+        show_text: TextSink,
+        settings: KeyboardSettings,
+        *,
+        is_secure_input: Callable[[], bool] = is_secure_input_active,
+    ) -> None:
         """Initialize the keyboard listener.
 
         Args:
             show_text: Sink invoked (on a pynput listener thread) with the
                 formatted label each time a key is pressed
             settings: Keyboard settings
+            is_secure_input: Predicate returning whether the OS currently reports
+                secure input (a password/authentication field is focused). Called
+                per press when ``settings.mask_secure_input`` is set; injected so
+                tests can drive masking without a real secure field. Defaults to
+                the macOS probe :func:`keycast.secure_input.is_secure_input_active`
+                (a no-op returning ``False`` on other platforms).
         """
         self.show_text = show_text
         """The callback function called when a key is pressed."""
         self.settings = settings
         """The keyboard settings."""
+        self._is_secure_input = is_secure_input
+        """Predicate telling whether secure input is active (see __init__)."""
         self.listener: keyboard.Listener | None = None
         """The keyboard listener instance."""
         self.logger = logging.getLogger(__name__)
@@ -84,6 +100,12 @@ class KeyListener:
         """Currently held modifiers: key name -> HeldModifier(label, pressed_at)."""
         self._chord_fired = False
         """Whether a non-modifier completed a chord during the current hold."""
+        self._secure_input_active = False
+        """Whether the last observed press saw secure input active.
+
+        Tracks the active<->inactive edge so masking is logged once per
+        transition, never per keystroke (see :meth:`_on_press`).
+        """
 
     @staticmethod
     def _is_modifier(key_name: str | None) -> bool:
@@ -246,6 +268,33 @@ class KeyListener:
                     format_event("key_event_skipped", reason="key_is_none")
                 )
                 return
+            # Secure-input masking: if the OS reports a password/authentication
+            # field is focused, drop the keystroke entirely before it can be
+            # formatted, held as a chord modifier, or reach the sink -- so a typed
+            # credential never lands on the overlay. Checked ahead of chord state
+            # so a modifier pressed inside a secure field is not stashed in
+            # _held_modifiers (which would fabricate a phantom chord on the next
+            # visible key). Best-effort: is_secure_input is False off macOS.
+            if self.settings.mask_secure_input:
+                secure = self._is_secure_input()
+                # Edge-triggered logging: one line when masking begins and one
+                # when it ends -- never per keystroke. A per-press log (even at
+                # DEBUG) would re-leak into ~/.keycast/main.log the very password
+                # length/cadence the mask exists to hide. Logging only the
+                # transition still lets an operator confirm masking engaged. The
+                # "ended" edge is picked up lazily on the first press after
+                # secure input clears, so no polling thread is needed.
+                if secure != self._secure_input_active:
+                    self._secure_input_active = secure
+                    self.logger.info(
+                        format_event(
+                            "secure_input_masking_started"
+                            if secure
+                            else "secure_input_masking_ended"
+                        )
+                    )
+                if secure:
+                    return
             if self.settings.group_chords:
                 self._evict_stale_modifiers()
             key_name = self._key_name(key)
@@ -314,8 +363,18 @@ class KeyListener:
             if key_name not in self._held_modifiers:
                 return
             label = self._held_modifiers.pop(key_name).label
-            # Emit a lone modifier only if no chord consumed this hold session.
-            emit_lone = not self._chord_fired and self.settings.show_modifier_keys
+            # Emit a lone modifier only if no chord consumed this hold session,
+            # and not while secure input is active. A modifier pressed *before* a
+            # password field gained focus is legitimately held (the press-path
+            # mask never saw it), but releasing it *during* the secure window
+            # must not surface even a lone modifier label -- symmetric with the
+            # press-path mask. The pop above and the reset below still run, so
+            # chord state stays clean across the secure window.
+            emit_lone = (
+                not self._chord_fired
+                and self.settings.show_modifier_keys
+                and not (self.settings.mask_secure_input and self._is_secure_input())
+            )
             if not self._held_modifiers:
                 # Hold session ended; reset for the next one.
                 self._chord_fired = False
