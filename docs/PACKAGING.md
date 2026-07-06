@@ -440,9 +440,15 @@ so the order is **reserve → update manifest → release → submit**.
 
 #### 1. Partner Center account + name reservation
 
-1. Register (free) at
-   [Partner Center](https://partner.microsoft.com/dashboard/registration) —
-   account type **Individual**. Identity verification can take a day or two.
+1. Register (free) for a first-time **Individual** account by starting at
+   [Store Developer](https://storedeveloper.microsoft.com) → **Get started for
+   free** → **Individual developer**. This is the *only* entry point for the
+   fee-free onboarding flow — starting from Partner Center directly (or via Xbox
+   / Visual Studio) routes you through the **legacy** flow instead
+   ([Microsoft Learn](https://learn.microsoft.com/en-us/windows/apps/publish/partner-center/open-a-developer-account)).
+   Identity verification (government ID + selfie) can take a day or two. If you
+   *already* have a developer account, skip straight to
+   [Apps & Games](https://aka.ms/submitwindowsapp).
 2. Dashboard → **Apps and games** → **+ New product** → choose
    **"MSIX or PWA app"** (⚠️ *not* "EXE or MSI app" — that is the Win32 route
    [ADR-009](adr/009-microsoft-store.md) rejects).
