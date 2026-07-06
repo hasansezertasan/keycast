@@ -83,6 +83,35 @@ class TestIsSecureInputActive:
         monkeypatch.setattr(secure_input, "_load_probe", lambda: _boom)
         assert secure_input.is_secure_input_active() is False
 
+    def test_call_failure_retires_probe_and_logs_once(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A persistently raising probe is retired: invoked once, logged once.
+
+        Secure input is a per-press hot path; re-invoking and re-logging a broken
+        probe every press would flood the log and re-leak password cadence via
+        the log-line count and timestamps.
+        """
+        calls = {"n": 0}
+
+        def _boom() -> bool:
+            calls["n"] += 1
+            raise OSError("secure-input read failed")
+
+        monkeypatch.setattr(secure_input, "_load_probe", lambda: _boom)
+        with caplog.at_level(logging.INFO, logger="keycast.secure_input"):
+            assert secure_input.is_secure_input_active() is False
+            assert secure_input.is_secure_input_active() is False
+            assert secure_input.is_secure_input_active() is False
+
+        assert calls["n"] == 1  # probe retired after the first failure
+        read_failed = [
+            r
+            for r in caplog.records
+            if "macos_secure_input_read_failed" in r.getMessage()
+        ]
+        assert len(read_failed) == 1  # logged once, not per press
+
 
 class TestLoadProbe:
     """The framework load itself: macOS-only, degrades to None, never raises."""

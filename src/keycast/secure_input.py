@@ -91,7 +91,10 @@ def is_secure_input_active() -> bool:
 
     Best-effort and macOS-only: returns ``False`` on other platforms and whenever
     the probe cannot be loaded or raises, so a host without the signal keeps
-    capturing normally rather than silently blanking the overlay.
+    capturing normally rather than silently blanking the overlay. A probe that
+    raises on call is retired after the first failure (logged once), so a
+    persistent fault fails open *silently* thereafter rather than re-logging every
+    press -- which would flood the log and leak typing cadence.
 
     Returns:
         ``True`` only when macOS reports secure event input is enabled.
@@ -113,6 +116,16 @@ def is_secure_input_active() -> bool:
         # mislabel a detection fault as ``key_format_error``. A symbol that loaded
         # but raises on call is unexpected on macOS; log at INFO (not DEBUG) so it
         # is visible, but never let it kill the keystroke.
+        #
+        # Retire the probe after this first call-time failure -- same posture as a
+        # load-time failure (``_load_failed``). If the fault persists (secure
+        # input is a per-press hot path), re-logging every press would both flood
+        # ~/.keycast/main.log and, worse, re-leak the password length/cadence the
+        # mask exists to hide via the log-line count and timestamps. Disabling the
+        # probe makes every later call fail open *silently*, so the leak stays
+        # closed; the one INFO line still records that masking went dark.
+        _probe = None
+        _load_failed = True
         logging.getLogger(__name__).info(
             format_event(
                 "macos_secure_input_read_failed",
