@@ -57,8 +57,12 @@ process. Resolution order — first match wins:
    by location to pick the recommended command:
    - path under `pipx`'s venvs (`PIPX_HOME` or `~/.local/pipx/venvs`) → **pipx**
    - path under uv's tool dir (`~/.local/share/uv/tools`) or uv cache → **uv tool / uvx**
-   - path under a Homebrew prefix (`$(brew --prefix)`, typically `/opt/homebrew`
-     or `/usr/local`) → **Homebrew formula**
+   - path under a keycast Homebrew **Cellar keg**
+     (`<brew-prefix>/Cellar/keycast/…`) → **Homebrew formula**. The keg marker,
+     not the bare brew prefix, is the signal: a bare `/opt/homebrew` prefix also
+     matches the `site-packages` of a Homebrew-provided CPython, which would
+     misclassify an ordinary `pip install` into brew's Python as a formula
+     (refined by [ADR-005](005-updates-package-structure.md))
    - otherwise → **pip** (generic `pip install -U`)
 2. **Frozen, and the executable path is under a Homebrew prefix / `Caskroom`**
    (or `/Applications/keycast.app` with a matching cask receipt) → **Homebrew cask**.
