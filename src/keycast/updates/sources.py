@@ -68,6 +68,39 @@ def _looks_homebrew(location_posix: str) -> bool:
     )
 
 
+_HOMEBREW_FORMULA_KEG_MARKER = "/cellar/keycast/"
+"""Lower-cased POSIX fragment marking a Homebrew **formula** keg for keycast.
+
+A formula builds keycast into its own Cellar keg
+(``<brew-prefix>/Cellar/keycast/<version>/...``), so this keycast-named fragment
+is the reliable formula signal (see ADR-005). The broad :func:`_looks_homebrew`
+prefix check is deliberately *not* reused for the formula case — see
+:func:`_looks_homebrew_formula`.
+"""
+
+
+def _looks_homebrew_formula(location_posix: str) -> bool:
+    """Return whether a non-frozen package location is a Homebrew *formula* keg.
+
+    Deliberately narrower than :func:`_looks_homebrew`. That helper also matches
+    the bare ``/opt/homebrew/`` (or ``/usr/local/cellar/``) prefix, which is
+    correct for the frozen cask branch but wrong here: it also matches the
+    ``site-packages`` of a *Homebrew-provided CPython*, so an ordinary
+    ``pip install keycast`` into ``brew``'s Python
+    (``/opt/homebrew/lib/pythonX/site-packages/keycast/``) would be misclassified
+    as a formula and handed a ``brew upgrade keycast`` command that does not apply
+    to a pip install. A genuine formula instead lives under a keycast-named Cellar
+    keg, so key off that fragment alone (see ADR-005).
+
+    Args:
+        location_posix: ``location.as_posix().lower()`` of this package.
+
+    Returns:
+        True only if the location sits inside a keycast Homebrew Cellar keg.
+    """
+    return _HOMEBREW_FORMULA_KEG_MARKER in location_posix
+
+
 def _is_under(location_posix: str, raw_dir: str) -> bool:
     """Return whether a POSIX path lives under a (possibly native) directory.
 
@@ -351,7 +384,11 @@ def detect_install_source(
         or _is_under(posix, env.get("UV_TOOL_DIR", ""))
     ):
         return InstallSource.UV_TOOL
-    if _looks_homebrew(posix):
+    # Formula detection keys off the keycast-named Cellar keg, NOT the broad
+    # _looks_homebrew prefix: the latter also matches the site-packages of a
+    # Homebrew-provided CPython, misclassifying a plain `pip install` into brew's
+    # Python as a formula (see _looks_homebrew_formula / ADR-005).
+    if _looks_homebrew_formula(posix):
         return InstallSource.HOMEBREW_FORMULA
     return InstallSource.PIP
 

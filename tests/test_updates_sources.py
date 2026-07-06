@@ -39,6 +39,35 @@ class TestLooksHomebrew:
         assert sources._looks_homebrew("/usr/lib/python3.14/site-packages") is False
 
 
+class TestLooksHomebrewFormula:
+    """The narrow formula-keg heuristic (must not fire on brew's own CPython)."""
+
+    @pytest.mark.parametrize(
+        "posix",
+        [
+            "/opt/homebrew/cellar/keycast/0.1.0/libexec/lib/python3.14/site-packages",
+            "/usr/local/cellar/keycast/0.1.0/lib",
+            "/home/linuxbrew/.linuxbrew/cellar/keycast/0.1.0/lib",
+        ],
+    )
+    def test_formula_keg_detected(self, posix: str) -> None:
+        assert sources._looks_homebrew_formula(posix) is True
+
+    @pytest.mark.parametrize(
+        "posix",
+        [
+            # A plain `pip install` into a Homebrew-provided CPython: lives under
+            # the brew prefix but is NOT a keycast keg. Must not read as a formula.
+            "/opt/homebrew/lib/python3.14/site-packages/keycast/updates/sources.py",
+            "/usr/local/lib/python3.14/site-packages/keycast",
+            # A different formula's keg must not match keycast's.
+            "/opt/homebrew/cellar/other/0.1.0/lib",
+        ],
+    )
+    def test_non_formula_paths_rejected(self, posix: str) -> None:
+        assert sources._looks_homebrew_formula(posix) is False
+
+
 class TestScoopSource:
     """The Scoop location heuristic: per-user vs global, path marker + env root."""
 
@@ -637,6 +666,21 @@ class TestDetectInstallSource:
 
     def test_plain_pip(self) -> None:
         loc = Path("/usr/lib/python3.14/site-packages/keycast/updates/sources.py")
+        assert (
+            sources.detect_install_source(
+                frozen=False, location=loc, env={}, read_installer=lambda: "pip"
+            )
+            == InstallSource.PIP
+        )
+
+    def test_pip_into_homebrew_python_is_pip_not_formula(self) -> None:
+        # Regression: a plain `pip install keycast` into a Homebrew-provided
+        # CPython lands under the brew prefix but is NOT a formula keg. It must
+        # classify as PIP (→ `pip install -U keycast`), not HOMEBREW_FORMULA
+        # (→ `brew upgrade keycast`, which does not apply to a pip install).
+        loc = Path(
+            "/opt/homebrew/lib/python3.14/site-packages/keycast/updates/sources.py"
+        )
         assert (
             sources.detect_install_source(
                 frozen=False, location=loc, env={}, read_installer=lambda: "pip"
