@@ -1,5 +1,6 @@
 """Tests for the settings module (load, recovery, creation, invariants)."""
 
+import errno
 import json
 import os
 import platform
@@ -14,7 +15,9 @@ from keycast.settings import (
     LoggingSettings,
     MouseSettings,
     Settings,
+    _best_effort_fsync_dir,
     _default_key_mappings,
+    _fsync_data,
     _PRESET_OVERRIDES,
     is_bare_key_name,
     is_button_string,
@@ -278,6 +281,88 @@ class TestCreateSettingsFile:
         # The atomic-write temp file is cleaned up on failure.
         assert list(config_path.parent.glob("*.tmp")) == []
         assert "could not save config" in capsys.readouterr().err
+
+    def test_write_aborts_on_real_fsync_writeback_failure(
+        self,
+        config_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A genuine fsync failure (ENOSPC) aborts the replace; old config kept.
+
+        The data never reached disk, so _write_settings must not go on to replace
+        a good config with an unflushed file -- it cleans up the temp, warns, and
+        leaves no config behind (first run) rather than persisting bad data.
+        """
+
+        def failing_fsync(_fd: int) -> None:
+            raise OSError(errno.ENOSPC, "No space left on device")
+
+        monkeypatch.setattr(os, "fsync", failing_fsync)
+
+        settings = Settings.create_settings_file()  # must not raise
+
+        assert settings.display.width == DisplaySettings().width
+        # Replace was aborted: no config written, temp cleaned up, user warned.
+        assert not config_path.exists()
+        assert list(config_path.parent.glob("*.tmp")) == []
+        assert "could not save config" in capsys.readouterr().err
+
+    def test_write_tolerates_unsupported_fsync(
+        self, config_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """fsync-unsupported (EINVAL) is tolerated: the atomic replace still runs.
+
+        Some filesystems cannot fsync a regular fd; the atomic os.replace alone
+        already prevents a torn file, so the write must still succeed there.
+        """
+
+        def unsupported_fsync(_fd: int) -> None:
+            raise OSError(errno.EINVAL, "Invalid argument")
+
+        monkeypatch.setattr(os, "fsync", unsupported_fsync)
+
+        settings = Settings.create_settings_file()
+
+        # The write went through despite fsync being unsupported.
+        assert config_path.exists()
+        assert settings.display.width == DisplaySettings().width
+
+    def test_fsync_data_propagates_real_failure(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_fsync_data re-raises a writeback error but swallows an unsupported one."""
+
+        def eio(_fd: int) -> None:
+            raise OSError(errno.EIO, "I/O error")
+
+        monkeypatch.setattr(os, "fsync", eio)
+        with pytest.raises(OSError, match="I/O error"):
+            _fsync_data(0)
+
+        def einval(_fd: int) -> None:
+            raise OSError(errno.EINVAL, "Invalid argument")
+
+        monkeypatch.setattr(os, "fsync", einval)
+        _fsync_data(0)  # tolerated: must not raise
+
+    def test_best_effort_fsync_dir_swallows_all_failures(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The directory fsync never fails a completed write (Windows / unsupported)."""
+        # os.open failing (e.g. Windows cannot open a directory fd) is a no-op.
+        monkeypatch.setattr(
+            os, "open", lambda *_a, **_k: (_ for _ in ()).throw(OSError)
+        )
+        _best_effort_fsync_dir(tmp_path)  # must not raise
+
+        # os.fsync failing after a successful open is also swallowed.
+        real_open = os.open
+        monkeypatch.setattr(os, "open", real_open)
+        monkeypatch.setattr(
+            os, "fsync", lambda _fd: (_ for _ in ()).throw(OSError("nope"))
+        )
+        _best_effort_fsync_dir(tmp_path)  # must not raise
 
     def test_default_colors_survive_write_and_reload(self, config_path: Path) -> None:
         """Color fields round-trip through the first-run write + reload.

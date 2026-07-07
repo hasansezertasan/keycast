@@ -1,5 +1,6 @@
 """Python module for keycast configuration and paths."""
 
+import errno
 import logging
 import os
 import platform
@@ -93,28 +94,53 @@ def is_button_string(name: str) -> bool:
     return name.startswith("Button.")
 
 
-def _best_effort_fsync(fd: int) -> None:
-    """``os.fsync`` a file descriptor, tolerating an unsupported filesystem.
+# Errnos meaning "fsync is not supported for this descriptor/filesystem" (rather
+# than "the write failed"). Only these are tolerated when flushing the config
+# data: a genuine writeback failure (ENOSPC / EIO / EDQUOT / ...) means the bytes
+# never reached disk and must abort the pending os.replace, so the previous
+# config is preserved instead of being overwritten by an unflushed file. EINVAL
+# is what Linux returns for an fd/FS that cannot fsync; ENOTSUP/EOPNOTSUPP is the
+# BSD/macOS equivalent. (getattr guards platforms lacking the ENOTSUP alias.)
+_FSYNC_UNSUPPORTED_ERRNOS = frozenset(
+    {
+        errno.EINVAL,
+        getattr(errno, "ENOTSUP", errno.EINVAL),
+        getattr(errno, "EOPNOTSUPP", errno.EINVAL),
+    }
+)
 
-    Durability is an enhancement layered on top of the atomic ``os.replace`` in
-    :meth:`Settings._write_settings`; the replace alone already prevents a torn
-    file. Some filesystems (and some network mounts) reject ``fsync``, so a
-    failure is swallowed rather than turning a successful write into an error.
+
+def _fsync_data(fd: int) -> None:
+    """``os.fsync`` a data descriptor before it is atomically renamed into place.
+
+    Propagates a real writeback failure so :meth:`Settings._write_settings`
+    aborts the ``os.replace`` and keeps the previous config, rather than replacing
+    it with data that never reached disk. Only "fsync unsupported for this
+    descriptor/filesystem" (see :data:`_FSYNC_UNSUPPORTED_ERRNOS`) is tolerated --
+    there the atomic replace alone still guards against a torn file.
 
     Args:
         fd: An open file descriptor to flush to disk.
+
+    Raises:
+        OSError: On a genuine writeback failure (ENOSPC, EIO, EDQUOT, ...).
     """
     try:
         os.fsync(fd)
-    except OSError:
-        pass
+    except OSError as exc:
+        if exc.errno in _FSYNC_UNSUPPORTED_ERRNOS:
+            return
+        raise
 
 
 def _best_effort_fsync_dir(directory: Path) -> None:
-    """``os.fsync`` a directory so a rename within it is durable, if supported.
+    """``os.fsync`` a directory so a completed rename is durable, if supported.
 
-    No-op where a directory fd cannot be opened or synced (notably Windows).
-    Best-effort for the same reason as :func:`_best_effort_fsync`.
+    Fully best-effort: a no-op wherever a directory fd cannot be opened or synced
+    (notably Windows). Unlike :func:`_fsync_data` this runs *after* the atomic
+    ``os.replace``, so the file contents are already safe on disk -- only the
+    durability of the rename metadata is at stake, which is not worth failing a
+    successful write over.
 
     Args:
         directory: The directory whose metadata to flush.
@@ -1026,11 +1052,12 @@ class Settings(BaseSettings):
                     # rename. Without this a power loss just after os.replace can
                     # reorder data vs. rename metadata and leave a zero-length or
                     # truncated config -- the exact corruption the tmp+replace
-                    # dance exists to prevent. Best-effort: fsync is unsupported on
-                    # some filesystems, so a failure here must not fail the write
-                    # (the atomic replace below is what guarantees no torn file).
+                    # dance exists to prevent. A real writeback failure here
+                    # (ENOSPC/EIO/...) propagates so the replace is aborted and the
+                    # old config kept; only "fsync unsupported" is tolerated (the
+                    # atomic replace still guarantees no torn file). See _fsync_data.
                     tmp_file.flush()
-                    _best_effort_fsync(tmp_file.fileno())
+                    _fsync_data(tmp_file.fileno())
                 os.replace(tmp_name, json_file)
                 # fsync the directory so the rename itself is durable. Also
                 # best-effort: Windows cannot open a directory fd, and some
