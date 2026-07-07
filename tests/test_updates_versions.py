@@ -5,11 +5,14 @@
 
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock
 
 import pytest
 
 from keycast.updates import versions
+
+_ALLOWED_URL = "https://api.github.com/repos/hasansezertasan/keycast/releases/latest"
 
 
 class TestVersionComparison:
@@ -43,11 +46,25 @@ class TestVersionComparison:
 class TestFetchLatestReleaseTag:
     """The GitHub fetch, with ``urlopen`` patched (never real network)."""
 
-    def _patch_urlopen(self, monkeypatch: pytest.MonkeyPatch, payload: object) -> None:
+    def _patch_urlopen(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        payload: object,
+        *,
+        url: str = _ALLOWED_URL,
+        raw: bytes | None = None,
+    ) -> None:
+        # Build a realistic response so the real read()/geturl()/json.loads path
+        # runs: geturl() drives the redirect/scheme guard and read(n) drives the
+        # size cap. ``raw`` overrides the body for the size-limit test.
+        response = MagicMock()
+        response.geturl.return_value = url
+        response.read.return_value = (
+            raw if raw is not None else json.dumps(payload).encode()
+        )
         cm = MagicMock()
-        cm.__enter__.return_value = object()
+        cm.__enter__.return_value = response
         monkeypatch.setattr(versions.urllib.request, "urlopen", lambda *_a, **_k: cm)
-        monkeypatch.setattr(versions.json, "load", lambda _resp: payload)
 
     def test_returns_tag(self, monkeypatch: pytest.MonkeyPatch) -> None:
         self._patch_urlopen(monkeypatch, {"tag_name": "v1.2.3"})
@@ -59,6 +76,25 @@ class TestFetchLatestReleaseTag:
 
     def test_non_dict_payload_is_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
         self._patch_urlopen(monkeypatch, ["unexpected"])
+        assert versions.fetch_latest_release_tag() is None
+
+    def test_off_host_redirect_is_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A redirect that leaves HTTPS-on-GitHub is rejected before trusting the body.
+
+        urllib follows 30x automatically; a spoofed release notice is a
+        social-engineering vector, so a final URL off api.github.com yields None
+        even if the (attacker-controlled) body parses.
+        """
+        self._patch_urlopen(
+            monkeypatch, {"tag_name": "v9.9.9"}, url="http://evil.example/latest"
+        )
+        assert versions.fetch_latest_release_tag() is None
+
+    def test_oversize_response_is_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A body larger than MAX_RESPONSE_BYTES is treated as a failed check."""
+        # read(MAX+1) returns MAX+1 bytes -> over the cap -> None, before json.loads.
+        oversize = b"x" * (versions.MAX_RESPONSE_BYTES + 1)
+        self._patch_urlopen(monkeypatch, {"tag_name": "v1.0"}, raw=oversize)
         assert versions.fetch_latest_release_tag() is None
 
     def test_network_error_is_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -76,8 +112,11 @@ class TestFetchLatestReleaseTag:
         # a refactor and would silently reintroduce hangs / rate-limit 403s, so
         # pin them by capturing what `fetch` actually hands to urlopen.
         captured: dict[str, object] = {}
+        response = MagicMock()
+        response.geturl.return_value = _ALLOWED_URL
+        response.read.return_value = json.dumps({"tag_name": "v1.0"}).encode()
         cm = MagicMock()
-        cm.__enter__.return_value = object()
+        cm.__enter__.return_value = response
 
         def fake_urlopen(request: object, timeout: float) -> object:
             captured["request"] = request
@@ -85,7 +124,6 @@ class TestFetchLatestReleaseTag:
             return cm
 
         monkeypatch.setattr(versions.urllib.request, "urlopen", fake_urlopen)
-        monkeypatch.setattr(versions.json, "load", lambda _resp: {"tag_name": "v1.0"})
 
         assert versions.fetch_latest_release_tag() == "v1.0"
         assert captured["timeout"] == versions.REQUEST_TIMEOUT_SECONDS

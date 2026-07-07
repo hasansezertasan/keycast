@@ -28,6 +28,23 @@ LATEST_RELEASE_API_URL = (
 REQUEST_TIMEOUT_SECONDS: float = 5.0
 """Hard cap on the GitHub request so a slow network never stalls a refresh."""
 
+MAX_RESPONSE_BYTES: int = 1 << 20
+"""Ceiling on the response body we will read (1 MiB).
+
+The latest-release payload is a few KB; anything approaching this is a
+compromised, MITM'd, or misdirected endpoint. Bounding the read keeps a hostile
+or runaway body from exhausting memory on the background refresh thread. A
+response at or over the cap is treated as a failed check (``None``)."""
+
+_ALLOWED_URL_PREFIX = "https://api.github.com/"
+"""The final response URL must still start with this.
+
+``urllib`` follows redirects automatically and will happily follow a 30x to
+``http://`` or another host, silently downgrading TLS. The tag is only
+*displayed*, but a spoofed "update available -- run brew upgrade ..." notice is a
+social-engineering vector, so a redirect that leaves HTTPS-on-GitHub is rejected
+before the body is trusted."""
+
 
 def strip_v(tag: str) -> str:
     """Drop a single leading ``v`` from a release tag (``v0.3.0`` -> ``0.3.0``).
@@ -85,7 +102,18 @@ def fetch_latest_release_tag(timeout: float = REQUEST_TIMEOUT_SECONDS) -> str | 
     )
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            payload = json.load(response)
+            # Reject a redirect that left HTTPS-on-GitHub before trusting the body.
+            final_url = response.geturl()
+            if not final_url.startswith(_ALLOWED_URL_PREFIX):
+                logger.debug("Update check redirected off-host to %s", final_url)
+                return None
+            # Read one byte past the cap so an over-size body is detectable rather
+            # than silently truncated into a parseable-but-wrong payload.
+            raw = response.read(MAX_RESPONSE_BYTES + 1)
+        if len(raw) > MAX_RESPONSE_BYTES:
+            logger.debug("Update check response exceeded %d bytes", MAX_RESPONSE_BYTES)
+            return None
+        payload = json.loads(raw)
     except Exception:
         # Network, timeout, rate-limit (HTTP 403/429), and JSON-parse errors all
         # land here; the traceback says which, so keep the message neutral rather
