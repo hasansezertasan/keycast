@@ -1,5 +1,6 @@
 """Tests for the main entry point."""
 
+import sys
 import tkinter as tk
 from unittest.mock import patch
 
@@ -49,3 +50,26 @@ def test_main_headless_failure_logs_actionable_hint(
     assert exc_info.value.code == 1
     assert "reason=no_display" in caplog.text
     assert "hint=" in caplog.text
+
+
+def test_main_missing_tkinter_logs_actionable_hint(
+    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Python built without _tkinter (ImportError) gets the same headless hint.
+
+    ``import tkinter`` raising -- not just ``tk.TclError`` at construction -- must
+    still degrade to exit 1 with an actionable message rather than an uncaught
+    traceback. Poisoning sys.modules makes the lazy ``import tkinter`` in main()
+    raise ImportError.
+    """
+    monkeypatch.setitem(sys.modules, "tkinter", None)
+
+    with (
+        caplog.at_level("ERROR", logger="keycast"),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        main()
+
+    assert exc_info.value.code == 1
+    assert "reason=no_display" in caplog.text
+    assert "_tkinter" in caplog.text

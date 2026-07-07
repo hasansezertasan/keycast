@@ -195,10 +195,10 @@ class KeyListener:
             # Character (or unknown) keys are always shown.
             return True
 
-        # Check if it's a modifier key. pynput reports the Windows/Super key as
-        # "cmd" (not "win") on every platform, so there is no "win" prefix to
-        # match here.
-        if key_name.startswith(("ctrl", "alt", "shift", "cmd")):
+        # Check if it's a modifier key. Reuse _is_modifier so the modifier-prefix
+        # set lives in exactly one place (it also documents the "cmd" not "win"
+        # naming); duplicating the prefix tuple here risked the two drifting.
+        if self._is_modifier(key_name):
             return self.settings.show_modifier_keys
 
         # Check if it's a function key (f1, f2, etc.)
@@ -251,6 +251,52 @@ class KeyListener:
         if stale:
             self._chord_fired = False
 
+    def _is_secure_keystroke_masked(self) -> bool:
+        """Return whether the current keystroke must be dropped for secure input.
+
+        If the OS reports a password/authentication field is focused, the
+        keystroke is dropped before it can be formatted, held as a chord
+        modifier, or reach the sink -- so a typed credential never lands on the
+        overlay. Best-effort: ``is_secure_input`` is ``False`` off macOS.
+
+        Edge-triggered logging: one line when masking begins and one when it ends
+        -- never per keystroke. A per-press log (even at DEBUG) would re-leak into
+        ``~/.keycast/main.log`` the very password length/cadence the mask exists
+        to hide. Logging only the transition still lets an operator confirm
+        masking engaged; the "ended" edge is picked up lazily on the first press
+        after secure input clears, so no polling thread is needed.
+
+        Returns:
+            True if the keystroke should be dropped (secure input is active).
+        """
+        secure = self._is_secure_input()
+        if secure != self._secure_input_active:
+            self._secure_input_active = secure
+            self.logger.info(
+                format_event(
+                    "secure_input_masking_started"
+                    if secure
+                    else "secure_input_masking_ended"
+                )
+            )
+        return secure
+
+    def _build_chord_label(self, formatted_key: str) -> str:
+        """Prefix the currently held modifiers onto ``formatted_key``.
+
+        Modifiers are joined in the order pressed. The chord always carries its
+        modifiers, even when ``show_modifier_keys`` is off (a chord without them
+        is useless).
+
+        Args:
+            formatted_key: The display label of the non-modifier key.
+
+        Returns:
+            The chord label, e.g. ``"Control Left + Shift Left + a"``.
+        """
+        labels = [held.label for held in self._held_modifiers.values()]
+        return self.settings.chord_separator.join([*labels, formatted_key])
+
     def _on_press(self, key: keyboard.Key | keyboard.KeyCode | None) -> None:
         """Handle key press events.
 
@@ -261,40 +307,20 @@ class KeyListener:
         # key formatting ("could not format this key") is distinct from a broken
         # display sink ("the overlay is broken"). Keeping them in one try would
         # mislabel a display-layer fault as an input error, so they are caught
-        # and reported under different event names.
+        # and reported under different event names. Neither log passes the key
+        # itself -- only ``key_kind`` (its type name) -- so an error while typing
+        # into a non-secure-flagged field cannot leak the character into the log.
         try:
             if key is None:
                 self.logger.warning(
                     format_event("key_event_skipped", reason="key_is_none")
                 )
                 return
-            # Secure-input masking: if the OS reports a password/authentication
-            # field is focused, drop the keystroke entirely before it can be
-            # formatted, held as a chord modifier, or reach the sink -- so a typed
-            # credential never lands on the overlay. Checked ahead of chord state
-            # so a modifier pressed inside a secure field is not stashed in
-            # _held_modifiers (which would fabricate a phantom chord on the next
-            # visible key). Best-effort: is_secure_input is False off macOS.
-            if self.settings.mask_secure_input:
-                secure = self._is_secure_input()
-                # Edge-triggered logging: one line when masking begins and one
-                # when it ends -- never per keystroke. A per-press log (even at
-                # DEBUG) would re-leak into ~/.keycast/main.log the very password
-                # length/cadence the mask exists to hide. Logging only the
-                # transition still lets an operator confirm masking engaged. The
-                # "ended" edge is picked up lazily on the first press after
-                # secure input clears, so no polling thread is needed.
-                if secure != self._secure_input_active:
-                    self._secure_input_active = secure
-                    self.logger.info(
-                        format_event(
-                            "secure_input_masking_started"
-                            if secure
-                            else "secure_input_masking_ended"
-                        )
-                    )
-                if secure:
-                    return
+            # Checked ahead of chord state so a modifier pressed inside a secure
+            # field is not stashed in _held_modifiers (which would fabricate a
+            # phantom chord on the next visible key).
+            if self.settings.mask_secure_input and self._is_secure_keystroke_masked():
+                return
             if self.settings.group_chords:
                 self._evict_stale_modifiers()
             key_name = self._key_name(key)
@@ -322,21 +348,19 @@ class KeyListener:
                 return
             formatted_key = self._format_key(key)
             if chord_active:
-                # Prefix the held modifiers, in the order pressed. The chord
-                # always carries its modifiers, even when show_modifier_keys is
-                # off (a chord without them is useless).
-                labels = [held.label for held in self._held_modifiers.values()]
-                formatted_key = self.settings.chord_separator.join(
-                    [*labels, formatted_key]
-                )
+                formatted_key = self._build_chord_label(formatted_key)
         except Exception as exc:
-            self._error_throttler.log("key_format_error", exc, key=key)
+            self._error_throttler.log(
+                "key_format_error", exc, key_kind=type(key).__name__
+            )
             return
 
         try:
             self.show_text(formatted_key)
         except Exception as exc:
-            self._error_throttler.log("key_sink_error", exc, key=key)
+            self._error_throttler.log(
+                "key_sink_error", exc, key_kind=type(key).__name__
+            )
 
     def _on_release(self, key: keyboard.Key | keyboard.KeyCode | None) -> None:
         """Handle key release events, used only for chord grouping.
@@ -381,13 +405,17 @@ class KeyListener:
             if not emit_lone:
                 return
         except Exception as exc:
-            self._error_throttler.log("key_format_error", exc, key=key)
+            self._error_throttler.log(
+                "key_format_error", exc, key_kind=type(key).__name__
+            )
             return
 
         try:
             self.show_text(label)
         except Exception as exc:
-            self._error_throttler.log("key_sink_error", exc, key=key)
+            self._error_throttler.log(
+                "key_sink_error", exc, key_kind=type(key).__name__
+            )
 
     def start(self) -> None:
         """Start the keyboard listener."""

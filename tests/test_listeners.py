@@ -215,6 +215,25 @@ class TestKeyListener:
         callback.assert_not_called()
         assert listener._error_throttler.log.call_args[0][0] == "key_format_error"
 
+    def test_sink_error_log_does_not_leak_the_keystroke(self) -> None:
+        """An error log must carry only key_kind, never the typed character.
+
+        Secure-input masking drops keystrokes before the sink on macOS, but on
+        other platforms (or a non-flagged field) a sink error must not write the
+        pressed character into ~/.keycast/main.log -- that would undermine the
+        app's privacy guarantee. Only the key *type* name is logged.
+        """
+        callback = Mock(side_effect=RuntimeError("boom"))
+        listener = KeyListener(callback, KeyboardSettings())
+        listener._error_throttler = Mock()
+
+        listener._on_press(keyboard.KeyCode.from_char("p"))
+
+        kwargs = listener._error_throttler.log.call_args.kwargs
+        assert kwargs == {"key_kind": "KeyCode"}
+        # No argument value carries the typed character.
+        assert "p" not in [str(value) for value in kwargs.values()]
+
     def test_on_press_forwards_formatted_character(self) -> None:
         """A shown character key is formatted and forwarded to the sink."""
         callback = Mock()

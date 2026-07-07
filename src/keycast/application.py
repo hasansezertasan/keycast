@@ -113,6 +113,9 @@ class Keycast:
             )
         )
         self._stopped = False
+        # Set by signal_handler to the received signum; logged in run() after the
+        # main loop returns. Not logged in the handler itself -- see signal_handler.
+        self._pending_signal: int | None = None
         self.display_window = DisplayWindow(self.settings.display)
         self.mouse_listener = MouseListener(
             show_text=self.display_window.show_text,
@@ -443,8 +446,11 @@ class Keycast:
     def stop(self) -> None:
         """Stop the keycast application.
 
-        Idempotent: safe to call multiple times (e.g. from a signal handler
-        and again from ``run``'s ``finally`` block).
+        Idempotent: safe to call more than once. In practice only ``run``'s
+        ``finally`` block calls it -- the signal handler merely *requests* the
+        loop to exit (see :meth:`signal_handler`), so the two-phase shutdown does
+        the teardown here on the main thread once ``mainloop`` has returned. The
+        guard keeps a future direct caller from double-stopping.
         """
         if self._stopped:
             return
@@ -465,7 +471,7 @@ class Keycast:
                 )
         self.logger.info(format_event("keycast_stopped"))
 
-    def signal_handler(self, _signum: int, _frame: types.FrameType | None) -> None:
+    def signal_handler(self, signum: int, _frame: types.FrameType | None) -> None:
         """Stop the application in response to SIGINT/SIGTERM.
 
         The handler runs on the main thread, which is blocked inside the
@@ -474,8 +480,13 @@ class Keycast:
         in ``mainloop`` raises Tcl errors). Once ``mainloop`` returns, control
         unwinds to ``run`` where the ``finally`` block performs the actual
         shutdown via :meth:`stop`.
+
+        Does no logging here: ``logging`` takes a non-reentrant lock, and a
+        signal can interrupt the main thread mid-emit (a ``root.after`` callback
+        that logs), so logging from the handler could deadlock. Instead it records
+        the signum and :meth:`run` logs it after the loop returns.
         """
-        self.logger.info(format_event("shutdown_signal_received", signum=_signum))
+        self._pending_signal = signum
         self.display_window.request_stop()
 
     def run(self) -> None:
@@ -494,4 +505,13 @@ class Keycast:
             )
             sys.exit(1)
         finally:
+            # Deferred from signal_handler (which must not log; see there). Logged
+            # here on the main thread after mainloop has returned, where the
+            # logging lock is safe to take.
+            if self._pending_signal is not None:
+                self.logger.info(
+                    format_event(
+                        "shutdown_signal_received", signum=self._pending_signal
+                    )
+                )
             self.stop()

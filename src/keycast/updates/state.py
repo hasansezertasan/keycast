@@ -55,6 +55,10 @@ def read_state(path: Path = UPDATE_CHECK_FILE_PATH) -> UpdateState:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except OSError, ValueError:
+        # PEP 758 (3.14): ``ruff format`` normalizes a no-``as`` multi-except to
+        # this bare form on our 3.14 floor -- it is valid and formatter-enforced,
+        # not the Py2 syntax error it resembles. A missing/unreadable file
+        # (OSError) or malformed JSON (ValueError) both degrade to an empty state.
         return UpdateState()
     if not isinstance(raw, dict):
         return UpdateState()
