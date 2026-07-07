@@ -790,14 +790,20 @@ class TestSignalHandler:
         keycast.display_window.request_stop.assert_called_once()
         keycast.display_window.stop.assert_not_called()
 
-    def test_signal_handler_logs_signum(
+    def test_signal_handler_records_signum_without_logging(
         self, keycast: Keycast, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """The shutdown log line carries the structured signum field."""
+        """The handler records the signum but does not log (logging can deadlock).
+
+        Logging takes a non-reentrant lock and a signal can interrupt the main
+        thread mid-emit, so the handler must not log; it records the signum for
+        run() to log after the loop returns.
+        """
         with caplog.at_level("INFO", logger="keycast.application"):
             keycast.signal_handler(15, None)
 
-        assert "shutdown_signal_received signum=15" in caplog.text
+        assert keycast._pending_signal == 15
+        assert "shutdown_signal_received" not in caplog.text
 
 
 class TestRun:
@@ -854,6 +860,27 @@ class TestRun:
             keycast.run()
 
         assert manager.mock_calls == [call.request_stop(), call.stop()]
+
+    def test_run_logs_deferred_signal_after_loop_returns(
+        self, keycast: Keycast, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A signal received during the loop is logged by run(), not the handler.
+
+        signal_handler only records the signum (logging from a handler can
+        deadlock); run() emits the structured shutdown line after mainloop
+        returns, on the main thread where the logging lock is safe.
+        """
+        keycast.display_window.start.side_effect = lambda **_kwargs: (
+            keycast.signal_handler(15, None)
+        )
+
+        with (
+            patch("keycast.application.signal.signal"),
+            caplog.at_level("INFO", logger="keycast.application"),
+        ):
+            keycast.run()
+
+        assert "shutdown_signal_received signum=15" in caplog.text
 
     def test_run_swallows_keyboard_interrupt_and_cleans_up(
         self, keycast: Keycast
