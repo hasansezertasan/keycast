@@ -10,6 +10,16 @@ from typing import TYPE_CHECKING
 
 from keycast.logging_setup import _ErrorThrottler, format_event
 
+# Runaway backstop for the retained-events list. The fade timer prunes events
+# older than fade_duration_ms every 100ms, so in normal operation ``events``
+# holds at most a fraction of a second of input. This ceiling only bites if the
+# fade tick is wedged (its own guards keep that from happening) or the loop is
+# driven pathologically fast in a test; it is far above any real display need
+# (max_events tops out at 20) and simply drops the oldest rows so the list can
+# never grow without bound. Not a functional limit -- rendering still honours
+# fade_duration_ms and max_events.
+_MAX_RETAINED_EVENTS = 10_000
+
 if TYPE_CHECKING:
     # tkinter is imported lazily in _setup_window so the module stays importable
     # on a Python built without the _tkinter C-extension (e.g. some Homebrew
@@ -41,7 +51,11 @@ class DisplayWindow:
         # icon whose PhotoImage is no longer referenced, so it must outlive the
         # _apply_window_icon call that sets it (see that method).
         self._icon_image: tk.PhotoImage | None = None
-        self.events: list[tuple[str, float]] = []  # (event_text, timestamp)
+        # (event_text, monotonic_timestamp). Timestamps use time.monotonic (not
+        # wall-clock) so fade eviction measures elapsed time and is immune to
+        # system clock jumps (NTP steps, DST, VM resume) that would otherwise
+        # freeze events on screen or wipe them instantly.
+        self.events: list[tuple[str, float]] = []
         # Guards ``events`` and ``root``: ``show_text`` runs on pynput listener
         # threads while ``_fade_timer``/``stop`` run on the Tk main thread.
         #
@@ -311,7 +325,7 @@ class DisplayWindow:
             return
 
         try:
-            current_time = time.time()
+            current_time = time.monotonic()
             # Remove events older than fade_duration_ms
             with self._lock:
                 self.events = [
@@ -400,7 +414,13 @@ class DisplayWindow:
                 # without adding noise at the default INFO level.
                 self.logger.debug("show_text_dropped_no_root")
                 return
-            self.events.append((text, time.time()))
+            self.events.append((text, time.monotonic()))
+            # Runaway backstop: the fade tick normally keeps this list tiny, but
+            # cap it so a wedged tick or a pathological input rate cannot grow it
+            # without bound. Drops only the oldest rows; recent events (all that
+            # max_events renders) are untouched.
+            if len(self.events) > _MAX_RETAINED_EVENTS:
+                del self.events[:-_MAX_RETAINED_EVENTS]
             root = self.root
             minimized = self._minimized
 

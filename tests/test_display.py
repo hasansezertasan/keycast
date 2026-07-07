@@ -7,7 +7,7 @@ from unittest.mock import Mock, call, patch
 import pytest
 from pydantic_extra_types.color import Color
 
-from keycast.display import DisplayWindow
+from keycast.display import _MAX_RETAINED_EVENTS, DisplayWindow
 from keycast.settings import DisplaySettings
 
 
@@ -223,8 +223,10 @@ class TestDisplayWindow:
         """_fade_timer drops events older than fade_duration_ms, keeps fresh ones."""
         window = DisplayWindow(DisplaySettings(fade_duration_ms=2000))
 
-        with patch("keycast.display.time.time", return_value=100.0):
+        with patch("keycast.display.time.monotonic", return_value=100.0):
             # 100.0 - 97.0 = 3s old -> stale (>2000ms); 99.5 -> 0.5s -> fresh.
+            # Timestamps are monotonic (not wall-clock) so fade timing survives
+            # system-clock jumps.
             window.events = [("old", 97.0), ("fresh", 99.5)]
             window._fade_timer()
 
@@ -402,7 +404,7 @@ class TestDisplayWindow:
         ages past the window while the just-appended one survives.
         """
         window = DisplayWindow(DisplaySettings(fade_duration_ms=500))
-        with patch("keycast.display.time.time") as now:
+        with patch("keycast.display.time.monotonic") as now:
             now.return_value = 1000.0
             window.show_text("old")
             now.return_value = 1000.4  # 400ms later: still inside the 500ms window
@@ -411,6 +413,25 @@ class TestDisplayWindow:
             window._fade_timer()
 
         assert [text for text, _ in window.events] == ["recent"]
+
+    def test_events_list_is_capped_by_runaway_backstop(
+        self, mock_tk: tuple[Mock, Mock]
+    ) -> None:
+        """show_text caps ``events`` so a wedged fade tick cannot grow it forever.
+
+        The fade tick normally keeps the list tiny; this pins the independent
+        backstop that bounds it even if the tick never runs. Only the oldest rows
+        are dropped -- the most recent (all that max_events renders) survive.
+        """
+        window = DisplayWindow(DisplaySettings(fade_duration_ms=10000))
+
+        for i in range(_MAX_RETAINED_EVENTS + 5):
+            window.show_text(f"event-{i}")
+
+        assert len(window.events) == _MAX_RETAINED_EVENTS
+        # Oldest five were dropped; the newest event is retained.
+        assert window.events[0][0] == "event-5"
+        assert window.events[-1][0] == f"event-{_MAX_RETAINED_EVENTS + 4}"
 
     def test_update_display_noop_when_window_destroyed_with_live_label(
         self, mock_tk: tuple[Mock, Mock]
