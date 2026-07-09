@@ -179,6 +179,7 @@ How keycast compares to other keystroke/mouse visualizers:
 - **Pydantic Documentation**: [docs.pydantic.dev](https://docs.pydantic.dev/)
 - **Tkinter Documentation**: [tkinter documentation](https://docs.python.org/3/library/tkinter.html)
 - **uv Documentation**: [docs.astral.sh/uv](https://docs.astral.sh/uv/)
+- **PyPiMap**: [pypimap.com](https://pypimap.com/) — interactive dependency-graph explorer for PyPI packages
 
 ### Project Resources
 - **Main README**: [../README.md](../README.md)
