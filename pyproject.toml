@@ -69,7 +69,7 @@ test = [
   # "pytest-xdist[psutil]~=3.5",
 ]
 tool = [
-  "prek==0.4.5", # git hook runner used by the `hooks` CI job and locally
+  "prek==0.4.10", # git hook runner used by the `hooks` CI job and locally
   # "marimo==0.17.0",
   # "pyinstaller==6.16.0",
 ]
