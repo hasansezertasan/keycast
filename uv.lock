@@ -257,7 +257,7 @@ dev = [
     { name = "tox-uv", specifier = "==1.35.2" },
     { name = "ty", specifier = "==0.0.51" },
     { name = "types-pyinstaller", specifier = "==6.16.0.20250918" },
-    { name = "types-pynput", specifier = "==1.8.1.20250809" },
+    { name = "types-pynput", specifier = "==1.8.1.20260712" },
     { name = "typos", specifier = "==1.47.2" },
     { name = "validate-pyproject", extras = ["all"], specifier = "==0.25" },
     { name = "vulture", specifier = "==2.16" },
@@ -271,7 +271,7 @@ lint = [
     { name = "taplo", specifier = "==0.9.3" },
     { name = "ty", specifier = "==0.0.51" },
     { name = "types-pyinstaller", specifier = "==6.16.0.20250918" },
-    { name = "types-pynput", specifier = "==1.8.1.20250809" },
+    { name = "types-pynput", specifier = "==1.8.1.20260712" },
     { name = "typos", specifier = "==1.47.2" },
     { name = "validate-pyproject", extras = ["all"], specifier = "==0.25" },
     { name = "vulture", specifier = "==2.16" },
@@ -916,11 +916,11 @@ wheels = [
 
 [[package]]
 name = "types-pynput"
-version = "1.8.1.20250809"
+version = "1.8.1.20260712"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/38/ae/9d630d3e164f7d7fc24dbb97a2d80cbd089c0c592cc93f698fe347428865/types_pynput-1.8.1.20250809.tar.gz", hash = "sha256:c315e4c3bae4c23a94a12b677f1e0bb5611c4a7b114ce09cc870d9b8335e95eb", size = 11683, upload-time = "2025-08-09T03:15:35.701Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/64/e3/9c440c4e96055259292bca0758ece072e73c7b75f95689470b8ddb03d38e/types_pynput-1.8.1.20260712.tar.gz", hash = "sha256:0eab69f49a3b626c3da117651ffd65291fffae6bf8559ff0e976fcf6762ff20a", size = 12543, upload-time = "2026-07-12T05:13:20.791Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d8/dd/f00d30ee7aa0d117e5d0595d728f775c16bb2f8f7525b2c800ef549fe38e/types_pynput-1.8.1.20250809-py3-none-any.whl", hash = "sha256:ca0103244c726353e0da97bc21fa081cefc5dfea206995f6369a87854eff07a1", size = 12211, upload-time = "2025-08-09T03:15:34.979Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/41/ede4d88cffc7cfc6d7bea308c029b29451dcbc3025e01581ce3a251ce063/types_pynput-1.8.1.20260712-py3-none-any.whl", hash = "sha256:b9d6369171a0c61eeaedc0b0330c1827d13a1265ed5821bcc88f3c71d548ec0c", size = 12313, upload-time = "2026-07-12T05:13:19.846Z" },
 ]
 
 [[package]]
