@@ -47,7 +47,7 @@ lint = [
   "typos==1.47.2",
   "validate-pyproject[all]==0.25",
   "vulture==2.16",
-  "slotscheck==0.20.0",
+  "slotscheck==0.20.1",
   # "shellcheck-py==0.11.0.1",
   # "shellcheck-makefile==1.27.3",
   # "yamllint==1.37.1",
