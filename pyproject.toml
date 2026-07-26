@@ -31,7 +31,7 @@ keycast = "keycast.cli:app"
 [dependency-groups]
 dev = [
   "keycast",
-  "tox==4.55.1",
+  "tox==4.58.0",
   "tox-uv==1.35.2",
   { include-group = "lint" },
   { include-group = "test" },
