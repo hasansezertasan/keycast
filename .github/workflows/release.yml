@@ -81,7 +81,7 @@ jobs:
     # bundle's effective minimum-macOS floor, so it must not silently follow the
     # `macos-latest` -> macOS 26 migration (runner-images#14167). Bump this pin
     # consciously when raising the supported-OS floor.
-    runs-on: macos-15
+    runs-on: macos-26
     name: Build macOS app
     timeout-minutes: 20
     permissions:
