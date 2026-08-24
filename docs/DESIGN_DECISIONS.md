@@ -122,8 +122,12 @@ take a `show_text` argument and call it with a fully formatted label.
 **Example**:
 ```python
 # DisplayWindow.show_text satisfies the TextSink protocol.
-key_listener = KeyListener(show_text=display_window.show_text, settings=keyboard_settings)
-mouse_listener = MouseListener(show_text=display_window.show_text, settings=mouse_settings)
+key_listener = KeyListener(
+    show_text=display_window.show_text, settings=keyboard_settings
+)
+mouse_listener = MouseListener(
+    show_text=display_window.show_text, settings=mouse_settings
+)
 ```
 
 > **Evolution**: this started as a plain callback pair
@@ -193,7 +197,9 @@ mouse_listener = MouseListener(show_text=display_window.show_text, settings=mous
 **Example**:
 ```python
 display_window = DisplayWindow(settings.display)
-key_listener = KeyListener(show_text=display_window.show_text, settings=settings.keyboard)
+key_listener = KeyListener(
+    show_text=display_window.show_text, settings=settings.keyboard
+)
 ```
 
 **Rationale**:
@@ -422,7 +428,7 @@ the path forward are recorded in [ADR-012](adr/012-click-ripple.md).
 **Implementation**:
 ```python
 # DisplaySettings.max_events (default 5, configurable)
-recent_events = self.events[-self.settings.max_events:]
+recent_events = self.events[-self.settings.max_events :]
 ```
 
 **Rationale**:

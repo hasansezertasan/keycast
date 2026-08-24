@@ -40,7 +40,7 @@ dev = [
 lint = [
   "mypy==2.3.1",
   "pyright==1.1.411",
-  "ty==0.0.51",
+  "ty==0.0.74",
   "pyrefly==1.2.0",
   "ruff==0.15.18",
   "taplo==0.9.3",
@@ -122,6 +122,13 @@ cache-keys = [
   { git = { commit = true, tags = true } },
 ]
 trusted-publishing = "always"
+
+
+# Ruff 0.16 expanded its default rule set. Pin the project policy explicitly
+# so upgrading Ruff or its prek hook does not silently turn new diagnostics into
+# unrelated dependency-PR failures. These are Ruff's historical defaults.
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
 
 
 [tool.coverage.run]
