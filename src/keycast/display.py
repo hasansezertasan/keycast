@@ -6,7 +6,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from keycast.logging_setup import _ErrorThrottler, format_event
 
@@ -258,14 +258,12 @@ class DisplayWindow:
         if sys.platform == "darwin":
             try:
                 # Load AppKit dynamically: pyobjc generates its members at import
-                # time and ships no stubs, so its symbols are invisible to static
-                # analysis. ``import_module`` keeps mypy/pyright happy; ty still
-                # resolves the "AppKit" literal, so the two member lookups carry a
-                # narrow ty ignore (kept on short lines so formatting can't move
-                # the pragma off them).
-                appkit = importlib.import_module("AppKit")
-                ns_image = appkit.NSImage  # ty: ignore[unresolved-attribute]
-                ns_app = appkit.NSApplication  # ty: ignore[unresolved-attribute]
+                # time and ships no stubs. Cast the dynamic module to ``Any`` at
+                # this FFI boundary so all supported checkers analyze the same
+                # cross-platform source without brittle version-specific ignores.
+                appkit = cast(Any, importlib.import_module("AppKit"))
+                ns_image = appkit.NSImage
+                ns_app = appkit.NSApplication
                 image = ns_image.alloc().initWithContentsOfFile_(str(icon_path))
                 if image is not None:
                     ns_app.sharedApplication().setApplicationIconImage_(image)

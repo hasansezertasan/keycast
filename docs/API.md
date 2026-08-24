@@ -217,8 +217,10 @@ def __init__(self, show_text: TextSink, settings: KeyboardSettings) -> None
 from keycast.listeners import KeyListener
 from keycast.settings import KeyboardSettings
 
+
 def on_key(text: str) -> None:
     print(f"Key pressed: {text}")
+
 
 settings = KeyboardSettings(
     show_modifier_keys=True,
@@ -393,8 +395,10 @@ def __init__(self, show_text: TextSink, settings: MouseSettings) -> None
 from keycast.listeners import MouseListener
 from keycast.settings import MouseSettings
 
+
 def on_click(text: str) -> None:
     print(f"Mouse click: {text}")
+
 
 settings = MouseSettings(show_mouse_clicks=True, show_mouse_position=True)
 listener = MouseListener(show_text=on_click, settings=settings)
@@ -490,7 +494,9 @@ This is a classmethod that returns the loaded `Settings` instance.
 ```python
 from keycast.settings import Settings
 
-settings = Settings.create_settings_file()  # Creates ~/.keycast/config.json on first run
+settings = (
+    Settings.create_settings_file()
+)  # Creates ~/.keycast/config.json on first run
 ```
 
 ##### effective_logging() -> LoggingSettings
@@ -669,11 +675,13 @@ anywhere — a logger, a queue, or a test double:
 from keycast.listeners import KeyListener, MouseListener
 from keycast.settings import KeyboardSettings, MouseSettings
 
+
 def sink(text: str) -> None:
     # Filter, transform, or forward events however you like. Labels match what
     # the listener emits (e.g. "Control Left", "Space Bar"); see Key Formatting.
     if not text.endswith(("Left", "Right")):  # skip modifier keys
         print(f"event: {text}")
+
 
 key_listener = KeyListener(show_text=sink, settings=KeyboardSettings())
 mouse_listener = MouseListener(show_text=sink, settings=MouseSettings())
@@ -752,10 +760,12 @@ after `start()` returns:
 ```python
 import signal
 
+
 # `window`, `key_listener`, `mouse_listener` created as in "Manual Wiring".
 def handler(signum, frame):
     # request_stop is thread/handler-safe; it only asks the loop to exit.
     window.request_stop()
+
 
 signal.signal(signal.SIGINT, handler)
 signal.signal(signal.SIGTERM, handler)
