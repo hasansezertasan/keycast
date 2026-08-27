@@ -54,7 +54,7 @@ lint = [
   # "yamlfix==1.18.0",
   # "yamlfmt==1.1.1",
   "types-pynput==1.8.1.20260712",
-  "types-pyinstaller==6.22.0.20260812",
+  "types-pyinstaller==6.22.1.20260827",
 ]
 test = [
   # "coverage-enable-subprocess==1.0",
