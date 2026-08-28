@@ -27,5 +27,5 @@ rev = "v0.16.4"
 hooks = [{ id = "ruff-check" }, { id = "ruff-format" }]
 [[repos]]
 repo = "https://github.com/crate-ci/typos"
-rev = "v1.49.0"
+rev = "v1.49.1"
 hooks = [{ id = "typos" }]
