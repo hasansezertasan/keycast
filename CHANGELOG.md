@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.3.0](https://github.com/hasansezertasan/keycast/compare/v0.2.0...v0.3.0) (2026-09-05)
+
+
+### Features
+
+* add startup input-capture status summary to overlay and logs ([#36](https://github.com/hasansezertasan/keycast/issues/36)) ([08659cb](https://github.com/hasansezertasan/keycast/commit/08659cbf8d5ceda3ded616467a701cdd1a11a574))
+* add the Microsoft Store MSIX channel (ADR-009) ([#39](https://github.com/hasansezertasan/keycast/issues/39)) ([d9d6066](https://github.com/hasansezertasan/keycast/commit/d9d6066a058666a80be9b99b6c6701d58b4cfaab))
+* detect Mac App Store installs (ADR-011) ([#45](https://github.com/hasansezertasan/keycast/issues/45)) ([302326b](https://github.com/hasansezertasan/keycast/commit/302326b0654bcf0eadee6fa315d21017573b6202))
+* mask keystrokes during macOS secure input (ADR-015) ([#46](https://github.com/hasansezertasan/keycast/issues/46)) ([12b7e1c](https://github.com/hasansezertasan/keycast/commit/12b7e1c9f5338414e08aa494ebef77ffbbb865cb))
+* system-wide Screencast Mode (presets + chord grouping) ([#38](https://github.com/hasansezertasan/keycast/issues/38)) ([946856e](https://github.com/hasansezertasan/keycast/commit/946856e4eebd3dad273133a3749242e5c1e66aa2))
+
+
+### Bug Fixes
+
+* classify pip-into-Homebrew-Python as pip, not formula ([#47](https://github.com/hasansezertasan/keycast/issues/47)) ([7c3e376](https://github.com/hasansezertasan/keycast/commit/7c3e37639dcb57995929d0c4964c65f508d2340c))
+* **deps:** update dependency packaging to v26.3 ([#88](https://github.com/hasansezertasan/keycast/issues/88)) ([4791034](https://github.com/hasansezertasan/keycast/commit/4791034dd1340104e57ea5e6b6fa17554d21b680))
+* **deps:** update dependency pydantic-settings to v2.15.0 ([#90](https://github.com/hasansezertasan/keycast/issues/90)) ([7406bf3](https://github.com/hasansezertasan/keycast/commit/7406bf30eb01e1276b16e6557b958a2c63d44a57))
+* **deps:** update dependency typer to v0.27.0 ([#74](https://github.com/hasansezertasan/keycast/issues/74)) ([78d5185](https://github.com/hasansezertasan/keycast/commit/78d5185be95d149237f8e8d10c2defe58a60ee7d))
+* **deps:** update dependency typer to v0.27.1 ([#85](https://github.com/hasansezertasan/keycast/issues/85)) ([dbc46ef](https://github.com/hasansezertasan/keycast/commit/dbc46ef2cfd88f949b7ceaf9feb8688cb1385d42))
+* **deps:** update dependency typer to v0.27.2 ([#117](https://github.com/hasansezertasan/keycast/issues/117)) ([8a97fa2](https://github.com/hasansezertasan/keycast/commit/8a97fa2b520ca2d39ad131f04ae1b9bce886d4d7))
+* security and robustness hardening from code review ([#49](https://github.com/hasansezertasan/keycast/issues/49)) ([b924469](https://github.com/hasansezertasan/keycast/commit/b924469568f75309cd647af9e1bbbf56078c9163))
+
+
+### Documentation
+
+* add the Microsoft Store submission runbook to PACKAGING.md ([#41](https://github.com/hasansezertasan/keycast/issues/41)) ([52e3c1e](https://github.com/hasansezertasan/keycast/commit/52e3c1e34ffc3537e92acefdfdde0ffce4c3846a))
+* ADR-016 keep keycast.updates in-tree until a second consumer ([#50](https://github.com/hasansezertasan/keycast/issues/50)) ([657c89f](https://github.com/hasansezertasan/keycast/commit/657c89f337446876a645aafaf3501ad1ae73a539))
+* document Homebrew cask and formula install in README ([#31](https://github.com/hasansezertasan/keycast/issues/31)) ([98cf856](https://github.com/hasansezertasan/keycast/commit/98cf8563a475838dde2779f5e8fcd4a2c9f192fd))
+* document Microsoft Store version mapping in PACKAGING.md ([#42](https://github.com/hasansezertasan/keycast/issues/42)) ([71fb652](https://github.com/hasansezertasan/keycast/commit/71fb65222769987b89053d9acef7e210d8c6f448))
+* record Microsoft Store MSIX distribution decision in ADR-009 ([#37](https://github.com/hasansezertasan/keycast/issues/37)) ([8fad399](https://github.com/hasansezertasan/keycast/commit/8fad399212243fd7f84abb26c72f87d5b71d987b))
+* record Scoop bucket distribution in ADR-008 ([#34](https://github.com/hasansezertasan/keycast/issues/34)) ([299864c](https://github.com/hasansezertasan/keycast/commit/299864ca689bb84a9f6c30ffc5e324963cc70129))
+* start Store registration from Store Developer, not Partner Center ([#48](https://github.com/hasansezertasan/keycast/issues/48)) ([f1490b7](https://github.com/hasansezertasan/keycast/commit/f1490b76dccf0f5b5e6ef33b502c9e3a9704a4c1))
+* surface Scoop install path in README and PROJECT_OVERVIEW ([#33](https://github.com/hasansezertasan/keycast/issues/33)) ([12b6d39](https://github.com/hasansezertasan/keycast/commit/12b6d39b6dfdb426bdee182793a8a5a97505cd7c))
+
 ## [0.2.0](https://github.com/hasansezertasan/keycast/compare/v0.1.0...v0.2.0) (2026-07-01)
 
 
