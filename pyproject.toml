@@ -39,7 +39,7 @@ dev = [
 ]
 lint = [
   "mypy==2.3.1",
-  "pyright==1.1.412",
+  "pyright==1.1.413",
   "ty==0.0.79",
   "pyrefly==1.2.0",
   "ruff==0.16.6",
