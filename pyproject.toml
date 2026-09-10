@@ -42,7 +42,7 @@ lint = [
   "pyright==1.1.414",
   "ty==0.0.80",
   "pyrefly==1.2.0",
-  "ruff==0.16.6",
+  "ruff==0.16.7",
   "taplo==0.9.3",
   "typos==1.50.1",
   "validate-pyproject[all]==0.26",
