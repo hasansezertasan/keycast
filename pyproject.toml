@@ -77,7 +77,7 @@ tool = [
 
 [build-system]
 requires = [
-  "hatchling==1.32.0",
+  "hatchling==1.32.3",
   "hatch-vcs==0.5.0",
   # "hatch-babel==0.1.2",
   # "setuptools-scm==9.2.1",
