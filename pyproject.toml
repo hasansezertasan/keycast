@@ -31,7 +31,7 @@ keycast = "keycast.cli:app"
 [dependency-groups]
 dev = [
   "keycast",
-  "tox==4.63.0",
+  "tox==4.64.2",
   "tox-uv==1.36.0",
   { include-group = "lint" },
   { include-group = "test" },
@@ -40,9 +40,9 @@ dev = [
 lint = [
   "mypy==2.3.1",
   "pyright==1.1.414",
-  "ty==0.0.83",
+  "ty==0.0.84",
   "pyrefly==1.3.1",
-  "ruff==0.16.8",
+  "ruff==0.16.9",
   "taplo==0.9.3",
   "typos==1.50.2",
   "validate-pyproject[all]==0.26",
