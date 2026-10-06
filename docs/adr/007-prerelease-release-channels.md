@@ -21,9 +21,9 @@ Current state:
   nothing while the channel is off and are ready the moment it is on.
 
 Builds on [ADR-001](001-desktop-app-packaging.md) (the multi-channel packaging this
-routes between) and the release pipeline documented in `CLAUDE.md` → *Release
+routes between) and the release pipeline documented in `AGENTS.md` → *Release
 pipeline* and `docs/PACKAGING.md`. The operational "how to cut / graduate a beta"
-lives in `CLAUDE.md`; this ADR records the *why* and the landscape of
+lives in `AGENTS.md`; this ADR records the *why* and the landscape of
 alternatives. Supersedes nothing.
 
 ## Context
@@ -36,7 +36,7 @@ Homebrew and Scoop. We wanted a way to publish a release that testers can opt in
 **without** it reaching the auto-updating binary channels (`brew`, `scoop`).
 
 The releases are automated by release-please + hatch-vcs (the git tag *is* the
-version; see `CLAUDE.md`), publishing to PyPI via Trusted Publishing and producing
+version; see `AGENTS.md`), publishing to PyPI via Trusted Publishing and producing
 a GitHub release with `.dmg`/`.zip`/installer assets, then nudging a Homebrew tap
 and a Scoop bucket. Any prerelease scheme had to fit that existing pipeline.
 

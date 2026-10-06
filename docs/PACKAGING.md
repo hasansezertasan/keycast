@@ -157,7 +157,7 @@ The bucket repo and its manifest live outside this repository.
 ## Release & CI
 
 The release pipeline (`.github/workflows/release.yml`, workflow name **Release**)
-is a decomposed DAG gated on the release-please flow (see `CLAUDE.md`). The
+is a decomposed DAG gated on the release-please flow (see `AGENTS.md`). The
 release is **atomic** — nothing publishes unless every artifact builds:
 
 ```text
