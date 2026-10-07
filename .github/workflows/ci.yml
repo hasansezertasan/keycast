@@ -156,7 +156,7 @@ jobs:
           hdiutil create -volname keycast \
             -srcfolder dist/keycast.app -ov -format UDZO keycast.dmg
       - name: Upload the .dmg as a preview build
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: keycast-macos-preview
           path: keycast.dmg
@@ -228,7 +228,7 @@ jobs:
         # resolution and layout staging can't drift between the two.
         run: ./packaging/msix/pack.ps1
       - name: Upload the folder and installer as a preview build
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: keycast-windows-preview
           path: |

@@ -67,7 +67,7 @@ jobs:
       - name: Build the package
         run: uv build --no-sources --quiet
       - name: Upload the distribution
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist-pypi
           path: dist/
@@ -126,7 +126,7 @@ jobs:
           echo "sha256 (for the Homebrew cask):"
           shasum -a 256 keycast.dmg
       - name: Upload the .dmg
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist-macos
           path: keycast.dmg
@@ -183,7 +183,7 @@ jobs:
         # for normal users, the zip as the portable / no-admin option.
         run: iscc /DMyAppVersion=${{ needs.release-please.outputs.version }} packaging/keycast.iss
       - name: Upload the .zip and the installer
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist-windows
           path: |
@@ -209,7 +209,7 @@ jobs:
         run: ./packaging/msix/pack.ps1 -Version '${{ needs.release-please.outputs.version }}'
       - name: Upload the MSIX (not a dist-* name — stays off the release)
         if: ${{ needs.release-please.outputs.is_prerelease != 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: keycast-msix
           path: keycast.msix
