@@ -91,7 +91,7 @@ driven entirely by Conventional Commit messages on `main`:
 - **Mainline cuts stable releases** — the prerelease/beta channel is **designed
   but currently disabled.** The pipeline *can* run mainline as a rolling `beta`
   channel (`prerelease` + `versioning: "prerelease"` + `prerelease-type: "beta"`),
-  but those keys are intentionally **absent** from `release-please-config.json`, so
+  but those keys are intentionally **absent** from `.github/release-please-config.json`, so
   a normal merge bumps to a stable version. The `is_prerelease` guards in
   `release.yml` remain in place but **inert**: a stable tag has no `-` →
   `is_prerelease=false` → `bump-cask`/`bump-scoop` fire and the release is marked
@@ -123,7 +123,7 @@ for the full rationale — the maturity/cadence/audience three-axis model, why `
 over alpha/rc, what release-please does and does not own, and why
 nightly / canary / insiders / edge are deferred). **To enable it**, add
 `prerelease: true` + `versioning: "prerelease"` + `prerelease-type: "beta"` to
-`release-please-config.json`. Once enabled, the maturity ladder is
+`.github/release-please-config.json`. Once enabled, the maturity ladder is
 `alpha < beta < rc < final` (default `beta`), and day-to-day:
 
 - **Cut a beta: just merge.** release-please bumps `0.2.0-beta.1 → 0.2.0-beta.2`,
