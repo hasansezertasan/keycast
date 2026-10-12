@@ -651,7 +651,7 @@ jobs:
         env:
           PYTHONUNBUFFERED: "1"
           # Passed via env (not interpolated into run:) — read by the Python
-          # process, so no template-injection surface. See ADR-027 / CLAUDE.md.
+          # process, so no template-injection surface. See ADR-027 / AGENTS.md.
           DOCS_BUILD_VERSION: ${{ needs.release-please.outputs.version }}
         # Builds only this release's docs, then assembles ./site with every prior
         # version copied from gh-pages, a `latest` alias, and a root redirect.

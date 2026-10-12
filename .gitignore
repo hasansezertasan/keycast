@@ -537,3 +537,6 @@ docs/_static/versions.json
 megalinter-reports/
 src/**/_version.py
 mise.local.toml
+# ai-rulez machine-local manifest (v5 keeps per-file claims/digests here);
+# regenerated, never committed.
+.ai-rulez/.generated-manifest.local.json

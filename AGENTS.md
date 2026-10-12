@@ -4,12 +4,11 @@ Project: keycast
 Source: .ai-rulez/config.toml
 
 NEVER edit this file - modify .ai-rulez/ content instead
-Use MCP server: npx -y ai-rulez@latest mcp
 Regenerate: ai-rulez generate
 
 Docs: https://github.com/Goldziher/ai-rulez
 Content-Hash: blake3:f3e685b05e0730e321b09d00ffccef12c6068c570284681cb053476a744f07f0
-Source-Hash: blake3:098c086204b9ab89f6cea62132a1a92f7204a55df240cdcb0f14c8f78530fc1a
+Source-Hash: blake3:f45617e646b4cfc1e24a231096dcb1f9c82cfd0f36abac306929d1c4f2a8578f
 -->
 
 # keycast

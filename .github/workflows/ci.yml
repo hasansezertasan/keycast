@@ -51,7 +51,7 @@ jobs:
       - name: Run prek hooks
         run: xvfb-run -a uv run --locked --group prek prek run --all-files --show-diff-on-failure
       - name: Verify the generated agent instruction files are committed and current
-        # The `ai-rulez` hook above regenerates AGENTS.md/CLAUDE.md/... from
+        # The `ai-rulez` hook above regenerates AGENTS.md/... from
         # `.ai-rulez/`, but a *fixing* hook only fails on a **modified tracked**
         # file: a project that never committed the generated output would have it
         # rewritten as *untracked* files here and stay green, shipping a repo
