@@ -43,7 +43,14 @@ exe = EXE(
     upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    # Console subsystem (Windows-only flag; ignored on macOS/Linux). The
+    # freezer exe is terminal-distributed (Scoop installs the raw Windows
+    # binary via `bin`), so `--help`/`version`/`info` must print to the
+    # caller's terminal: a windowed build has no stdout and those subcommands
+    # silently produce nothing. packaging/keycast.spec deliberately stays
+    # windowed — the .app/.msi are desktop bundles launched from a menu,
+    # while this artifact doubles as the CLI.
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

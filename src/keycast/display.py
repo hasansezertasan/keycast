@@ -286,7 +286,11 @@ class DisplayWindow:
                 # time and ships no stubs. Cast the dynamic module to ``Any`` at
                 # this FFI boundary so all supported checkers analyze the same
                 # cross-platform source without brittle version-specific ignores.
-                appkit = cast("Any", importlib.import_module("AppKit"))  # pyright: ignore[reportExplicitAny] — pyobjc is dynamic
+                # The ``Any`` annotation is load-bearing, not redundant: ruff
+                # TC006 keeps the cast value quoted (a string forward-ref the
+                # unused-import queries do not count as a use), so the name
+                # needs this real annotation reference to stay imported.
+                appkit: Any = cast("Any", importlib.import_module("AppKit"))  # pyright: ignore[reportExplicitAny] — pyobjc is dynamic
                 ns_image = appkit.NSImage
                 ns_app = appkit.NSApplication
                 image = ns_image.alloc().initWithContentsOfFile_(str(icon_path))
