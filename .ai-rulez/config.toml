@@ -1,6 +1,6 @@
 # ai-rulez configuration: the single source of truth for this project's agent
 # instructions. Edit the sources in this directory — never the files
-# `ai-rulez generate` writes from them (AGENTS.md, ...), which carry
+# `ai-rulez generate` writes from them (AGENTS.md, CLAUDE.md, ...), which carry
 # a DO-NOT-EDIT banner and a content hash. See ADR-035 in the template repo.
 #
 # Free-text answers are rendered through `to_json`, which supplies the quotes
@@ -8,13 +8,14 @@
 # non-ASCII character would otherwise produce TOML that does not parse, and
 # copier would still report a successful render. `github_repo_name` is validated
 # to a Python identifier, so it is interpolated bare on purpose.
-version = "5.0"
+version = "4.0"
 name = "keycast"
 description = "Keycast is a cross-platform keystroke and mouse click visualizer built in Python."
 # `.gitignore` is a cobo-sealed, sha256-verified block (ADR-012). ai-rulez
 # defaults this to `true` and would rewrite the file to ignore its own output —
 # breaking the seal, failing `gitignore-drift.yml`, and hiding the very files
-# the coding agents have to read from the repository. The output is committed here.
+# GitHub has to read from the repository (Copilot reads
+# `.github/copilot-instructions.md` server-side). The output is committed here.
 gitignore = false
 # No builtin domains. Every universal domain either restates a rule this
 # project's CI already enforces (conventional commits, branch names) or
@@ -31,17 +32,7 @@ presets = [
   "opencode",
 ]
 
-[claude]
-# Claude Code reads AGENTS.md natively — no CLAUDE.md. Skills emit once to the
-# shared .agents/skills/ instead of per-tool directories.
-claude_md = "none"
-
 [header]
 # Generated files are committed, so a timestamp would rewrite every one of them
 # on every run and make the drift check meaningless.
 timestamp = false
-hashes = "full"
-
-# Pinned by `ai-rulez migrate v5`: the 4.x default. Remove this line to take the v5 default.
-[mcp]
-self_server = false

@@ -114,7 +114,7 @@ sast = [
 # best-effort rather than a guarantee. Still a single version source, same as
 # every other pin (ADR-035).
 agents = [
-  "ai-rulez==5.1.0",
+  "ai-rulez==4.11.5",
 ]
 test = [
   "coverage-enable-subprocess==1.0",

@@ -170,7 +170,7 @@ in its ephemeral environment. The first sync creates `uv.lock` for a newly
 generated project.
 
 The agent instruction files every AI coding tool reads (`AGENTS.md`,
-`.agents/skills/`, …) are **generated** from the
+`CLAUDE.md`, `.github/copilot-instructions.md`, …) are **generated** from the
 sources in `.ai-rulez/` by [ai-rulez](https://github.com/Goldziher/ai-rulez) —
 each one opens with a banner saying so. Edit the source, never the output, and
 regenerate:

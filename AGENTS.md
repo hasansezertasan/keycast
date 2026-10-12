@@ -4,11 +4,12 @@ Project: keycast
 Source: .ai-rulez/config.toml
 
 NEVER edit this file - modify .ai-rulez/ content instead
+Use MCP server: npx -y ai-rulez@latest mcp
 Regenerate: ai-rulez generate
 
 Docs: https://github.com/Goldziher/ai-rulez
-Content-Hash: blake3:f3e685b05e0730e321b09d00ffccef12c6068c570284681cb053476a744f07f0
-Source-Hash: blake3:f45617e646b4cfc1e24a231096dcb1f9c82cfd0f36abac306929d1c4f2a8578f
+Content-Hash: blake3:7b75707653c062f76be540bba7a9b9f6c97cb8724b20953609371e39db0c7857
+Source-Hash: blake3:2c2e7583f73ecc436b82a4cff74eb78c614f427228e80c597fd3e41b2584a1f4
 -->
 
 # keycast
@@ -73,7 +74,6 @@ Design rules that must survive every change:
   documented per site with `# noqa: C901` — refactor those only with care.
 - Versions come from Git tags — do not hand-edit a version literal anywhere.
 - Commit messages follow Conventional Commits; releases are automated by release-please.
-  Do not add an AI `Co-Authored-By` trailer to commits.
 - **Docs are a contract.** `README.md` and `docs/` (API, ARCHITECTURE,
   DESIGN_DECISIONS, PROJECT_OVERVIEW) must match the code; `tests/test_docs_contract.py`
   pins class/constructor names, the `Settings` section set, default key labels,

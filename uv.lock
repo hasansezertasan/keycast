@@ -8,11 +8,11 @@ resolution-markers = [
 
 [[package]]
 name = "ai-rulez"
-version = "5.1.0"
+version = "4.11.5"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/64/58/1297ecce2fa50cb4335c5ff1dd59ef4cbadd07fdb46b9ebb33f44bc473f8/ai_rulez-5.1.0.tar.gz", hash = "sha256:cb8137f6ac9236c14c9ec5ef0ffc393457f743e5cfeb0660523115db8d141997", size = 16052, upload-time = "2026-10-12T20:56:18.425Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2f/bb/6fd0ef844126b0b96c810d478017ce579cc5d55be4df50b824b14c3422d4/ai_rulez-4.11.5.tar.gz", hash = "sha256:7d8c8e62c7080ccacb13d486492d7e3ea96fb6b32e8729ac8b5cbb5665ae242a", size = 16849, upload-time = "2026-09-19T10:06:04.636Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/92/f33573d3dbf051d0d62e5635b2b80791ee69496a4a45ba785e36c73ac390/ai_rulez-5.1.0-py3-none-any.whl", hash = "sha256:c2a02ae00a9489ef55e69b709b7c7af298b26b56ff879268b6005d2da4d9b9c8", size = 10683, upload-time = "2026-10-12T20:56:17.036Z" },
+    { url = "https://files.pythonhosted.org/packages/5f/68/996a5ff2edd6f5e4a62dbf73fcd51aadaceb45c5917c377f4c599aa0e01b/ai_rulez-4.11.5-py3-none-any.whl", hash = "sha256:63f26a37b6baa2927354f89743f932c643aa3223c51c6c12eebdb5a46bd20b0a", size = 11039, upload-time = "2026-09-19T10:06:03.41Z" },
 ]
 
 [[package]]
@@ -1100,7 +1100,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-agents = [{ name = "ai-rulez", specifier = "==5.1.0" }]
+agents = [{ name = "ai-rulez", specifier = "==4.11.5" }]
 dev = [
     { name = "basedpyright", specifier = "==1.40.2" },
     { name = "coverage", extras = ["toml"], specifier = "==7.16.2" },

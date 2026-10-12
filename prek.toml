@@ -135,7 +135,7 @@ hooks = [
   # revision worth tracking here).
   { id = "detect-secrets", name = "detect-secrets (pre-commit secret scan)", entry = "uv run --locked --group style detect-secrets-hook --baseline .secrets.baseline", language = "system", pass_filenames = true },
   # ai-rulez regenerates the agent instruction files every host reads (AGENTS.md,
-  # .agents/skills/, ...) from the `.ai-rulez/` sources, which are the only thing anyone
+  # CLAUDE.md, ...) from the `.ai-rulez/` sources, which are the only thing anyone
   # edits. It is a *fixing* hook, so it behaves like the formatters above: it
   # rewrites what drifted and fails the run when it had to, which is what keeps
   # the committed output honest — there is no `--check` mode for preset output
