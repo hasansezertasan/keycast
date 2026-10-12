@@ -33,9 +33,13 @@ Design rules that must survive every change:
   the `BLE001`/`PLW0717` per-file-ignores in `pyproject.toml`); a listener
   failure must never take down the overlay. Narrow a handler only when you can
   prove the failure set.
-- **Lazy imports are load-bearing.** `tkinter`/`pynput` stay function-local
-  (`PLC0415`) so `--help`, `version`, and headless tooling (slotscheck, Sphinx)
-  never pay for the GUI toolkit. Sphinx autodoc is the exception: the three
+- **Lazy imports are load-bearing.** `tkinter` stays function-local
+  (`PLC0415`), and the `cli.py` subcommands import the GUI chain lazily, so
+  `--help`, `version`, and `info` never pay for the GUI toolkit. `pynput` is
+  the exception, not the rule: `listeners.py` imports it at module scope, so
+  anything importing the listener chain (tests, Sphinx autodoc, a bare
+  `python -m keycast`) needs a display — CI and the dev container provide
+  Xvfb for exactly this. Sphinx autodoc is the other exception: the three
   names it renders (`types`, `DisplaySettings`, `LoggingSettings`) are runtime
   imports with `noqa: TC001/TC003` — moving them back under `TYPE_CHECKING`
   breaks the docs build.

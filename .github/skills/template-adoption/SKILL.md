@@ -2,7 +2,7 @@
 name: template-adoption
 description: "Reconcile an initial copier-pyproject adoption, an update to a newer template version, or a post-update audit against the project's existing behavior. Use for overlapping workflows, Copier conflicts, custom tooling, stale commands, and documentation drift. Repository-settings setup belongs to repo-setup."
 # Content-Hash: blake3:ad849cfdf9532185fd8e97d0281e2855bfa9f4ef2f0a779cb9782452b50f66f8
-# Source-Hash: blake3:91ae4dec2638f843961fe552f9a2e94107153738cf7059fc35fdce89827f50d6
+# Source-Hash: blake3:2c2e7583f73ecc436b82a4cff74eb78c614f427228e80c597fd3e41b2584a1f4
 ---
 
 # Reconcile template adoption and updates

@@ -8,8 +8,8 @@ Use MCP server: npx -y ai-rulez@latest mcp
 Regenerate: ai-rulez generate
 
 Docs: https://github.com/Goldziher/ai-rulez
-Content-Hash: blake3:0529d56f6533f070087ac7f808162958c0fd11964928b292d8c491aa4d2f81e5
-Source-Hash: blake3:91ae4dec2638f843961fe552f9a2e94107153738cf7059fc35fdce89827f50d6
+Content-Hash: blake3:7b75707653c062f76be540bba7a9b9f6c97cb8724b20953609371e39db0c7857
+Source-Hash: blake3:2c2e7583f73ecc436b82a4cff74eb78c614f427228e80c597fd3e41b2584a1f4
 -->
 
 # keycast
@@ -51,9 +51,13 @@ Design rules that must survive every change:
   the `BLE001`/`PLW0717` per-file-ignores in `pyproject.toml`); a listener
   failure must never take down the overlay. Narrow a handler only when you can
   prove the failure set.
-- **Lazy imports are load-bearing.** `tkinter`/`pynput` stay function-local
-  (`PLC0415`) so `--help`, `version`, and headless tooling (slotscheck, Sphinx)
-  never pay for the GUI toolkit. Sphinx autodoc is the exception: the three
+- **Lazy imports are load-bearing.** `tkinter` stays function-local
+  (`PLC0415`), and the `cli.py` subcommands import the GUI chain lazily, so
+  `--help`, `version`, and `info` never pay for the GUI toolkit. `pynput` is
+  the exception, not the rule: `listeners.py` imports it at module scope, so
+  anything importing the listener chain (tests, Sphinx autodoc, a bare
+  `python -m keycast`) needs a display — CI and the dev container provide
+  Xvfb for exactly this. Sphinx autodoc is the other exception: the three
   names it renders (`types`, `DisplaySettings`, `LoggingSettings`) are runtime
   imports with `noqa: TC001/TC003` — moving them back under `TYPE_CHECKING`
   breaks the docs build.

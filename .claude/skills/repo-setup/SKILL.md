@@ -3,7 +3,7 @@ description: Use to perform (or resume, or verify) the one-time repository & rel
 name: repo-setup
 user_invocable: false
 # Content-Hash: blake3:1002c89cfc3288771d3fb3c1ae8dd4485855d5be2f2886ac7d3a40c5b6fc3793
-# Source-Hash: blake3:91ae4dec2638f843961fe552f9a2e94107153738cf7059fc35fdce89827f50d6
+# Source-Hash: blake3:2c2e7583f73ecc436b82a4cff74eb78c614f427228e80c597fd3e41b2584a1f4
 ---
 
 # Set up this repository's release & maintenance automation
