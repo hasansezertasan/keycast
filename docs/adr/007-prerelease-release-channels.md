@@ -16,7 +16,7 @@ Current state:
   back (see *Decision*).
 - **Guards: present but inert.** The `is_prerelease` output + channel guards in
   `.github/workflows/release.yml` (prerelease GitHub releases marked `--prerelease
-  --latest=false`; `bump-homebrew` / `bump-scoop` gated to stable) remain in place. For
+  --latest=false`; `bump-cask` / `bump-scoop` gated to stable) remain in place. For
   a stable tag they are no-ops (no `-` → `is_prerelease=false`), so they cost
   nothing while the channel is off and are ready the moment it is on.
 
@@ -79,8 +79,8 @@ intended behavior when enabled, not as current behavior.
   accepts the upload and `pip install keycast` ignores it unless `--pre` is passed.
 - **Guard the binary channels.** A new `is_prerelease` workflow output (`true`
   when the tag contains a `-`; a final/graduated tag never does) drives:
-  `finalize-release` marks betas `--prerelease --latest=false` (stable forces
-  `--prerelease=false --latest`), and `bump-homebrew` / `bump-scoop` are **skipped**
+  `publish-release` marks betas `--prerelease --latest=false` (stable forces
+  `--prerelease=false --latest`), and `bump-cask` / `bump-scoop` are **skipped**
   for prereleases.
 - **Graduate via `Release-As`.** A `Release-As: X.Y.Z` commit footer (no suffix)
   overrides the computed version and opens a stable release PR; the hyphen-free
@@ -251,11 +251,11 @@ them):**
   |---|---|---|
   | **PyPI** | Yes | Uploaded as `0.2.0bN`, but hidden from `pip install keycast` — only `--pre` / `uv pip install --prerelease=allow` sees it. |
   | **GitHub Releases page** | Yes | Full asset set (`.dmg`, `.zip`, installer, sdist, wheel), flagged **Pre-release**, **not "Latest"**. |
-  | **Homebrew cask** | No | `bump-homebrew` gated off for prereleases. |
+  | **Homebrew cask** | No | `bump-cask` gated off for prereleases. |
   | **Scoop bucket** | No | `bump-scoop` gated off (both the binary-zip and pipx-shim manifests). |
 
 - **Two layers of protection for brew/scoop.** (1) *Push side:* the
-  `bump-homebrew`/`bump-scoop` jobs don't fire for a prerelease, so we never nudge the
+  `bump-cask`/`bump-scoop` jobs don't fire for a prerelease, so we never nudge the
   downstream repos. (2) *Pull side:* the tap and bucket also run their own cron
   that re-derives from GitHub's *latest* release / PyPI's *latest* version — and
   because betas are marked `--prerelease --latest=false`, both "latest" endpoints

@@ -80,7 +80,7 @@ works unchanged.
 - **Submission: manual first, automated later.** The first submission (identity
   reservation, listing copy, capability justification, age rating) is manual in
   Partner Center. Subsequent version bumps are a **best-effort job outside the
-  atomic release gate** (mirrors `bump-homebrew` / `bump-scoop`) using `msstore-cli`
+  atomic release gate** (mirrors `bump-cask` / `bump-scoop`) using `msstore-cli`
   / the Store submission API — added only after the manual flow has succeeded
   once.
 - **New install source: `MICROSOFT_STORE`.** Store-installed MSIX apps run from
@@ -118,7 +118,7 @@ works unchanged.
 - **Release pipeline:** `build-windows` gains a `makeappx pack` step producing
   the `keycast.msix` **workflow artifact** (retained for the submission job /
   manual upload; never attached to the GitHub Release — see Decision); a new
-  best-effort `submit-store` job (post-`finalize-release`, gated on
+  best-effort `submit-store` job (post-`publish-release`, gated on
   `is_prerelease == false` and on a Partner Center API secret being present —
   warns and exits 0 otherwise, like `bump-scoop`).
 - **CI:** the PR-level `build-windows` check also runs `makeappx pack` against
