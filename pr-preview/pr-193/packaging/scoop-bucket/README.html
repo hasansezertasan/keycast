@@ -194,24 +194,31 @@ PyPI for the latest release:</p>
 for a full manifest to copy and adapt.</p>
 </li>
 <li><p>A <strong>binary manifest</strong> pointing at the GitHub release asset the
-standalone-executable build attaches, with <code class="docutils literal notranslate"><span class="pre">checkver:</span> <span class="pre">github</span></code> and a
+Windows bundle build attaches, with <code class="docutils literal notranslate"><span class="pre">checkver:</span> <span class="pre">github</span></code> and a
 matching <code class="docutils literal notranslate"><span class="pre">autoupdate</span></code> block so future releases resolve automatically.
-The <code class="docutils literal notranslate"><span class="pre">build-freezer</span></code> release job attaches the Windows binary
-as <code class="docutils literal notranslate"><span class="pre">keycast-freezer-windows.exe</span></code> (a raw <code class="docutils literal notranslate"><span class="pre">.exe</span></code>,
-not a zip — install it via <code class="docutils literal notranslate"><span class="pre">bin</span></code>, no <code class="docutils literal notranslate"><span class="pre">extract_dir</span></code>), so the <code class="docutils literal notranslate"><span class="pre">url</span></code> must name
+The <code class="docutils literal notranslate"><span class="pre">build-windows</span></code> release job attaches the onedir folder
+as <code class="docutils literal notranslate"><span class="pre">keycast-windows.zip</span></code> (a zip of <code class="docutils literal notranslate"><span class="pre">dist/keycast/</span></code> — extract it via
+<code class="docutils literal notranslate"><span class="pre">extract_dir</span></code>, then shim <code class="docutils literal notranslate"><span class="pre">keycast.exe</span></code>), so the <code class="docutils literal notranslate"><span class="pre">url</span></code> must name
 that exact asset:</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="p">{</span>
 </span><span data-line="2"><span class="w">  </span><span class="nt">"checkver"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 </span><span data-line="3"><span class="w">    </span><span class="nt">"github"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://github.com/hasansezertasan/keycast"</span>
 </span><span data-line="4"><span class="w">  </span><span class="p">},</span>
-</span><span data-line="5"><span class="w">  </span><span class="nt">"autoupdate"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span data-line="6"><span class="w">    </span><span class="nt">"architecture"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span data-line="7"><span class="w">      </span><span class="nt">"64bit"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-</span><span data-line="8"><span class="w">        </span><span class="nt">"url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://github.com/hasansezertasan/keycast/releases/download/v$version/keycast-freezer-windows.exe"</span>
-</span><span data-line="9"><span class="w">      </span><span class="p">}</span>
-</span><span data-line="10"><span class="w">    </span><span class="p">}</span>
-</span><span data-line="11"><span class="w">  </span><span class="p">}</span>
-</span><span data-line="12"><span class="p">}</span>
+</span><span data-line="5"><span class="w">  </span><span class="nt">"architecture"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span data-line="6"><span class="w">    </span><span class="nt">"64bit"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span data-line="7"><span class="w">      </span><span class="nt">"url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://github.com/hasansezertasan/keycast/releases/download/v$version/keycast-windows.zip"</span><span class="p">,</span>
+</span><span data-line="8"><span class="w">      </span><span class="nt">"extract_dir"</span><span class="p">:</span><span class="w"> </span><span class="s2">"keycast"</span>
+</span><span data-line="9"><span class="w">    </span><span class="p">}</span>
+</span><span data-line="10"><span class="w">  </span><span class="p">},</span>
+</span><span data-line="11"><span class="w">  </span><span class="nt">"autoupdate"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span data-line="12"><span class="w">    </span><span class="nt">"architecture"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span data-line="13"><span class="w">      </span><span class="nt">"64bit"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span data-line="14"><span class="w">        </span><span class="nt">"url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://github.com/hasansezertasan/keycast/releases/download/v$version/keycast-windows.zip"</span>
+</span><span data-line="15"><span class="w">      </span><span class="p">}</span>
+</span><span data-line="16"><span class="w">    </span><span class="p">}</span>
+</span><span data-line="17"><span class="w">  </span><span class="p">},</span>
+</span><span data-line="18"><span class="w">  </span><span class="nt">"bin"</span><span class="p">:</span><span class="w"> </span><span class="s2">"keycast.exe"</span>
+</span><span data-line="19"><span class="p">}</span>
 </span></pre></div>
 </div>
 <p>See keycast’s

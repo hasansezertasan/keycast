@@ -69,11 +69,11 @@ bucket repository, using the bucket's own `GITHUB_TOKEN`.
      for a full manifest to copy and adapt.
 
    - A **binary manifest** pointing at the GitHub release asset the
-     standalone-executable build attaches, with `checkver: github` and a
+     Windows bundle build attaches, with `checkver: github` and a
      matching `autoupdate` block so future releases resolve automatically.
-     The `build-freezer` release job attaches the Windows binary
-     as `keycast-freezer-windows.exe` (a raw `.exe`,
-     not a zip — install it via `bin`, no `extract_dir`), so the `url` must name
+     The `build-windows` release job attaches the onedir folder
+     as `keycast-windows.zip` (a zip of `dist/keycast/` — extract it via
+     `extract_dir`, then shim `keycast.exe`), so the `url` must name
      that exact asset:
 
      ```json
@@ -81,13 +81,20 @@ bucket repository, using the bucket's own `GITHUB_TOKEN`.
        "checkver": {
          "github": "https://github.com/hasansezertasan/keycast"
        },
+       "architecture": {
+         "64bit": {
+           "url": "https://github.com/hasansezertasan/keycast/releases/download/v$version/keycast-windows.zip",
+           "extract_dir": "keycast"
+         }
+       },
        "autoupdate": {
          "architecture": {
            "64bit": {
-             "url": "https://github.com/hasansezertasan/keycast/releases/download/v$version/keycast-freezer-windows.exe"
+             "url": "https://github.com/hasansezertasan/keycast/releases/download/v$version/keycast-windows.zip"
            }
          }
-       }
+       },
+       "bin": "keycast.exe"
      }
      ```
 
