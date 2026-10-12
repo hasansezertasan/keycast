@@ -572,7 +572,14 @@ jobs:
     # (the workflow_dispatch exception is why finalize-release re-dispatches
     # itself above). So docs deployment must live in this workflow as a job.
     needs: [release-please, finalize-release]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.release-please.outputs.is_prerelease != 'true' }}
+    # Kept OFF the docs site for prereleases: under minor/major granularity a
+    # beta (e.g. 0.3.0-beta.1) collapses to its stable-looking slug (0.3),
+    # which pick_latest() would treat as stable and assemble_site() would
+    # publish over the graduated docs and the `latest` alias. Same
+    # inert-while-disabled posture as the MSIX/Homebrew/Scoop prerelease
+    # guards (ADR-007) — binding if the beta channel is ever enabled.
+    # Graduating to stable rebuilds and publishes the docs then.
     permissions:
       contents: write  # IMPORTANT: Mandatory for GitHub Pages
     steps:

@@ -40,6 +40,16 @@ jobs:
           echo "Redeploying documentation for the latest published release: $tag"
           dispatch_ref="$(git rev-parse HEAD)"
           git checkout --force --detach "$tag"
+          # The tag must carry the Sphinx docs infrastructure this redeploy
+          # rebuilds. A tag from before the docs-site adoption has no
+          # docs/conf.py (and no docs dependency group), so restoring only the
+          # builder below would invoke Sphinx on a tree with no project and
+          # fail obscurely — refuse here with an actionable message instead.
+          # Publish a release from a post-adoption revision, then redeploy.
+          if [ ! -f docs/conf.py ]; then
+            echo "::error::$tag predates the Sphinx docs infrastructure (docs/conf.py); cannot rebuild its docs — publish a post-adoption release first, then redeploy"
+            exit 1
+          fi
           # Keep THIS revision's tools/build_docs.py. The tag carries the docs
           # *sources* we want to rebuild, but build_docs.py is orchestration —
           # the same layer as this workflow file, which workflow_dispatch already

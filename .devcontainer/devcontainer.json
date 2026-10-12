@@ -23,7 +23,19 @@
   // Uncomment the next line if you want to keep your containers running after VS Code shuts down.
   "shutdownAction": "stopCompose",
   // Uncomment the next line to run commands after the container is created.
-  "postCreateCommand": "uv sync",
+  // xvfb runs as the image's default (root) user: the test suite and the
+  // Sphinx docs build import pynput, whose X11 backend aborts with no display
+  // (same reason CI wraps those jobs in xvfb-run), so the documented
+  // pytest/tox commands need it installed before the first run.
+  "postCreateCommand": "apt-get update && apt-get install -y xvfb && uv sync",
+  // Keep a headless X server on :99 across restarts and point every integrated
+  // terminal at it. The trailing sleep keeps the step green when a server from
+  // a previous start is still holding the display (the fresh Xvfb then exits,
+  // the old one keeps serving).
+  "postStartCommand": "rm -f /tmp/.X99-lock; Xvfb :99 -screen 0 1280x800x24 >/tmp/xvfb.log 2>&1 & sleep 1",
+  "remoteEnv": {
+    "DISPLAY": ":99"
+  },
   // Configure tool-specific properties.
   "customizations": {
     "vscode": {
