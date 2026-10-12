@@ -157,8 +157,7 @@ The bucket repo and its manifest live outside this repository.
 ## Release & CI
 
 The release pipeline (`.github/workflows/release.yml`, workflow name **Release**)
-is a decomposed DAG gated on the release-please flow (see `.github/workflows/release.yml`
-and `docs/adr/007-prerelease-release-channels.md`). The
+is a decomposed DAG gated on the release-please flow (see `AGENTS.md`). The
 release is **atomic** — nothing publishes unless every artifact builds:
 
 ```text
@@ -228,24 +227,27 @@ release** (betas are skipped — see the beta-channel note above).
 so this repo deliberately keeps **no** copy of `keycast.rb` (it would only drift
 behind the live file).
 
-### How it bumps (first-party tool, PR-based)
+### How it bumps (dispatch + listener, PR-based)
 
-`release.yml`'s `bump-cask` job runs after the release is published and calls
-Homebrew's own **`brew bump-cask-pr`**, which downloads the released
-`keycast.dmg`, computes its sha256, rewrites the cask, and opens a **PR** on the
-tap (so `brew style`/`audit` run on the change). `--no-fork` pushes the PR branch
-straight to the tap you own. The dedicated wrapper actions
-(`macauley/action-homebrew-bump-cask`) are abandoned, so the first-party tool is
-called directly.
+`release.yml`'s `bump-homebrew` job runs after the release is published and
+`POST`s a `repository_dispatch` (`update-cask`) event to
+`hasansezertasan/homebrew-tap` with the new version. The listener workflow in
+the tap (`update-cask-dispatch.yml`, see
+`docs/packaging/homebrew-tap/`) receives that event, resolves the new version,
+runs Homebrew's own **`brew bump-cask-pr`** — which downloads the released
+`keycast.dmg`, computes its sha256, rewrites the cask, and opens a **PR** on
+the tap (so `brew style`/`audit` run on the change) — all inside the tap
+repository, using the tap's own `GITHUB_TOKEN`.
 
 The job is **best-effort and outside the atomic release gate**: it runs after the
 release is published, so a tap hiccup cannot block or unwind a shipped release.
 
 > **Why a PAT, not `GITHUB_TOKEN`:** the automatic token is scoped to the repo
-> whose workflow runs and cannot push to / open a PR on another repo.
-> `bump-cask-pr` is inherently cross-repo, so it needs a fine-grained PAT
-> (Contents + Pull requests: write on the tap) in the `TAP_TOKEN` secret. When
-> that secret is absent the `bump-cask` step warns and exits 0.
+> whose workflow runs and cannot POST a cross-repo dispatch, so the job needs
+> a fine-grained PAT (Contents: write on the tap) in the `HOMEBREW_TAP_TOKEN`
+> secret. The tap opens its own PR with its own `GITHUB_TOKEN`, so Pull
+> requests: write is not needed on the PAT. When that secret is absent the
+> `bump-homebrew` step warns and exits 0.
 
 > The app is **unsigned** (ad-hoc only) until an Apple Developer account is
 > available; hence the Gatekeeper caveat in the cask. Adopting Developer-ID
@@ -281,14 +283,13 @@ release is published, so a tap hiccup cannot block or unwind a shipped release.
    ```
 
 2. **Create a fine-grained PAT** scoped to **only** `hasansezertasan/homebrew-tap`
-   with **Contents: Read and write** (push the PR branch) and **Pull requests:
-   Read and write** (open the PR).
+   with **Contents: Read and write** (to fire the dispatch).
 
-3. **Store it** on the keycast repo as the `TAP_TOKEN` secret (Settings → Secrets
-   and variables → Actions). Without it, the `bump-cask` job warns and skips —
+3. **Store it** on the keycast repo as the `HOMEBREW_TAP_TOKEN` secret (Settings → Secrets
+   and variables → Actions). Without it, the `bump-homebrew` job warns and skips —
    releases still succeed.
 
-After this, the cask is edited only by `bump-cask-pr` in the tap; if a static
+After this, the cask is edited only by the tap's listener workflow; if a static
 stanza ever changes (caveats, signing later), edit it in the tap directly.
 
 ## Scoop bucket
@@ -330,12 +331,12 @@ that the package repo fires for promptness.
 `release.yml`'s `bump-scoop` job is that dispatch: after the release is published
 it `POST`s `repos/…/scoop-bucket/dispatches` so the bucket bumps immediately
 instead of waiting for its cron. The job is **best-effort and outside the atomic
-release gate** (mirrors `bump-cask`); if the dispatch is skipped or fails, the
+release gate** (mirrors `bump-homebrew`); if the dispatch is skipped or fails, the
 next scheduled run still bumps the manifests.
 
 > **Why a PAT:** `repository_dispatch` is cross-repo, which the automatic
 > `GITHUB_TOKEN` cannot do. The `bump-scoop` job needs a fine-grained PAT with
-> **Contents: write** scoped to **only** the bucket, in the `BUCKET_TOKEN`
+> **Contents: write** scoped to **only** the bucket, in the `SCOOP_BUCKET_TOKEN`
 > secret. When it is absent the step warns and exits 0 — and the bucket's cron
 > still keeps both manifests current.
 
@@ -349,7 +350,7 @@ next scheduled run still bumps the manifests.
    `bump-scoop` dispatch reaches it.
 2. **Create a fine-grained PAT** scoped to **only** `hasansezertasan/scoop-bucket`
    with **Contents: Read and write** (to fire the dispatch).
-3. **Store it** on the keycast repo as the `BUCKET_TOKEN` secret. Without
+3. **Store it** on the keycast repo as the `SCOOP_BUCKET_TOKEN` secret. Without
    it, the `bump-scoop` job warns and skips — releases still succeed.
 
 After this, the manifests are edited only by the bucket's updater; users install
@@ -506,7 +507,7 @@ usually settles it.
 
 Per [ADR-009](adr/009-microsoft-store.md), only *after* a manual submission has
 survived review once: a best-effort `submit-store` job (msstore-cli / the Store
-submission API) can mirror `bump-cask` / `bump-scoop` to push subsequent version
+submission API) can mirror `bump-homebrew` / `bump-scoop` to push subsequent version
 bumps automatically.
 
 ## Mac App Store (sandboxed)

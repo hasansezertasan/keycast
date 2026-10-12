@@ -117,9 +117,12 @@ jobs:
     name: Publish to PyPI
     timeout-minutes: 10
     # Atomic gate: requires ALL builders (wheel, freezer binaries, and the
-    # desktop .dmg/.exe bundles below). A failed bundle blocks the PyPI release
-    # too — nothing ships unless every artifact built.
-    needs: [release-please, build, build-freezer, build-macos, build-windows]
+    # desktop .dmg/.exe bundles below) plus the SBOM. A failed bundle or SBOM
+    # blocks the PyPI release too — nothing ships unless every artifact built.
+    # `sbom` is required here (not just in `attach-github-release` below)
+    # because PyPI publication is irreversible: without this gate a failed SBOM
+    # would leave a published version whose GitHub release stays a draft.
+    needs: [release-please, build, build-freezer, build-macos, build-windows, sbom]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     permissions:
       id-token: write  # IMPORTANT: Mandatory for Trusted Publishing (gh-action-pypi-publish)
@@ -651,7 +654,7 @@ jobs:
         env:
           PYTHONUNBUFFERED: "1"
           # Passed via env (not interpolated into run:) — read by the Python
-          # process, so no template-injection surface. See ADR-027 / AGENTS.md.
+          # process, so no template-injection surface. See ADR-027 / CLAUDE.md.
           DOCS_BUILD_VERSION: ${{ needs.release-please.outputs.version }}
         # Builds only this release's docs, then assembles ./site with every prior
         # version copied from gh-pages, a `latest` alias, and a root redirect.
