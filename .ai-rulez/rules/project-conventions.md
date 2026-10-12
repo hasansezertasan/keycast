@@ -12,6 +12,7 @@ priority: high
   documented per site with `# noqa: C901` — refactor those only with care.
 - Versions come from Git tags — do not hand-edit a version literal anywhere.
 - Commit messages follow Conventional Commits; releases are automated by release-please.
+  Do not add an AI `Co-Authored-By` trailer to commits.
 - **Docs are a contract.** `README.md` and `docs/` (API, ARCHITECTURE,
   DESIGN_DECISIONS, PROJECT_OVERVIEW) must match the code; `tests/test_docs_contract.py`
   pins class/constructor names, the `Settings` section set, default key labels,
