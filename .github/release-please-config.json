@@ -7,7 +7,6 @@
   "bump-patch-for-minor-pre-major": false,
   "draft": true,
   "force-tag-creation": true,
-  "prerelease": false,
   "changelog-path": "CHANGELOG.md",
   "changelog-type": "default",
   "changelog-sections": [
