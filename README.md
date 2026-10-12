@@ -119,7 +119,7 @@ unless `show_startup_status` is `false` or the app starts minimized — briefly
 shows a one-line summary on the overlay so you can immediately tell whether
 capture is live:
 
-```
+```text
 Input status — Keyboard: OK, Mouse: Permission needed
 ```
 
@@ -251,7 +251,7 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
 ```
 
 > These are top-level flags (not sections).
-
+>
 > `preset` — a named settings bundle layered over the rest of your config on
 > load. `"custom"` (default) uses your file exactly as written. `"presenter"`
 > makes the overlay large and legible for screencasts, `"minimal"` makes it
@@ -262,28 +262,28 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
 > values, copy them into your config and keep `preset: "custom"`. The on-disk
 > config is never rewritten with the preset's values; only the running app sees
 > them.
-
+>
 > `check_for_updates` — when `true` (default), keycast checks the GitHub
 > Releases API at most once a day and shows a non-blocking notice if a newer
 > version exists (see [Updates](#updates)). Set it to `false` to disable all
 > automatic update checks (offline and privacy-respecting). The check fails
 > silently when offline.
-
+>
 > `show_startup_status` — when `true` (default), keycast shows a short startup
 > line on the overlay with keyboard/mouse capture status (`OK`, `Off`,
 > `Permission needed`, `Not capturing`, or `Unknown`). The structured
 > `startup_input_status` log event is written regardless of this flag; setting
 > it to `false` only suppresses the on-overlay line. The line is also skipped on
 > a minimized start.
-
+>
 > `debug` — when `true`, keycast surfaces verbose diagnostics regardless of
 > `logging.level`; a quick switch for troubleshooting without editing the logging
 > block. Defaults to `false`.
-
+>
 > `auto_start` — when `true` (default), the input listeners start on launch. Set
 > it to `false` as a master switch to start with the overlay visible but
 > capturing nothing, regardless of `keyboard.enabled` / `mouse.enabled`.
-
+>
 > `start_minimized` — when `true`, the overlay starts hidden and appears the
 > first time a key or click is captured. Requires `auto_start` to be `true`
 > (otherwise nothing is captured and the overlay would never appear, so the
@@ -291,7 +291,7 @@ keycast uses a JSON configuration file with Pydantic-based settings validation. 
 > both listeners disabled, or they fail to start (e.g. missing OS input
 > permissions) — keycast keeps the overlay **visible** rather than hiding a
 > window it could never restore. Defaults to `false`.
-
+>
 > Enabling/disabling each listener is controlled per-component via
 > `keyboard.enabled` and `mouse.enabled` (see the Keyboard/Mouse settings above).
 
@@ -343,7 +343,7 @@ uv run python -m pytest tests/ -v
 
 ### Project Structure
 
-```
+```text
 keycast/
 ├── src/keycast/
 │   ├── __init__.py      # Package initialization
@@ -401,6 +401,7 @@ This is the most common issue on macOS. You need to grant accessibility permissi
 6. **Restart keycast**
 
 If you're still having issues, try:
+
 - Restart your terminal/IDE after granting permissions
 - Make sure you're running keycast from the same terminal/IDE that you granted permissions to
 - On some systems, you may need to restart your computer after granting permissions

@@ -1,0 +1,159 @@
+---
+name: Update Cask (Dispatch)
+# Triggered by the source repo's release workflow (bump-homebrew job) after a
+# GitHub release with a downloadable app artifact is published.
+#
+# All the work happens HERE, not in the producer: the producer only signals.
+# That keeps cask-bump logic in one place as more producers come online. A
+# producer's dispatch token needs Contents: write on this tap (required by
+# the POST /dispatches API for fine-grained PATs) but not Pull requests:
+# write — this tap opens its own PR with its own GITHUB_TOKEN.
+on:
+  repository_dispatch:
+    types: [update-cask]
+# Expected payload:
+# {
+#   "cask": "example",           # Cask name (required)
+#   "version": "0.4.0"           # New version (optional; livecheck if omitted)
+# }
+jobs:
+  update:
+    timeout-minutes: 20
+    name: Update cask (dispatch)
+    # macOS: bump-cask-pr / livecheck --cask are rejected on Linux.
+    runs-on: macos-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write  # open a failure issue on this tap (no PAT, GITHUB_TOKEN only)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate payload
+        # The dispatch payload is attacker-controllable. Read it ONLY through env
+        # (never interpolate ${{ ... }} into the script source, which would let a
+        # value like `example"; rm -rf / #` execute), and validate against strict
+        # patterns before any downstream use. Validated values are persisted to
+        # $GITHUB_ENV so later steps consume the sanitized data, not the raw event.
+        # Validate with bash's =~, which matches the WHOLE string. `grep -E`
+        # matches line-by-line, so a multiline value like $'example\nCASK=x'
+        # would pass a per-line check and then smuggle a second `CASK=` line
+        # into $GITHUB_ENV below (the second assignment wins). =~ has no record
+        # separator: an embedded CR/LF isn't in the character class and can't
+        # reach the `$` anchor, so any multiline payload is rejected here.
+        shell: bash
+        env:
+          RAW_CASK: ${{ github.event.client_payload.cask }}
+          RAW_VERSION: ${{ github.event.client_payload.version }}
+        run: |
+          if [ -z "$RAW_CASK" ]; then
+            echo "::error::'cask' is required in client_payload"; exit 1
+          fi
+          # Homebrew cask token: lowercase alphanumerics and hyphens only.
+          if [[ ! "$RAW_CASK" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+            echo "::error::invalid cask token (must match ^[a-z0-9][a-z0-9-]*\$)"; exit 1
+          fi
+          # Version is optional; if present, restrict to safe version characters.
+          if [ -n "$RAW_VERSION" ] && [[ ! "$RAW_VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ ]]; then
+            echo "::error::invalid version (must match ^[A-Za-z0-9][A-Za-z0-9._+-]*\$)"; exit 1
+          fi
+          if [ ! -f "Casks/${RAW_CASK}.rb" ]; then
+            echo "::error::Cask '${RAW_CASK}' not found"; exit 1
+          fi
+          {
+            echo "CASK=$RAW_CASK"
+            echo "VERSION=$RAW_VERSION"
+          } >> "$GITHUB_ENV"
+          echo "Validated cask: $RAW_CASK"
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@d3565f64e59130f1fd713440276f7d3e11079b88  # main
+      - name: Resolve target version
+        id: check
+        # OWNER/REPO come through env (never interpolated into the script source),
+        # matching the payload-validation discipline above.
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.repository }}
+        run: |
+          tap="${OWNER}/$(basename "$REPO")"
+          ref="${tap}/${CASK}"
+
+          if [ -n "$VERSION" ]; then
+            # Version provided in payload (already validated), use it directly.
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "has_update=true" >> "$GITHUB_OUTPUT"
+            echo "Using provided version: $VERSION"
+          else
+            # No version given: ask livecheck for the latest.
+            out=$(brew livecheck --cask --json "$ref" 2>/dev/null || echo "[]")
+            outdated=$(echo "$out" | jq -r '.[0].version.outdated // false')
+            if [ "$outdated" = "true" ]; then
+              latest=$(echo "$out" | jq -r '.[0].version.latest')
+              echo "version=$latest" >> "$GITHUB_OUTPUT"
+              echo "has_update=true" >> "$GITHUB_OUTPUT"
+              echo "Found update: $latest"
+            else
+              echo "has_update=false" >> "$GITHUB_OUTPUT"
+              echo "Cask is already up to date"
+            fi
+          fi
+      - name: Bump and verify
+        if: steps.check.outputs.has_update == 'true'
+        env:
+          RESOLVED_VERSION: ${{ steps.check.outputs.version }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.repository }}
+        run: |
+          tap="${OWNER}/$(basename "$REPO")"
+          ref="${tap}/${CASK}"
+
+          echo "Bumping $CASK to $RESOLVED_VERSION..."
+          # --write-only edits the file in place; no PR/push from brew itself.
+          brew bump-cask-pr --no-audit --no-browse --write-only \
+            --version="$RESOLVED_VERSION" "$ref"
+
+          # The PR is opened with GITHUB_TOKEN and so won't trigger tests.yml.
+          # Audit HERE instead (online, against the published artifact), so the
+          # auto-PR is verified inside the run that creates it. A failure here
+          # trips the `if: failure()` issue step below.
+          brew audit --cask --strict --online "$ref"
+      - name: Create Pull Request
+        if: steps.check.outputs.has_update == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1  # v8.1.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(${{ env.CASK }}): update to ${{ steps.check.outputs.version }}"
+          title: "chore(${{ env.CASK }}): update to ${{ steps.check.outputs.version }}"
+          body: |
+            Automated update triggered by package release.
+
+            - **Cask**: ${{ env.CASK }}
+            - **Version**: ${{ steps.check.outputs.version }}
+
+            Bumped and audited (`brew audit --cask --strict --online`) in the
+            triggering workflow run.
+
+            ---
+            *Triggered by repository_dispatch from the cask source repo.*
+          branch: auto-update/cask-${{ env.CASK }}
+          delete-branch: true
+      - name: Report failure
+        # Fire-and-forget dispatch hides failures from the producer, so surface
+        # them as an issue on this tap. The owner watches the tap, so this
+        # notifies without any cross-repo PAT (GITHUB_TOKEN + issues: write).
+        # CASK/VERSION are read from $GITHUB_ENV (set only if validation passed).
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Cask bump failed: ${CASK:-<unknown>} ${VERSION}"
+          body="$(printf 'Automated cask bump triggered by a release dispatch failed.\n\n- Cask: %s\n- Version: %s\n- Run: %s\n\nInvestigate if it keeps failing.' "${CASK:-<unknown>}" "${VERSION:-<from livecheck>}" "$RUN_URL")"
+          # `gh issue create --label` fails if the label does not exist yet, so
+          # retry without labels before giving up — a labelless issue still
+          # notifies. A fresh tap has neither label until they are provisioned.
+          gh issue create --title "$title" --label "automated,cask-bump-failure" --body "$body" \
+            || gh issue create --title "$title" --body "$body" \
+            || echo "::warning::could not open failure issue"

@@ -5,8 +5,13 @@ import logging
 import platform
 import signal
 import sys
+
+# Runtime import (not TYPE_CHECKING): `signal_handler` annotates with
+# `types.FrameType`, and Sphinx autodoc evaluates annotations to render
+# signatures. `noqa: TC003` — the typing-only placement would break the docs.
+import types  # noqa: TC003
 from enum import StrEnum
-from typing import TYPE_CHECKING, NamedTuple
+from typing import NamedTuple, Self
 
 from keycast import __version__
 from keycast.display import DisplayWindow
@@ -15,8 +20,8 @@ from keycast.logging_setup import format_event, setup_logging
 from keycast.settings import Settings
 from keycast.updates import notify_pending_update
 
-if TYPE_CHECKING:
-    import types
+__all__ = ["Keycast"]
+
 
 _MACOS_APP_SERVICES_FRAMEWORK = (
     "/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices"
@@ -41,7 +46,7 @@ class _InputSourceStatus(StrEnum):
 
     label: str
 
-    def __new__(cls, value: str, label: str) -> "_InputSourceStatus":
+    def __new__(cls, value: str, label: str) -> Self:
         """Build a StrEnum member that also carries an overlay ``label``."""
         member = str.__new__(cls, value)
         member._value_ = value
@@ -93,12 +98,12 @@ class Keycast:
         # config; "custom" (the default) is a no-op. Applied here so every
         # component below sees the resolved settings, while the on-disk config
         # keeps the user's raw values (see Settings.resolve_preset).
-        self.settings = Settings.create_settings_file().resolve_preset()
+        self.settings: Settings = Settings.create_settings_file().resolve_preset()
         # debug mode can widen logging beyond the configured level; resolve the
         # effective logging settings in one place (Settings.effective_logging)
         # rather than branching on settings.debug here.
         setup_logging(self.settings.effective_logging())
-        self.logger = logging.getLogger(__name__)
+        self.logger: logging.Logger = logging.getLogger(__name__)
         # First line after logging is configured: stamp the version and platform
         # so a user-submitted log identifies the build and OS that produced it.
         # Note: this logs sys.platform ("darwin"/"win32"/"linux"), which is a
@@ -106,24 +111,18 @@ class Keycast:
         # "Linux") that settings.py keys off for key-label normalization; the two
         # are not interchangeable.
         self.logger.info(
-            format_event(
-                "keycast_starting",
-                version=__version__,
-                platform=sys.platform,
-            )
+            format_event("keycast_starting", version=__version__, platform=sys.platform)
         )
-        self._stopped = False
+        self._stopped: bool = False
         # Set by signal_handler to the received signum; logged in run() after the
         # main loop returns. Not logged in the handler itself -- see signal_handler.
         self._pending_signal: int | None = None
-        self.display_window = DisplayWindow(self.settings.display)
-        self.mouse_listener = MouseListener(
-            show_text=self.display_window.show_text,
-            settings=self.settings.mouse,
+        self.display_window: DisplayWindow = DisplayWindow(self.settings.display)
+        self.mouse_listener: MouseListener = MouseListener(
+            show_text=self.display_window.show_text, settings=self.settings.mouse
         )
-        self.key_listener = KeyListener(
-            show_text=self.display_window.show_text,
-            settings=self.settings.keyboard,
+        self.key_listener: KeyListener = KeyListener(
+            show_text=self.display_window.show_text, settings=self.settings.keyboard
         )
 
     def start(self) -> None:
@@ -213,6 +212,9 @@ class Keycast:
         unexpected error degrades to ``UNKNOWN`` (logged with a traceback,
         because reaching here means a real bug rather than a missing symbol,
         which :meth:`_macos_permission_precheck` already handles).
+
+        Returns:
+            The tri-state precheck outcome for this platform.
         """
         if system != "Darwin":
             return _PermissionPrecheck.UNKNOWN
@@ -273,6 +275,9 @@ class Keycast:
         they only ever fire on macOS, where these symbols are expected to exist,
         so either firing means something is wrong on the host and would
         otherwise be invisible at the default log level.
+
+        Returns:
+            The symbol's boolean value, or ``None`` when it can't be read.
         """
         logger = logging.getLogger(__name__)
         check = getattr(app_services, symbol, None)
@@ -297,12 +302,13 @@ class Keycast:
             return None
 
     def _startup_input_statuses(
-        self,
-        started: _ListenersStarted,
-        precheck: _PermissionPrecheck,
-        system: str,
+        self, started: _ListenersStarted, precheck: _PermissionPrecheck, system: str
     ) -> _StartupStatuses:
-        """Derive startup status per input source."""
+        """Derive startup status per input source.
+
+        Returns:
+            The keyboard/mouse startup statuses.
+        """
         return _StartupStatuses(
             keyboard=self._resolve_source_status(
                 enabled=self.key_listener.settings.enabled,
@@ -340,6 +346,9 @@ class Keycast:
         permission denial, the honest status is ``FAILED`` ("not capturing"),
         not ``UNKNOWN`` — we know capture failed, only the cause is undetermined.
         ``UNKNOWN`` is reserved for a platform we don't recognize at all.
+
+        Returns:
+            The user-facing status for this source.
         """
         if not self.settings.auto_start or not enabled:
             return _InputSourceStatus.DISABLED
@@ -350,23 +359,24 @@ class Keycast:
         if started:
             return _InputSourceStatus.ACTIVE
         # started is False here: the listener genuinely failed to start.
-        if system in ("Darwin", "Windows", "Linux"):
+        if system in {"Darwin", "Windows", "Linux"}:
             return _InputSourceStatus.FAILED
         return _InputSourceStatus.UNKNOWN
 
     @staticmethod
     def _format_startup_status_line(statuses: _StartupStatuses) -> str:
-        """Build the one-line startup status for the overlay."""
+        """Build the one-line startup status for the overlay.
+
+        Returns:
+            The overlay status line (e.g. ``"Input status — ..."``).
+        """
         return (
             f"Input status — Keyboard: {statuses.keyboard.label}, "
             f"Mouse: {statuses.mouse.label}"
         )
 
     def _log_startup_input_status(
-        self,
-        *,
-        statuses: _StartupStatuses,
-        precheck: _PermissionPrecheck,
+        self, *, statuses: _StartupStatuses, precheck: _PermissionPrecheck
     ) -> None:
         """Log startup input status as a structured event.
 
@@ -491,8 +501,8 @@ class Keycast:
 
     def run(self) -> None:
         """Run the keycast application."""
-        signal.signal(signal.SIGINT, self.signal_handler)
-        signal.signal(signal.SIGTERM, self.signal_handler)
+        _ = signal.signal(signal.SIGINT, self.signal_handler)
+        _ = signal.signal(signal.SIGTERM, self.signal_handler)
         try:
             self.start()
         except KeyboardInterrupt:

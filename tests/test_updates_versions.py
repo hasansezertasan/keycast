@@ -99,7 +99,8 @@ class TestFetchLatestReleaseTag:
 
     def test_network_error_is_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
         def boom(*_a: object, **_k: object) -> None:
-            raise OSError("offline")
+            msg = "offline"
+            raise OSError(msg)
 
         monkeypatch.setattr(versions.urllib.request, "urlopen", boom)
         assert versions.fetch_latest_release_tag() is None

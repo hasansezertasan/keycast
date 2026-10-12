@@ -16,15 +16,10 @@ layer: ``co_varnames`` is read directly so PEP 649 deferred annotations (and
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from keycast.application import (
-    Keycast,
-    _InputSourceStatus,
-    _StartupStatuses,
-)
+from keycast.application import Keycast, _InputSourceStatus, _StartupStatuses
 from keycast.display import DisplayWindow
 from keycast.listeners import KeyListener, MouseListener
 from keycast.settings import (
@@ -37,6 +32,9 @@ from keycast.settings import (
     Settings,
     _default_key_mappings,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def _positional_params(func: Callable[..., Any]) -> list[str]:
@@ -70,7 +68,7 @@ class TestDocumentedPublicApi:
             assert callable(getattr(Keycast, name)), name
 
     def test_settings_factory_classmethod(self) -> None:
-        assert callable(getattr(Settings, "create_settings_file"))
+        assert callable(Settings.create_settings_file)
 
     def test_plain_callable_satisfies_text_sink(self) -> None:
         # The docs promise any ``Callable[[str], None]`` is a valid sink; the
@@ -153,8 +151,7 @@ class TestDocumentedStartupStatusLabels:
     def test_status_line_format_is_stable(self) -> None:
         line = Keycast._format_startup_status_line(
             _StartupStatuses(
-                keyboard=_InputSourceStatus.NO_ACCESS,
-                mouse=_InputSourceStatus.DISABLED,
+                keyboard=_InputSourceStatus.NO_ACCESS, mouse=_InputSourceStatus.DISABLED
             )
         )
         assert line == "Input status — Keyboard: Permission needed, Mouse: Off"
@@ -187,7 +184,7 @@ class TestDocumentedDefaultLabels:
         # Guards against regressing to the old "Ctrl"/"Alt"/"Shift" doc claim.
         mappings = _default_key_mappings()
         for name in ("ctrl", "alt", "shift"):
-            assert mappings[name] not in ("Ctrl", "Alt", "Shift"), name
+            assert mappings[name] not in {"Ctrl", "Alt", "Shift"}, name
 
 
 class TestDocumentedLoggingBehavior:
@@ -264,10 +261,10 @@ class TestDmgBackgroundCoordinateContract:
 
     def test_icon_centres_match(self) -> None:
         settings, background = self._settings_src(), self._background_src()
-        # dmg_settings.py: appname -> (x, y); Applications -> (x, y)
+        # Both files record icon centres as (x, y) pairs; compare them pairwise.
         app_loc = _coord_pair(settings, r"appname:\s*\((\d+),\s*(\d+)\)")
         apps_loc = _coord_pair(settings, r'"Applications":\s*\((\d+),\s*(\d+)\)')
-        # make_dmg_background.py: APP_CENTER / APPS_CENTER
+        # make_dmg_background.py records the same centres under these names.
         app_centre = _coord_pair(background, r"APP_CENTER\s*=\s*\((\d+),\s*(\d+)\)")
         apps_centre = _coord_pair(background, r"APPS_CENTER\s*=\s*\((\d+),\s*(\d+)\)")
         assert app_loc == app_centre

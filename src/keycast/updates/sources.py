@@ -1,4 +1,4 @@
-"""Install-source detection: how was this keycast process installed?
+"""How this keycast process was installed (install-source detection).
 
 The detected :class:`InstallSource` drives the *right* update advice — a cask
 user is told ``brew upgrade --cask``, a pipx user ``pipx upgrade``, and so on
@@ -16,8 +16,19 @@ import enum
 import importlib.metadata
 import os
 import sys
-from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+__all__ = [
+    "InstallSource",
+    "detect_install_source",
+    "install_source_label",
+    "recommended_action",
+]
+
 
 RELEASES_URL = "https://github.com/hasansezertasan/keycast/releases"
 """User-facing page the notice points at when no upgrade command fits."""
@@ -102,7 +113,7 @@ def _looks_homebrew_formula(location_posix: str) -> bool:
 
 
 def _is_under(location_posix: str, raw_dir: str) -> bool:
-    """Return whether a POSIX path lives under a (possibly native) directory.
+    r"""Return whether a POSIX path lives under a (possibly native) directory.
 
     The directory comes from an env var, so it may be a native Windows path with
     backslashes; it is normalized to lower-cased POSIX before comparison so the
@@ -205,7 +216,12 @@ def _installer_marker_exists() -> bool:
         True if running on Windows and the marker file exists alongside the
         running executable.
     """
-    if sys.platform != "win32":
+    # Read the platform into a plainly-typed local before branching (same
+    # literal-narrowing defeat as secure_input.py): zuban/pyrefly prune the
+    # Windows-only body as dead code on some targets and then flag the
+    # "unreachable" path below.
+    host_platform: str = sys.platform
+    if host_platform != "win32":
         return False
     return (Path(sys.executable).parent / _INSTALLER_MARKER_NAME).exists()
 
@@ -244,7 +260,7 @@ fragment a safe location-only predicate.
 
 
 def _scoop_source(location_posix: str, env: dict[str, str]) -> InstallSource | None:
-    """Classify a frozen bundle as a global / per-user Scoop install, or neither.
+    r"""Classify a frozen bundle as a global / per-user Scoop install, or neither.
 
     Global is tested first (its default path also contains the per-user marker):
     the ``C:\\ProgramData\\scoop`` fragment or a custom ``SCOOP_GLOBAL`` root.
@@ -292,7 +308,9 @@ def _read_installer(dist_name: str = "keycast") -> str | None:
     return text.strip().lower() if text else None
 
 
-def detect_install_source(
+# The install-source decision tree is inherently branchy.
+# pylint: disable=too-many-return-statements
+def detect_install_source(  # noqa: C901 — install-source decision tree
     *,
     frozen: bool | None = None,
     location: Path | None = None,

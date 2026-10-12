@@ -17,12 +17,20 @@ the symbol cannot be read, because failing *closed* would blank the overlay
 indefinitely and read as a broken app rather than a protected one.
 """
 
+from __future__ import annotations
+
 import ctypes
 import logging
 import sys
-from collections.abc import Callable
+from typing import TYPE_CHECKING, cast
 
 from keycast.logging_setup import format_event
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+__all__ = ["is_secure_input_active"]
+
 
 # The Carbon umbrella framework re-exports HIToolbox, where
 # ``IsSecureEventInputEnabled`` lives. Loading Carbon (rather than reaching into
@@ -35,6 +43,9 @@ _SECURE_INPUT_SYMBOL = "IsSecureEventInputEnabled"
 # per-keystroke hot path does not reload the framework each press. ``None`` means
 # "not yet resolved"; ``_load_failed`` distinguishes "resolved to nothing" from
 # "never tried" so a broken load is logged once, not on every keystroke.
+# Module-level probe cache (not UPPER_CASE: this is mutable lazy-init state,
+# not a constant).
+# pylint: disable=invalid-name
 _probe: Callable[[], bool] | None = None
 _load_failed = False
 
@@ -49,6 +60,9 @@ def _load_probe() -> Callable[[], bool] | None:
     :meth:`keycast.application.Keycast._read_macos_permission`, which receives an
     already-loaded ``CDLL``. Returns ``None`` off macOS and whenever the
     framework or symbol is unavailable.
+
+    Returns:
+        The resolved probe, or ``None`` when unavailable.
     """
     logger = logging.getLogger(__name__)
     # Read the platform into a plainly-typed local before branching. mypy/pyright/
@@ -83,7 +97,9 @@ def _load_probe() -> Callable[[], bool] | None:
         return None
     probe.restype = ctypes.c_bool
     probe.argtypes = []
-    return probe
+    # `getattr` on a CDLL is untyped (Any); the restype/argtypes pin above is
+    # what makes the call a `() -> bool` probe.
+    return cast("Callable[[], bool]", probe)
 
 
 def is_secure_input_active() -> bool:
@@ -99,6 +115,8 @@ def is_secure_input_active() -> bool:
     Returns:
         ``True`` only when macOS reports secure event input is enabled.
     """
+    # Probe cache write; silenced (mirrors the module-level naming note above).
+    # pylint: disable=global-statement
     global _probe, _load_failed
     if _probe is None and not _load_failed:
         _probe = _load_probe()

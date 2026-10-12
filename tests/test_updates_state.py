@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
+from typing import TYPE_CHECKING
 
 from keycast.updates import state
 from keycast.updates.state import UpdateState
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
 
 
 class TestStateFile:
@@ -44,7 +47,8 @@ class TestStateFile:
         # A serialization failure must clean up the temp file and not raise: the
         # inner BaseException handler unlinks, the outer handler logs at DEBUG.
         def boom(*_args: object, **_kwargs: object) -> None:
-            raise ValueError("nope")
+            msg = "nope"
+            raise ValueError(msg)
 
         monkeypatch.setattr(state.json, "dump", boom)
         state.write_state(UpdateState(1.0, "v1"), tmp_path / "u.json")

@@ -32,7 +32,8 @@ class TestIsSecureInputActive:
         """A probe that raises on call degrades to False, not an exception."""
 
         def _boom() -> bool:
-            raise OSError("secure-input read failed")
+            msg = "secure-input read failed"
+            raise OSError(msg)
 
         monkeypatch.setattr(secure_input, "_load_probe", lambda: _boom)
         assert secure_input.is_secure_input_active() is False
@@ -60,7 +61,6 @@ class TestIsSecureInputActive:
 
         def _failing_load() -> None:
             calls["n"] += 1
-            return None
 
         monkeypatch.setattr(secure_input, "_load_probe", _failing_load)
         assert secure_input.is_secure_input_active() is False
@@ -78,7 +78,8 @@ class TestIsSecureInputActive:
         """
 
         def _boom() -> bool:
-            raise AttributeError("symbol vanished mid-call")
+            msg = "symbol vanished mid-call"
+            raise AttributeError(msg)
 
         monkeypatch.setattr(secure_input, "_load_probe", lambda: _boom)
         assert secure_input.is_secure_input_active() is False
@@ -96,7 +97,8 @@ class TestIsSecureInputActive:
 
         def _boom() -> bool:
             calls["n"] += 1
-            raise OSError("secure-input read failed")
+            msg = "secure-input read failed"
+            raise OSError(msg)
 
         monkeypatch.setattr(secure_input, "_load_probe", lambda: _boom)
         with caplog.at_level(logging.INFO, logger="keycast.secure_input"):
@@ -128,7 +130,8 @@ class TestLoadProbe:
         monkeypatch.setattr(secure_input.sys, "platform", "darwin")
 
         def _cdll_boom(_name: str) -> object:
-            raise OSError("cannot load Carbon")
+            msg = "cannot load Carbon"
+            raise OSError(msg)
 
         monkeypatch.setattr(secure_input.ctypes, "CDLL", _cdll_boom)
         with caplog.at_level(logging.WARNING, logger="keycast.secure_input"):

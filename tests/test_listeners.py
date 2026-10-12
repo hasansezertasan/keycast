@@ -2,6 +2,7 @@
 
 import logging
 import platform
+import traceback
 from unittest.mock import Mock, patch
 
 import pytest
@@ -375,9 +376,7 @@ class TestKeyListener:
         """
         secure = True
         listener = KeyListener(
-            Mock(),
-            KeyboardSettings(),
-            is_secure_input=lambda: secure,
+            Mock(), KeyboardSettings(), is_secure_input=lambda: secure
         )
 
         with caplog.at_level(logging.INFO, logger="keycast.listeners"):
@@ -618,7 +617,7 @@ class TestMouseListener:
         settings = MouseSettings(show_mouse_clicks=True)
         listener = MouseListener(mock_callback, settings)
 
-        listener._on_click(100, 200, mouse.Button.left, True)
+        listener._on_click(100, 200, mouse.Button.left, pressed=True)
         mock_callback.assert_called_once_with("Left Click")
 
     def test_on_click_released(self) -> None:
@@ -627,19 +626,16 @@ class TestMouseListener:
         settings = MouseSettings(show_mouse_clicks=True)
         listener = MouseListener(mock_callback, settings)
 
-        listener._on_click(100, 200, mouse.Button.left, False)
+        listener._on_click(100, 200, mouse.Button.left, pressed=False)
         mock_callback.assert_not_called()
 
     def test_on_click_with_position(self) -> None:
         """Test handling mouse click with position enabled."""
         mock_callback = Mock()
-        settings = MouseSettings(
-            show_mouse_clicks=True,
-            show_mouse_position=True,
-        )
+        settings = MouseSettings(show_mouse_clicks=True, show_mouse_position=True)
         listener = MouseListener(mock_callback, settings)
 
-        listener._on_click(150, 250, mouse.Button.right, True)
+        listener._on_click(150, 250, mouse.Button.right, pressed=True)
         mock_callback.assert_called_once_with("Right Click (150, 250)")
 
     def test_on_click_clicks_disabled(self) -> None:
@@ -648,7 +644,7 @@ class TestMouseListener:
         settings = MouseSettings(show_mouse_clicks=False)
         listener = MouseListener(mock_callback, settings)
 
-        listener._on_click(100, 200, mouse.Button.left, True)
+        listener._on_click(100, 200, mouse.Button.left, pressed=True)
         mock_callback.assert_not_called()
 
     def test_on_click_swallows_and_logs_sink_error(self) -> None:
@@ -661,7 +657,7 @@ class TestMouseListener:
         listener = MouseListener(callback, MouseSettings(show_mouse_clicks=True))
         listener._error_throttler = Mock()
 
-        listener._on_click(100, 200, mouse.Button.left, True)  # must not raise
+        listener._on_click(100, 200, mouse.Button.left, pressed=True)  # must not raise
 
         assert listener._error_throttler.log.call_count == 1
         assert listener._error_throttler.log.call_args[0][0] == "mouse_sink_error"
@@ -673,7 +669,8 @@ class TestMouseListener:
         listener._error_throttler = Mock()
 
         with patch.object(listener, "_format_button", side_effect=RuntimeError("boom")):
-            listener._on_click(100, 200, mouse.Button.left, True)  # must not raise
+            # Must not raise.
+            listener._on_click(100, 200, mouse.Button.left, pressed=True)
 
         callback.assert_not_called()
         assert listener._error_throttler.log.call_args[0][0] == "mouse_format_error"
@@ -777,8 +774,12 @@ class TestErrorThrottler:
         throttler = _ErrorThrottler(logger)
 
         # Capture an exception with a traceback, then leave the except block.
+        def _raise_stored() -> None:
+            msg = "stored"
+            raise RuntimeError(msg)
+
         try:
-            raise RuntimeError("stored")
+            _raise_stored()
         except RuntimeError as raised:
             stored = raised
         assert stored.__traceback__ is not None
@@ -852,7 +853,10 @@ class TestErrorThrottler:
         logger.error.assert_called_once()
 
     def test_error_key_without_traceback_is_unknown(self) -> None:
-        """An exception that was never raised has no traceback, so location is unknown."""
+        """An exception that was never raised has no traceback.
+
+        Location is unknown without one.
+        """
         exc = RuntimeError("never raised")
         assert exc.__traceback__ is None
 
@@ -868,7 +872,8 @@ class TestErrorThrottler:
         """
 
         def inner() -> None:
-            raise RuntimeError("deep")
+            msg = "deep"
+            raise RuntimeError(msg)
 
         def outer() -> None:
             inner()
@@ -877,13 +882,13 @@ class TestErrorThrottler:
             outer()
         except RuntimeError as exc:
             key = _ErrorThrottler._error_key(exc)
+            origin_line = traceback.extract_tb(exc.__traceback__)[-1].lineno
 
         # The innermost frame is inside ``inner``; its line differs from the
         # ``outer()`` call site, confirming the tb_next loop walked all the way in.
         assert key.startswith("RuntimeError@")
         assert f"{__file__}:" in key
-        inner_line = inner.__code__.co_firstlineno + 1
-        assert key.endswith(f":{inner_line}")
+        assert key.endswith(f":{origin_line}")
 
     def test_distinct_error_count_is_capped_by_evicting_oldest(self) -> None:
         """Tracking is bounded by evicting the least-recently-seen error.
@@ -915,7 +920,8 @@ class TestErrorThrottler:
         throttler = _ErrorThrottler(logger, summary_interval=5, max_distinct=2)
 
         def recur() -> None:
-            raise RuntimeError("recurring")
+            msg = "recurring"
+            raise RuntimeError(msg)
 
         # Fire the recurring error four times (below the summary interval),
         # interleaving a fresh, genuinely distinct error each round (a uniquely
@@ -927,8 +933,13 @@ class TestErrorThrottler:
             except RuntimeError as exc:
                 throttler.log("context", exc)
             noise_type = type(f"Noise{i}", (RuntimeError,), {})
+
+            def _raise_noise(_noise_type: type = noise_type) -> None:
+                msg = "noise"
+                raise _noise_type(msg)
+
             try:
-                raise noise_type("noise")
+                _raise_noise()
             except noise_type as exc:
                 throttler.log("context", exc)
 

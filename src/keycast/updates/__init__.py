@@ -19,8 +19,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from collections.abc import Callable
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from keycast import __version__
 from keycast.settings import UPDATE_CHECK_FILE_PATH
@@ -38,6 +37,10 @@ from keycast.updates.state import (
     write_state,
 )
 from keycast.updates.versions import fetch_latest_release_tag, is_newer, strip_v
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
 
 __all__ = [
     "InstallSource",
@@ -82,8 +85,7 @@ def refresh_state(
     tag = fetch()
     previous = read_state(path)
     write_state(
-        UpdateState(last_checked=now, last_seen_tag=tag or previous.last_seen_tag),
-        path,
+        UpdateState(last_checked=now, last_seen_tag=tag or previous.last_seen_tag), path
     )
 
 
@@ -122,7 +124,7 @@ def _update_enabled() -> bool:
         return True
 
 
-def notify_pending_update(
+def notify_pending_update(  # noqa: C901 — cached-notice/fast-path branches
     *,
     notify: Callable[[str], None],
     current: str = __version__,
@@ -171,6 +173,6 @@ def notify_pending_update(
             notify(format_notice(state.last_seen_tag, detect_install_source()))
 
         if due_for_check(state, now, interval):
-            spawn(lambda: refresh_state(now, path=state_path, fetch=fetch))
+            _ = spawn(lambda: refresh_state(now, path=state_path, fetch=fetch))
     except Exception:
         logger.debug("Update notice hot path failed", exc_info=True)

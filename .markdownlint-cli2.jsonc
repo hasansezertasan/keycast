@@ -1,0 +1,13 @@
+{
+  "config": {
+    "extends": ".github/linters/.markdownlint.yml",
+  },
+  "fix": true,
+  // The frozen legacy docs predate the markdownlint style and are GitHub-only
+  // reference (excluded from the Sphinx site in docs/conf.py). Reformatting
+  // them wholesale would churn hundreds of lines for zero reader value.
+  // (The prek hook carries the same exclusion so they are never passed
+  // explicitly either.)
+  "globs": ["**/*.md", "**/*.markdown", "!CHANGELOG.md", "!docs/API.md", "!docs/ARCHITECTURE.md", "!docs/COMPARISON.md", "!docs/DESIGN_DECISIONS.md", "!docs/PACKAGING.md", "!docs/PROJECT_OVERVIEW.md", "!docs/README.md"],
+  "gitignore": true,
+}

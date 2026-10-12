@@ -6,10 +6,10 @@ import typer
 
 from keycast import __version__
 
-app = typer.Typer(
-    name="keycast",
-    no_args_is_help=False,
-)
+__all__ = ["info", "main", "show_version"]
+
+
+app = typer.Typer(name="keycast", no_args_is_help=False)
 
 
 @app.callback(invoke_without_command=True)

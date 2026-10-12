@@ -126,7 +126,8 @@ class TestSetupLogging:
         settings = LoggingSettings(file_path=tmp_path / "main.log")
 
         def boom(*_args: object, **_kwargs: object) -> None:
-            raise OSError("read-only filesystem")
+            msg = "read-only filesystem"
+            raise OSError(msg)
 
         monkeypatch.setattr(Path, "mkdir", boom)
         root = logging.getLogger()
@@ -151,7 +152,8 @@ class TestSetupLogging:
         settings = LoggingSettings(file_path=tmp_path / "main.log")
 
         def boom(*_args: object, **_kwargs: object) -> None:
-            raise ValueError("not an OSError")
+            msg = "not an OSError"
+            raise ValueError(msg)
 
         monkeypatch.setattr(Path, "mkdir", boom)
         root = logging.getLogger()
@@ -163,6 +165,10 @@ class TestSetupLogging:
         added = [h for h in root.handlers if h not in before]
         assert not any(isinstance(h, RotatingFileHandler) for h in added)
 
+    # The crashing setup below intentionally leaks a half-opened file handler
+    # (that is the crash path under test); ignore its ResourceWarning locally.
+    # The template's `filterwarnings = error` would otherwise fail the test.
+    @pytest.mark.filterwarnings("ignore::ResourceWarning")
     def test_setup_logging_relies_on_prevalidated_format(self, tmp_path: Path) -> None:
         """setup_logging trusts the field validator; it does not re-validate format.
 
@@ -186,7 +192,10 @@ class TestSetupLogging:
         )
 
         try:
-            with patch("logging.basicConfig"), pytest.raises(ValueError):
+            with (
+                patch("logging.basicConfig"),
+                pytest.raises(ValueError, match="Invalid format"),
+            ):
                 setup_logging(unvalidated)
         finally:
             added = [h for h in root.handlers if h not in before]

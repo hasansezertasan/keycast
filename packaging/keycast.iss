@@ -18,7 +18,7 @@
 ; a certificate is acquired, sign both keycast.exe and this keycast-setup.exe.
 
 #ifndef MyAppVersion
-  #define MyAppVersion "0.0.0"
+    #define MyAppVersion "0.0.0"
 #endif
 
 #define MyAppName "keycast"

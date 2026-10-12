@@ -1,0 +1,39 @@
+---
+# Add 'documentation' label to any changes within 'docs' folder or any subfolders
+documentation:
+  - changed-files:
+      # The .ai-rulez sources are the agent-facing documentation; the files they
+      # generate are build output nobody edits by hand.
+      - any-glob-to-any-file: ['docs/**', '.ai-rulez/**']
+# Apply area labels from the component and cross-cutting paths a PR changes.
+# Keep each component rule gated so generated projects never receive labels for
+# packages they do not contain.
+area:core:
+  - changed-files:
+      - any-glob-to-any-file: ['src/keycast/core/**', 'src/keycast/utils/**', 'tests/core/**', 'tests/test_*.py']
+area:cli:
+  - changed-files:
+      - any-glob-to-any-file: ['src/keycast/cli/**', 'tests/cli/**']
+area:gui:
+  - changed-files:
+      - any-glob-to-any-file: ['src/keycast/gui/**', 'tests/gui/**']
+area:docs:
+  - changed-files:
+      - any-glob-to-any-file: ['docs/**', '.ai-rulez/**', '**/*.md', '**/*.rst']
+area:ci:
+  - changed-files:
+      - any-glob-to-any-file: .github/workflows/**
+area:deps:
+  - changed-files:
+      - any-glob-to-any-file: ['pyproject.toml', 'uv.lock']
+# Add 'release' label to any PR where the head branch name starts with 'release'
+release:
+  - head-branch: ['^release']
+bug:
+  - head-branch: ['^bugfix', '^bug/', '^fix/', '^hotfix']
+github_actions:
+  - changed-files:
+      - any-glob-to-any-file: ['.github/workflows/**', '.github/*labeler*.yml']
+tests:
+  - changed-files:
+      - any-glob-to-any-file: tests/**
