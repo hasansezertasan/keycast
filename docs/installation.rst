@@ -44,8 +44,9 @@ Scoop (Windows):
 
 .. code-block:: sh
 
-    scoop bucket add keycast https://github.com/hasansezertasan/scoop-bucket
-    scoop install keycast
+   scoop bucket add keycast https://github.com/hasansezertasan/scoop-bucket
+   scoop install keycast
+   scoop install keycast-pipx
 
 ``keycast`` is the packaged app; ``keycast-pipx`` is the terminal tool
 (installed via pipx).
