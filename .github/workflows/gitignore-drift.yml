@@ -29,11 +29,11 @@ jobs:
         # only when uv is on PATH; without it, mise falls back to
         # `pipx install` with the runner's older system Python, which cannot
         # satisfy cobo's Requires-Python >=3.14 (uv auto-provisions one).
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
       - name: Install mise tools
         # cobo is pinned in mise.toml (pipx backend, Renovate-tracked) and run
         # via `mise exec`, mirroring how ghalint/all-contributors are invoked.
-        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c  # v4.3.0
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
       - name: Refresh cobo sources
         run: mise exec -- cobo update
       - name: Check for gitignore drift

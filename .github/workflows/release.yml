@@ -78,7 +78,7 @@ jobs:
           python-version-file: .python-version
       - name: Setup uv
         id: setup-uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           enable-cache: true
           cache-dependency-glob: |
@@ -170,7 +170,7 @@ jobs:
         with:
           python-version-file: .python-version
       - name: Setup uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           enable-cache: true
           cache-dependency-glob: |
@@ -215,7 +215,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Setup uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           enable-cache: true
           # cache-python: enable-cache only caches the uv package cache, NOT the
@@ -272,7 +272,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Setup uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           enable-cache: true
           # NB: no cache-python on Windows. uv creates a minor-version *junction*
@@ -360,7 +360,7 @@ jobs:
         with:
           python-version-file: .python-version
       - name: Setup uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           enable-cache: true
           cache-dependency-glob: |
@@ -594,7 +594,7 @@ jobs:
           python-version-file: .python-version
       - name: Setup uv
         id: setup-uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           enable-cache: true
           cache-dependency-glob: |
@@ -661,7 +661,7 @@ jobs:
         # auth from the token input (default github.token) without writing it to
         # .git/config, so the checkout above keeps persist-credentials: false.
         # sphinx.ext.githubpages emits .nojekyll so _static/ is served.
-        uses: JamesIves/github-pages-deploy-action@d92aa235d04922e8f08b40ce78cc5442fcfbfa2f  # v4.8.0
+        uses: JamesIves/github-pages-deploy-action@fa24774553152dd7873cd16ebd8d959b010c5445  # v4.9.0
         with:
           folder: site
           # Preserve the PR preview tree (pr-preview/**) that docs-preview.yml

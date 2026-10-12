@@ -62,10 +62,10 @@ paid channel in keycast's distribution.
   Apple ID password), then `xcrun stapler staple`. Secrets:
   `MACOS_CERTIFICATE` (base64 `.p12`) + password, and the API key
   triple (key id / issuer / key file), imported into a throwaway CI keychain.
-- **Signing is inside the atomic gate.** Unlike `bump-cask`/`bump-scoop`, this
+- **Signing is inside the atomic gate.** Unlike `bump-homebrew`/`bump-scoop`, this
   is not best-effort: a release with a broken signature is worse than no
   release, so a signing or notarization failure fails `build-macos` and blocks
-  `publish-pypi` (ADR-001's atomicity, unchanged).
+  `pypi-publish` (ADR-001's atomicity, unchanged).
 
 ## Rationale
 

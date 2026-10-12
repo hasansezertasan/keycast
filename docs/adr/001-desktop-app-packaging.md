@@ -125,10 +125,11 @@ account is in use yet.
   **One spec drives both platforms** — PyInstaller's `BUNDLE` is a no-op off
   macOS, so Windows stops at the `dist/keycast/` folder, which CI zips.
 - **CI (new):** the release pipeline `release.yml` is a decomposed DAG —
-  `build-package` / `build-macos` / `build-windows` (pure producers,
-  `contents: read`) → `publish-pypi` (Trusted Publishing, `id-token` only) →
-  `publish-release` (attach all artifacts + un-draft) → `reconcile`. It is
-  **atomic**: `publish-pypi` needs all three builds, so a failed bundle blocks the
+  `build` / `build-freezer` / `build-macos` / `build-windows` (pure producers,
+  `contents: read`) → `pypi-publish` (Trusted Publishing, `id-token` only) →
+  `attach-github-release` (attach all artifacts) → `finalize-release` (un-draft +
+  reconcile). It is
+  **atomic**: `pypi-publish` needs all builders, so a failed bundle blocks the
   PyPI release too (chosen so a version never ships with a missing artifact). The
   macOS/Windows builds **must** pin Astral `3.14.6` — Homebrew's `python@3.14`
   lacks `_tkinter` and Astral `3.14.3` has broken Tk, so an unpinned Python

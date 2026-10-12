@@ -76,7 +76,7 @@ motivation: the goal is install/uninstall hygiene, not publisher trust.
 
 - **Release pipeline:** `build-windows` gains an `iscc` step after the zip and
   uploads `keycast-setup.exe` plus `keycast-windows.zip`. The release stays
-  **atomic** — a failed installer compile blocks `publish-pypi` like any other
+  **atomic** — a failed installer compile blocks `pypi-publish` like any other
   build failure — so `ci.yml`'s `build-windows` check now **also compiles
   `keycast.iss`** (with the script's `0.0.0` default) and asserts the `.exe`
   emerged, catching a broken script on the PR rather than at release.

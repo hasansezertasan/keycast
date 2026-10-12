@@ -72,7 +72,7 @@ Two structural facts constrain the design:
   `bump-scoop` job `POST`s a `update-manifest` dispatch to the bucket after a
   release publishes; the bucket's cron is the source of truth if the dispatch is
   skipped or fails. The job is **best-effort and outside the atomic release
-  gate** (mirrors `bump-cask`), and — per ADR-007 — is **gated to stable
+  gate** (mirrors `bump-homebrew`), and — per ADR-007 — is **gated to stable
   releases** so betas never reach Scoop users.
 
 ## Rationale
@@ -105,7 +105,7 @@ Two structural facts constrain the design:
   update keycast -g`; and a `keycast-pipx` install surfaces as `PIPX`, whose
   advice already covers `pipx upgrade keycast`. `README.md`'s Scoop section names
   both manifest update paths explicitly, because `scoop update` is per-manifest.
-- **Release pipeline:** `bump-scoop` needs a fine-grained PAT (`BUCKET_TOKEN`,
+- **Release pipeline:** `bump-scoop` needs a fine-grained PAT (`SCOOP_BUCKET_TOKEN`,
   **Contents: write**, scoped to the bucket only) because `repository_dispatch`
   is cross-repo and the automatic `GITHUB_TOKEN` cannot reach another repo. When
   the secret is absent the job **warns and exits 0** — releases still succeed and
