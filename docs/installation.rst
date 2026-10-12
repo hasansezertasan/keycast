@@ -25,11 +25,17 @@ Or run it without installing:
 
    uvx keycast
 
-Homebrew (macOS/Linux):
+Homebrew (macOS):
 
 .. code-block:: sh
 
     brew install --cask hasansezertasan/tap/keycast
+
+Homebrew (Linux):
+
+.. code-block:: sh
+
+    brew install hasansezertasan/tap/keycast
 
 The cask is the double-click app; the formula (``brew install
 hasansezertasan/tap/keycast``) is the terminal tool.
