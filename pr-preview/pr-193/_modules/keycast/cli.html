@@ -210,6 +210,14 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="77">    <span class="n">typer</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Platform: </span><span class="si">{</span><span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </span><span data-line="78">    <span class="n">typer</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Install source: </span><span class="si">{</span><span class="n">install_source_label</span><span class="p">(</span><span class="n">detect_install_source</span><span class="p">())</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span></div>
 
+</span><span data-line="79">
+</span><span data-line="80">
+</span><span data-line="81"><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+</span><span data-line="82">    <span class="c1"># PyInstaller entry point (see keycast.spec): the frozen `keycast`</span>
+</span><span data-line="83">    <span class="c1"># executable must behave exactly like the `keycast.cli:app` console</span>
+</span><span data-line="84">    <span class="c1"># script, so `--help`/`version`/`info` never import the GUI stack</span>
+</span><span data-line="85">    <span class="c1"># (tkinter/pynput) and a bare run launches the overlay via main().</span>
+</span><span data-line="86">    <span class="n">app</span><span class="p">()</span>
 </span></pre></div>
         </article><button class="back-to-top" type="button">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
