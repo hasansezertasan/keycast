@@ -413,323 +413,327 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="286">                <span class="c1"># time and ships no stubs. Cast the dynamic module to ``Any`` at</span>
 </span><span data-line="287">                <span class="c1"># this FFI boundary so all supported checkers analyze the same</span>
 </span><span data-line="288">                <span class="c1"># cross-platform source without brittle version-specific ignores.</span>
-</span><span data-line="289">                <span class="n">appkit</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="s2">"Any"</span><span class="p">,</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="s2">"AppKit"</span><span class="p">))</span>  <span class="c1"># pyright: ignore[reportExplicitAny] — pyobjc is dynamic</span>
-</span><span data-line="290">                <span class="n">ns_image</span> <span class="o">=</span> <span class="n">appkit</span><span class="o">.</span><span class="n">NSImage</span>
-</span><span data-line="291">                <span class="n">ns_app</span> <span class="o">=</span> <span class="n">appkit</span><span class="o">.</span><span class="n">NSApplication</span>
-</span><span data-line="292">                <span class="n">image</span> <span class="o">=</span> <span class="n">ns_image</span><span class="o">.</span><span class="n">alloc</span><span class="p">()</span><span class="o">.</span><span class="n">initWithContentsOfFile_</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">icon_path</span><span class="p">))</span>
-</span><span data-line="293">                <span class="k">if</span> <span class="n">image</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="294">                    <span class="n">ns_app</span><span class="o">.</span><span class="n">sharedApplication</span><span class="p">()</span><span class="o">.</span><span class="n">setApplicationIconImage_</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
-</span><span data-line="295">            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>  <span class="c1"># pyobjc raises many unrelated types</span>
-</span><span data-line="296">                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"could not set macOS dock icon: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span>
-</span><span data-line="297">
-</span><span data-line="298">    <span class="k">def</span><span class="w"> </span><span class="nf">_enable_dragging</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="n">tk</span><span class="o">.</span><span class="n">Tk</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="n">tk</span><span class="o">.</span><span class="n">Label</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="299"><span class="w">        </span><span class="sd">"""Bind press-and-drag handlers so the overlay can be moved by mouse.</span>
-</span><span data-line="300">
-</span><span data-line="301"><span class="sd">        ``overrideredirect(True)`` removes the title bar, so the window manager</span>
-</span><span data-line="302"><span class="sd">        has nothing to grab; bind directly on both the root and the label (the</span>
-</span><span data-line="303"><span class="sd">        label fills the window, so most clicks land on it). The cursor offset</span>
-</span><span data-line="304"><span class="sd">        within the window is captured on press so the window tracks the pointer</span>
-</span><span data-line="305"><span class="sd">        smoothly instead of snapping its top-left corner under the cursor.</span>
-</span><span data-line="306">
-</span><span data-line="307"><span class="sd">        Args:</span>
-</span><span data-line="308"><span class="sd">            root: The overlay's top-level window.</span>
-</span><span data-line="309"><span class="sd">            label: The label widget filling the window.</span>
-</span><span data-line="310"><span class="sd">        """</span>
-</span><span data-line="311">        <span class="k">for</span> <span class="n">widget</span> <span class="ow">in</span> <span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">label</span><span class="p">):</span>
-</span><span data-line="312">            <span class="n">_</span> <span class="o">=</span> <span class="n">widget</span><span class="o">.</span><span class="n">bind</span><span class="p">(</span><span class="s2">"&lt;Button-1&gt;"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_on_drag_start</span><span class="p">)</span>
-</span><span data-line="313">            <span class="n">_</span> <span class="o">=</span> <span class="n">widget</span><span class="o">.</span><span class="n">bind</span><span class="p">(</span><span class="s2">"&lt;B1-Motion&gt;"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_on_drag_motion</span><span class="p">)</span>
-</span><span data-line="314">
-</span><span data-line="315">    <span class="k">def</span><span class="w"> </span><span class="nf">_on_drag_start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">tk</span><span class="o">.</span><span class="n">Event</span><span class="p">[</span><span class="n">tk</span><span class="o">.</span><span class="n">Misc</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="316"><span class="w">        </span><span class="sd">"""Record where inside the window the drag began.</span>
-</span><span data-line="317">
-</span><span data-line="318"><span class="sd">        Args:</span>
-</span><span data-line="319"><span class="sd">            event: The button-press event; ``x``/``y`` are window-relative.</span>
-</span><span data-line="320"><span class="sd">        """</span>
-</span><span data-line="321">        <span class="bp">self</span><span class="o">.</span><span class="n">_drag_offset_x</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">x</span>
-</span><span data-line="322">        <span class="bp">self</span><span class="o">.</span><span class="n">_drag_offset_y</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">y</span>
-</span><span data-line="323">
-</span><span data-line="324">    <span class="k">def</span><span class="w"> </span><span class="nf">_on_drag_motion</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_event</span><span class="p">:</span> <span class="n">tk</span><span class="o">.</span><span class="n">Event</span><span class="p">[</span><span class="n">tk</span><span class="o">.</span><span class="n">Misc</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="325"><span class="w">        </span><span class="sd">"""Move the window to follow the cursor during a drag.</span>
-</span><span data-line="326">
-</span><span data-line="327"><span class="sd">        Args:</span>
-</span><span data-line="328"><span class="sd">            _event: The motion event (unused; absolute pointer position is read</span>
-</span><span data-line="329"><span class="sd">                from the root so the math is independent of which widget the</span>
-</span><span data-line="330"><span class="sd">                cursor is currently over).</span>
-</span><span data-line="331"><span class="sd">        """</span>
-</span><span data-line="332">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">:</span>
-</span><span data-line="333">            <span class="k">return</span>
-</span><span data-line="334">        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">winfo_pointerx</span><span class="p">()</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_drag_offset_x</span>
-</span><span data-line="335">        <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">winfo_pointery</span><span class="p">()</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_drag_offset_y</span>
-</span><span data-line="336">        <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">geometry</span><span class="p">(</span><span class="sa">f</span><span class="s2">"+</span><span class="si">{</span><span class="n">x</span><span class="si">}</span><span class="s2">+</span><span class="si">{</span><span class="n">y</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-</span><span data-line="337">
-</span><span data-line="338">    <span class="k">def</span><span class="w"> </span><span class="nf">_fade_timer</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="339"><span class="w">        </span><span class="sd">"""Timer callback for fading out old events.</span>
-</span><span data-line="340">
-</span><span data-line="341"><span class="sd">        Runs on the Tk main loop and reschedules itself. The body is guarded so a</span>
-</span><span data-line="342"><span class="sd">        transient failure (e.g. a ``TclError`` while a widget is mid-teardown, or</span>
-</span><span data-line="343"><span class="sd">        an error rendering text) is *logged* rather than silently killing the</span>
-</span><span data-line="344"><span class="sd">        fade loop. The reschedule lives in ``finally`` so one bad tick cannot</span>
-</span><span data-line="345"><span class="sd">        freeze stale events on screen forever.</span>
-</span><span data-line="346"><span class="sd">        """</span>
-</span><span data-line="347">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">winfo_exists</span><span class="p">():</span>
-</span><span data-line="348">            <span class="k">return</span>
-</span><span data-line="349">
-</span><span data-line="350">        <span class="k">try</span><span class="p">:</span>
-</span><span data-line="351">            <span class="n">current_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()</span>
-</span><span data-line="352">            <span class="c1"># Remove events older than fade_duration_ms</span>
-</span><span data-line="353">            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
-</span><span data-line="354">                <span class="bp">self</span><span class="o">.</span><span class="n">events</span> <span class="o">=</span> <span class="p">[</span>
-</span><span data-line="355">                    <span class="p">(</span><span class="n">event_text</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">)</span>
-</span><span data-line="356">                    <span class="k">for</span> <span class="n">event_text</span><span class="p">,</span> <span class="n">timestamp</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">events</span>
-</span><span data-line="357">                    <span class="k">if</span> <span class="p">(</span><span class="n">current_time</span> <span class="o">-</span> <span class="n">timestamp</span><span class="p">)</span> <span class="o">*</span> <span class="mi">1000</span>
-</span><span data-line="358">                    <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">fade_duration_ms</span>
-</span><span data-line="359">                <span class="p">]</span>
-</span><span data-line="360">            <span class="bp">self</span><span class="o">.</span><span class="n">_update_display</span><span class="p">()</span>
-</span><span data-line="361">        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-</span><span data-line="362">            <span class="bp">self</span><span class="o">.</span><span class="n">_error_throttler</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">"fade_timer_error"</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span>
-</span><span data-line="363">        <span class="k">finally</span><span class="p">:</span>
-</span><span data-line="364">            <span class="c1"># Schedule next fade check in 100ms. The re-check is defensive: the</span>
-</span><span data-line="365">            <span class="c1"># loop is ended by root.quit (scheduled by request_stop), and once</span>
-</span><span data-line="366">            <span class="c1"># mainloop returns no further after() callbacks fire, so a torn-down</span>
-</span><span data-line="367">            <span class="c1"># root is never actually observed here today. stop() (which nulls</span>
-</span><span data-line="368">            <span class="c1"># root) also runs on this same main thread, only after mainloop has</span>
-</span><span data-line="369">            <span class="c1"># returned, so it cannot interleave with this callback — this is</span>
-</span><span data-line="370">            <span class="c1"># ordering within the loop, not a cross-thread race. The guard keeps a</span>
-</span><span data-line="371">            <span class="c1"># torn-down root from being rescheduled (which would raise TclError)</span>
-</span><span data-line="372">            <span class="c1"># should the teardown lifecycle ever change.</span>
-</span><span data-line="373">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">:</span>
-</span><span data-line="374">                <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">after</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fade_timer</span><span class="p">)</span>
-</span><span data-line="375">
-</span><span data-line="376">    <span class="k">def</span><span class="w"> </span><span class="nf">_update_display</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="377"><span class="w">        </span><span class="sd">"""Update the display with current events.</span>
-</span><span data-line="378">
-</span><span data-line="379"><span class="sd">        Always runs on the Tk main loop, never on a pynput thread. Reached two</span>
-</span><span data-line="380"><span class="sd">        ways: directly from ``_fade_timer`` (already on the main loop), and via</span>
-</span><span data-line="381"><span class="sd">        ``root.after`` enqueued by ``show_text`` (which itself runs on a pynput</span>
-</span><span data-line="382"><span class="sd">        thread; ``after`` marshals this callback onto the main loop). That is why</span>
-</span><span data-line="383"><span class="sd">        the ``label.config`` below is safe to call unguarded for thread affinity.</span>
-</span><span data-line="384">
-</span><span data-line="385"><span class="sd">        In the ``after`` case a stale tick may run after teardown has begun, so</span>
-</span><span data-line="386"><span class="sd">        guard against a torn-down root/label and wrap the body the same way</span>
-</span><span data-line="387"><span class="sd">        ``_fade_timer`` does: a stale scheduled tick racing ``stop`` would</span>
-</span><span data-line="388"><span class="sd">        otherwise raise an unhandled ``TclError`` on the main loop. The</span>
-</span><span data-line="389"><span class="sd">        label-config call is cheap, so logging-and-continuing here costs nothing</span>
-</span><span data-line="390"><span class="sd">        in the normal path.</span>
-</span><span data-line="391"><span class="sd">        """</span>
-</span><span data-line="392">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">winfo_exists</span><span class="p">()</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">label</span><span class="p">:</span>
-</span><span data-line="393">            <span class="k">return</span>
-</span><span data-line="394">
-</span><span data-line="395">        <span class="k">try</span><span class="p">:</span>
-</span><span data-line="396">            <span class="c1"># Limit to max_events</span>
-</span><span data-line="397">            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
-</span><span data-line="398">                <span class="n">recent_events</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">events</span><span class="p">[</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">max_events</span> <span class="p">:]</span>
-</span><span data-line="399">
-</span><span data-line="400">            <span class="c1"># Format events for display</span>
-</span><span data-line="401">            <span class="n">event_texts</span> <span class="o">=</span> <span class="p">[</span><span class="n">event_text</span> <span class="k">for</span> <span class="n">event_text</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">recent_events</span><span class="p">]</span>
-</span><span data-line="402">            <span class="n">display_text</span> <span class="o">=</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">event_texts</span><span class="p">)</span>
+</span><span data-line="289">                <span class="c1"># The ``Any`` annotation is load-bearing, not redundant: ruff</span>
+</span><span data-line="290">                <span class="c1"># TC006 keeps the cast value quoted (a string forward-ref the</span>
+</span><span data-line="291">                <span class="c1"># unused-import queries do not count as a use), so the name</span>
+</span><span data-line="292">                <span class="c1"># needs this real annotation reference to stay imported.</span>
+</span><span data-line="293">                <span class="n">appkit</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="s2">"Any"</span><span class="p">,</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="s2">"AppKit"</span><span class="p">))</span>  <span class="c1"># pyright: ignore[reportExplicitAny] — pyobjc is dynamic</span>
+</span><span data-line="294">                <span class="n">ns_image</span> <span class="o">=</span> <span class="n">appkit</span><span class="o">.</span><span class="n">NSImage</span>
+</span><span data-line="295">                <span class="n">ns_app</span> <span class="o">=</span> <span class="n">appkit</span><span class="o">.</span><span class="n">NSApplication</span>
+</span><span data-line="296">                <span class="n">image</span> <span class="o">=</span> <span class="n">ns_image</span><span class="o">.</span><span class="n">alloc</span><span class="p">()</span><span class="o">.</span><span class="n">initWithContentsOfFile_</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">icon_path</span><span class="p">))</span>
+</span><span data-line="297">                <span class="k">if</span> <span class="n">image</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="298">                    <span class="n">ns_app</span><span class="o">.</span><span class="n">sharedApplication</span><span class="p">()</span><span class="o">.</span><span class="n">setApplicationIconImage_</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
+</span><span data-line="299">            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>  <span class="c1"># pyobjc raises many unrelated types</span>
+</span><span data-line="300">                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"could not set macOS dock icon: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span>
+</span><span data-line="301">
+</span><span data-line="302">    <span class="k">def</span><span class="w"> </span><span class="nf">_enable_dragging</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="n">tk</span><span class="o">.</span><span class="n">Tk</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="n">tk</span><span class="o">.</span><span class="n">Label</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="303"><span class="w">        </span><span class="sd">"""Bind press-and-drag handlers so the overlay can be moved by mouse.</span>
+</span><span data-line="304">
+</span><span data-line="305"><span class="sd">        ``overrideredirect(True)`` removes the title bar, so the window manager</span>
+</span><span data-line="306"><span class="sd">        has nothing to grab; bind directly on both the root and the label (the</span>
+</span><span data-line="307"><span class="sd">        label fills the window, so most clicks land on it). The cursor offset</span>
+</span><span data-line="308"><span class="sd">        within the window is captured on press so the window tracks the pointer</span>
+</span><span data-line="309"><span class="sd">        smoothly instead of snapping its top-left corner under the cursor.</span>
+</span><span data-line="310">
+</span><span data-line="311"><span class="sd">        Args:</span>
+</span><span data-line="312"><span class="sd">            root: The overlay's top-level window.</span>
+</span><span data-line="313"><span class="sd">            label: The label widget filling the window.</span>
+</span><span data-line="314"><span class="sd">        """</span>
+</span><span data-line="315">        <span class="k">for</span> <span class="n">widget</span> <span class="ow">in</span> <span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">label</span><span class="p">):</span>
+</span><span data-line="316">            <span class="n">_</span> <span class="o">=</span> <span class="n">widget</span><span class="o">.</span><span class="n">bind</span><span class="p">(</span><span class="s2">"&lt;Button-1&gt;"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_on_drag_start</span><span class="p">)</span>
+</span><span data-line="317">            <span class="n">_</span> <span class="o">=</span> <span class="n">widget</span><span class="o">.</span><span class="n">bind</span><span class="p">(</span><span class="s2">"&lt;B1-Motion&gt;"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_on_drag_motion</span><span class="p">)</span>
+</span><span data-line="318">
+</span><span data-line="319">    <span class="k">def</span><span class="w"> </span><span class="nf">_on_drag_start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">tk</span><span class="o">.</span><span class="n">Event</span><span class="p">[</span><span class="n">tk</span><span class="o">.</span><span class="n">Misc</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="320"><span class="w">        </span><span class="sd">"""Record where inside the window the drag began.</span>
+</span><span data-line="321">
+</span><span data-line="322"><span class="sd">        Args:</span>
+</span><span data-line="323"><span class="sd">            event: The button-press event; ``x``/``y`` are window-relative.</span>
+</span><span data-line="324"><span class="sd">        """</span>
+</span><span data-line="325">        <span class="bp">self</span><span class="o">.</span><span class="n">_drag_offset_x</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">x</span>
+</span><span data-line="326">        <span class="bp">self</span><span class="o">.</span><span class="n">_drag_offset_y</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">y</span>
+</span><span data-line="327">
+</span><span data-line="328">    <span class="k">def</span><span class="w"> </span><span class="nf">_on_drag_motion</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_event</span><span class="p">:</span> <span class="n">tk</span><span class="o">.</span><span class="n">Event</span><span class="p">[</span><span class="n">tk</span><span class="o">.</span><span class="n">Misc</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="329"><span class="w">        </span><span class="sd">"""Move the window to follow the cursor during a drag.</span>
+</span><span data-line="330">
+</span><span data-line="331"><span class="sd">        Args:</span>
+</span><span data-line="332"><span class="sd">            _event: The motion event (unused; absolute pointer position is read</span>
+</span><span data-line="333"><span class="sd">                from the root so the math is independent of which widget the</span>
+</span><span data-line="334"><span class="sd">                cursor is currently over).</span>
+</span><span data-line="335"><span class="sd">        """</span>
+</span><span data-line="336">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">:</span>
+</span><span data-line="337">            <span class="k">return</span>
+</span><span data-line="338">        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">winfo_pointerx</span><span class="p">()</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_drag_offset_x</span>
+</span><span data-line="339">        <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">winfo_pointery</span><span class="p">()</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_drag_offset_y</span>
+</span><span data-line="340">        <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">geometry</span><span class="p">(</span><span class="sa">f</span><span class="s2">"+</span><span class="si">{</span><span class="n">x</span><span class="si">}</span><span class="s2">+</span><span class="si">{</span><span class="n">y</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</span><span data-line="341">
+</span><span data-line="342">    <span class="k">def</span><span class="w"> </span><span class="nf">_fade_timer</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="343"><span class="w">        </span><span class="sd">"""Timer callback for fading out old events.</span>
+</span><span data-line="344">
+</span><span data-line="345"><span class="sd">        Runs on the Tk main loop and reschedules itself. The body is guarded so a</span>
+</span><span data-line="346"><span class="sd">        transient failure (e.g. a ``TclError`` while a widget is mid-teardown, or</span>
+</span><span data-line="347"><span class="sd">        an error rendering text) is *logged* rather than silently killing the</span>
+</span><span data-line="348"><span class="sd">        fade loop. The reschedule lives in ``finally`` so one bad tick cannot</span>
+</span><span data-line="349"><span class="sd">        freeze stale events on screen forever.</span>
+</span><span data-line="350"><span class="sd">        """</span>
+</span><span data-line="351">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">winfo_exists</span><span class="p">():</span>
+</span><span data-line="352">            <span class="k">return</span>
+</span><span data-line="353">
+</span><span data-line="354">        <span class="k">try</span><span class="p">:</span>
+</span><span data-line="355">            <span class="n">current_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()</span>
+</span><span data-line="356">            <span class="c1"># Remove events older than fade_duration_ms</span>
+</span><span data-line="357">            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+</span><span data-line="358">                <span class="bp">self</span><span class="o">.</span><span class="n">events</span> <span class="o">=</span> <span class="p">[</span>
+</span><span data-line="359">                    <span class="p">(</span><span class="n">event_text</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">)</span>
+</span><span data-line="360">                    <span class="k">for</span> <span class="n">event_text</span><span class="p">,</span> <span class="n">timestamp</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">events</span>
+</span><span data-line="361">                    <span class="k">if</span> <span class="p">(</span><span class="n">current_time</span> <span class="o">-</span> <span class="n">timestamp</span><span class="p">)</span> <span class="o">*</span> <span class="mi">1000</span>
+</span><span data-line="362">                    <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">fade_duration_ms</span>
+</span><span data-line="363">                <span class="p">]</span>
+</span><span data-line="364">            <span class="bp">self</span><span class="o">.</span><span class="n">_update_display</span><span class="p">()</span>
+</span><span data-line="365">        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+</span><span data-line="366">            <span class="bp">self</span><span class="o">.</span><span class="n">_error_throttler</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">"fade_timer_error"</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span>
+</span><span data-line="367">        <span class="k">finally</span><span class="p">:</span>
+</span><span data-line="368">            <span class="c1"># Schedule next fade check in 100ms. The re-check is defensive: the</span>
+</span><span data-line="369">            <span class="c1"># loop is ended by root.quit (scheduled by request_stop), and once</span>
+</span><span data-line="370">            <span class="c1"># mainloop returns no further after() callbacks fire, so a torn-down</span>
+</span><span data-line="371">            <span class="c1"># root is never actually observed here today. stop() (which nulls</span>
+</span><span data-line="372">            <span class="c1"># root) also runs on this same main thread, only after mainloop has</span>
+</span><span data-line="373">            <span class="c1"># returned, so it cannot interleave with this callback — this is</span>
+</span><span data-line="374">            <span class="c1"># ordering within the loop, not a cross-thread race. The guard keeps a</span>
+</span><span data-line="375">            <span class="c1"># torn-down root from being rescheduled (which would raise TclError)</span>
+</span><span data-line="376">            <span class="c1"># should the teardown lifecycle ever change.</span>
+</span><span data-line="377">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">:</span>
+</span><span data-line="378">                <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">after</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fade_timer</span><span class="p">)</span>
+</span><span data-line="379">
+</span><span data-line="380">    <span class="k">def</span><span class="w"> </span><span class="nf">_update_display</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="381"><span class="w">        </span><span class="sd">"""Update the display with current events.</span>
+</span><span data-line="382">
+</span><span data-line="383"><span class="sd">        Always runs on the Tk main loop, never on a pynput thread. Reached two</span>
+</span><span data-line="384"><span class="sd">        ways: directly from ``_fade_timer`` (already on the main loop), and via</span>
+</span><span data-line="385"><span class="sd">        ``root.after`` enqueued by ``show_text`` (which itself runs on a pynput</span>
+</span><span data-line="386"><span class="sd">        thread; ``after`` marshals this callback onto the main loop). That is why</span>
+</span><span data-line="387"><span class="sd">        the ``label.config`` below is safe to call unguarded for thread affinity.</span>
+</span><span data-line="388">
+</span><span data-line="389"><span class="sd">        In the ``after`` case a stale tick may run after teardown has begun, so</span>
+</span><span data-line="390"><span class="sd">        guard against a torn-down root/label and wrap the body the same way</span>
+</span><span data-line="391"><span class="sd">        ``_fade_timer`` does: a stale scheduled tick racing ``stop`` would</span>
+</span><span data-line="392"><span class="sd">        otherwise raise an unhandled ``TclError`` on the main loop. The</span>
+</span><span data-line="393"><span class="sd">        label-config call is cheap, so logging-and-continuing here costs nothing</span>
+</span><span data-line="394"><span class="sd">        in the normal path.</span>
+</span><span data-line="395"><span class="sd">        """</span>
+</span><span data-line="396">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">winfo_exists</span><span class="p">()</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">label</span><span class="p">:</span>
+</span><span data-line="397">            <span class="k">return</span>
+</span><span data-line="398">
+</span><span data-line="399">        <span class="k">try</span><span class="p">:</span>
+</span><span data-line="400">            <span class="c1"># Limit to max_events</span>
+</span><span data-line="401">            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+</span><span data-line="402">                <span class="n">recent_events</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">events</span><span class="p">[</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">max_events</span> <span class="p">:]</span>
 </span><span data-line="403">
-</span><span data-line="404">            <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">label</span><span class="o">.</span><span class="n">config</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="n">display_text</span><span class="p">)</span>
-</span><span data-line="405">        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-</span><span data-line="406">            <span class="bp">self</span><span class="o">.</span><span class="n">_error_throttler</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">"update_display_error"</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span>
+</span><span data-line="404">            <span class="c1"># Format events for display</span>
+</span><span data-line="405">            <span class="n">event_texts</span> <span class="o">=</span> <span class="p">[</span><span class="n">event_text</span> <span class="k">for</span> <span class="n">event_text</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">recent_events</span><span class="p">]</span>
+</span><span data-line="406">            <span class="n">display_text</span> <span class="o">=</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">event_texts</span><span class="p">)</span>
 </span><span data-line="407">
+</span><span data-line="408">            <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">label</span><span class="o">.</span><span class="n">config</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="n">display_text</span><span class="p">)</span>
+</span><span data-line="409">        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+</span><span data-line="410">            <span class="bp">self</span><span class="o">.</span><span class="n">_error_throttler</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">"update_display_error"</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span>
+</span><span data-line="411">
 <div class="viewcode-block" id="DisplayWindow.show_text">
 <a class="viewcode-back" href="../../modules.html#keycast.display.DisplayWindow.show_text">[docs]</a>
-</span><span data-line="408">    <span class="k">def</span><span class="w"> </span><span class="nf">show_text</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="409"><span class="w">        </span><span class="sd">"""Display a text.</span>
-</span><span data-line="410">
-</span><span data-line="411"><span class="sd">        Args:</span>
-</span><span data-line="412"><span class="sd">            text: The text to display</span>
-</span><span data-line="413"><span class="sd">        """</span>
-</span><span data-line="414">        <span class="kn">import</span><span class="w"> </span><span class="nn">tkinter</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tk</span>  <span class="c1"># noqa: PLC0415  # lazy: see the import note at module top</span>
-</span><span data-line="415">
-</span><span data-line="416">        <span class="c1"># Marshal the update onto the Tk main loop; show_text runs on a pynput</span>
-</span><span data-line="417">        <span class="c1"># listener thread, and tkinter widgets may only be touched from the</span>
-</span><span data-line="418">        <span class="c1"># thread that owns the main loop. The ``after`` call stays inside the</span>
-</span><span data-line="419">        <span class="c1"># lock so ``stop`` cannot null and ``destroy`` ``root`` between the check</span>
-</span><span data-line="420">        <span class="c1"># and the enqueue (which would raise TclError); ``after`` only schedules,</span>
-</span><span data-line="421">        <span class="c1"># so holding the lock briefly here does not block the main loop.</span>
-</span><span data-line="422">        <span class="c1"># CRITICAL: capture ``root`` under the lock but call ``after`` *outside*</span>
-</span><span data-line="423">        <span class="c1"># it. On macOS Tcl is thread-enabled, so a cross-thread ``root.after``</span>
-</span><span data-line="424">        <span class="c1"># blocks until the main loop services the Tcl event queue. Holding</span>
-</span><span data-line="425">        <span class="c1"># ``_lock`` across that call deadlocks: the main thread's</span>
-</span><span data-line="426">        <span class="c1"># ``_fade_timer``/``_update_display`` also take ``_lock``, so the main</span>
-</span><span data-line="427">        <span class="c1"># thread waits for the lock while this thread — holding the lock — waits</span>
-</span><span data-line="428">        <span class="c1"># for the main thread. Only the state mutation (``events.append``) needs</span>
-</span><span data-line="429">        <span class="c1"># the lock; the local ``root`` reference keeps the later ``after`` valid</span>
-</span><span data-line="430">        <span class="c1"># even if ``stop`` nulls ``self.root`` in between (the call then raises</span>
-</span><span data-line="431">        <span class="c1"># and is tolerated below).</span>
-</span><span data-line="432">        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
-</span><span data-line="433">            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">:</span>
-</span><span data-line="434">                <span class="c1"># Normal during shutdown (stop() nulled root); drop the event.</span>
-</span><span data-line="435">                <span class="c1"># Logged at debug so an *unexpected* null — events vanishing</span>
-</span><span data-line="436">                <span class="c1"># while the app is still meant to be running — is diagnosable</span>
-</span><span data-line="437">                <span class="c1"># without adding noise at the default INFO level.</span>
-</span><span data-line="438">                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"show_text_dropped_no_root"</span><span class="p">)</span>
-</span><span data-line="439">                <span class="k">return</span>
-</span><span data-line="440">            <span class="bp">self</span><span class="o">.</span><span class="n">events</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">text</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()))</span>
-</span><span data-line="441">            <span class="c1"># Runaway backstop: the fade tick normally keeps this list tiny, but</span>
-</span><span data-line="442">            <span class="c1"># cap it so a wedged tick or a pathological input rate cannot grow it</span>
-</span><span data-line="443">            <span class="c1"># without bound. Drops only the oldest rows; recent events (all that</span>
-</span><span data-line="444">            <span class="c1"># max_events renders) are untouched.</span>
-</span><span data-line="445">            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">events</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">_MAX_RETAINED_EVENTS</span><span class="p">:</span>
-</span><span data-line="446">                <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">events</span><span class="p">[:</span><span class="o">-</span><span class="n">_MAX_RETAINED_EVENTS</span><span class="p">]</span>
-</span><span data-line="447">            <span class="n">root</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span>
-</span><span data-line="448">            <span class="n">minimized</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_minimized</span>
-</span><span data-line="449">
-</span><span data-line="450">        <span class="k">try</span><span class="p">:</span>
-</span><span data-line="451">            <span class="c1"># A minimized start hides the overlay until the first event; re-show</span>
-</span><span data-line="452">            <span class="c1"># it now. Scheduled on the main loop (not done inline) because Tk</span>
-</span><span data-line="453">            <span class="c1"># widgets may only be touched from the thread owning the main loop —</span>
-</span><span data-line="454">            <span class="c1"># the same reason _update_display is marshalled via after.</span>
-</span><span data-line="455">            <span class="k">if</span> <span class="n">minimized</span><span class="p">:</span>
-</span><span data-line="456">                <span class="n">_</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">after</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_restore_from_minimized</span><span class="p">)</span>
-</span><span data-line="457">            <span class="n">_</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">after</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_update_display</span><span class="p">)</span>
-</span><span data-line="458">        <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="n">tk</span><span class="o">.</span><span class="n">TclError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-</span><span data-line="459">            <span class="c1"># The Tk loop can be dead while ``root`` still exists (external app</span>
-</span><span data-line="460">            <span class="c1"># teardown between mainloop() returning and stop() nulling root), or</span>
-</span><span data-line="461">            <span class="c1"># ``stop`` may have destroyed the captured ``root`` after we released</span>
-</span><span data-line="462">            <span class="c1"># the lock. ``after`` then raises RuntimeError ("main thread is not in</span>
-</span><span data-line="463">            <span class="c1"># main loop") or TclError; tolerate it and drop the event rather than</span>
-</span><span data-line="464">            <span class="c1"># surfacing a sink error to the listener's callback handler.</span>
-</span><span data-line="465">            <span class="c1">#</span>
-</span><span data-line="466">            <span class="c1"># Routed through the throttler, not a bare debug line: on a Tcl built</span>
-</span><span data-line="467">            <span class="c1"># without thread support a cross-thread ``after`` raises on *every*</span>
-</span><span data-line="468">            <span class="c1"># event while the loop is alive — the overlay would silently show</span>
-</span><span data-line="469">            <span class="c1"># nothing for the whole session. The throttler escalates that</span>
-</span><span data-line="470">            <span class="c1"># persistent failure to a visible (throttled) warning, while the</span>
-</span><span data-line="471">            <span class="c1"># legitimate one-or-two-event teardown race stays quiet in practice.</span>
-</span><span data-line="472">            <span class="bp">self</span><span class="o">.</span><span class="n">_error_throttler</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">"show_text_dropped_loop_gone"</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span></div>
+</span><span data-line="412">    <span class="k">def</span><span class="w"> </span><span class="nf">show_text</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="413"><span class="w">        </span><span class="sd">"""Display a text.</span>
+</span><span data-line="414">
+</span><span data-line="415"><span class="sd">        Args:</span>
+</span><span data-line="416"><span class="sd">            text: The text to display</span>
+</span><span data-line="417"><span class="sd">        """</span>
+</span><span data-line="418">        <span class="kn">import</span><span class="w"> </span><span class="nn">tkinter</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tk</span>  <span class="c1"># noqa: PLC0415  # lazy: see the import note at module top</span>
+</span><span data-line="419">
+</span><span data-line="420">        <span class="c1"># Marshal the update onto the Tk main loop; show_text runs on a pynput</span>
+</span><span data-line="421">        <span class="c1"># listener thread, and tkinter widgets may only be touched from the</span>
+</span><span data-line="422">        <span class="c1"># thread that owns the main loop. The ``after`` call stays inside the</span>
+</span><span data-line="423">        <span class="c1"># lock so ``stop`` cannot null and ``destroy`` ``root`` between the check</span>
+</span><span data-line="424">        <span class="c1"># and the enqueue (which would raise TclError); ``after`` only schedules,</span>
+</span><span data-line="425">        <span class="c1"># so holding the lock briefly here does not block the main loop.</span>
+</span><span data-line="426">        <span class="c1"># CRITICAL: capture ``root`` under the lock but call ``after`` *outside*</span>
+</span><span data-line="427">        <span class="c1"># it. On macOS Tcl is thread-enabled, so a cross-thread ``root.after``</span>
+</span><span data-line="428">        <span class="c1"># blocks until the main loop services the Tcl event queue. Holding</span>
+</span><span data-line="429">        <span class="c1"># ``_lock`` across that call deadlocks: the main thread's</span>
+</span><span data-line="430">        <span class="c1"># ``_fade_timer``/``_update_display`` also take ``_lock``, so the main</span>
+</span><span data-line="431">        <span class="c1"># thread waits for the lock while this thread — holding the lock — waits</span>
+</span><span data-line="432">        <span class="c1"># for the main thread. Only the state mutation (``events.append``) needs</span>
+</span><span data-line="433">        <span class="c1"># the lock; the local ``root`` reference keeps the later ``after`` valid</span>
+</span><span data-line="434">        <span class="c1"># even if ``stop`` nulls ``self.root`` in between (the call then raises</span>
+</span><span data-line="435">        <span class="c1"># and is tolerated below).</span>
+</span><span data-line="436">        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+</span><span data-line="437">            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">:</span>
+</span><span data-line="438">                <span class="c1"># Normal during shutdown (stop() nulled root); drop the event.</span>
+</span><span data-line="439">                <span class="c1"># Logged at debug so an *unexpected* null — events vanishing</span>
+</span><span data-line="440">                <span class="c1"># while the app is still meant to be running — is diagnosable</span>
+</span><span data-line="441">                <span class="c1"># without adding noise at the default INFO level.</span>
+</span><span data-line="442">                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"show_text_dropped_no_root"</span><span class="p">)</span>
+</span><span data-line="443">                <span class="k">return</span>
+</span><span data-line="444">            <span class="bp">self</span><span class="o">.</span><span class="n">events</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">text</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()))</span>
+</span><span data-line="445">            <span class="c1"># Runaway backstop: the fade tick normally keeps this list tiny, but</span>
+</span><span data-line="446">            <span class="c1"># cap it so a wedged tick or a pathological input rate cannot grow it</span>
+</span><span data-line="447">            <span class="c1"># without bound. Drops only the oldest rows; recent events (all that</span>
+</span><span data-line="448">            <span class="c1"># max_events renders) are untouched.</span>
+</span><span data-line="449">            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">events</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">_MAX_RETAINED_EVENTS</span><span class="p">:</span>
+</span><span data-line="450">                <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">events</span><span class="p">[:</span><span class="o">-</span><span class="n">_MAX_RETAINED_EVENTS</span><span class="p">]</span>
+</span><span data-line="451">            <span class="n">root</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span>
+</span><span data-line="452">            <span class="n">minimized</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_minimized</span>
+</span><span data-line="453">
+</span><span data-line="454">        <span class="k">try</span><span class="p">:</span>
+</span><span data-line="455">            <span class="c1"># A minimized start hides the overlay until the first event; re-show</span>
+</span><span data-line="456">            <span class="c1"># it now. Scheduled on the main loop (not done inline) because Tk</span>
+</span><span data-line="457">            <span class="c1"># widgets may only be touched from the thread owning the main loop —</span>
+</span><span data-line="458">            <span class="c1"># the same reason _update_display is marshalled via after.</span>
+</span><span data-line="459">            <span class="k">if</span> <span class="n">minimized</span><span class="p">:</span>
+</span><span data-line="460">                <span class="n">_</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">after</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_restore_from_minimized</span><span class="p">)</span>
+</span><span data-line="461">            <span class="n">_</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">after</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_update_display</span><span class="p">)</span>
+</span><span data-line="462">        <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="n">tk</span><span class="o">.</span><span class="n">TclError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+</span><span data-line="463">            <span class="c1"># The Tk loop can be dead while ``root`` still exists (external app</span>
+</span><span data-line="464">            <span class="c1"># teardown between mainloop() returning and stop() nulling root), or</span>
+</span><span data-line="465">            <span class="c1"># ``stop`` may have destroyed the captured ``root`` after we released</span>
+</span><span data-line="466">            <span class="c1"># the lock. ``after`` then raises RuntimeError ("main thread is not in</span>
+</span><span data-line="467">            <span class="c1"># main loop") or TclError; tolerate it and drop the event rather than</span>
+</span><span data-line="468">            <span class="c1"># surfacing a sink error to the listener's callback handler.</span>
+</span><span data-line="469">            <span class="c1">#</span>
+</span><span data-line="470">            <span class="c1"># Routed through the throttler, not a bare debug line: on a Tcl built</span>
+</span><span data-line="471">            <span class="c1"># without thread support a cross-thread ``after`` raises on *every*</span>
+</span><span data-line="472">            <span class="c1"># event while the loop is alive — the overlay would silently show</span>
+</span><span data-line="473">            <span class="c1"># nothing for the whole session. The throttler escalates that</span>
+</span><span data-line="474">            <span class="c1"># persistent failure to a visible (throttled) warning, while the</span>
+</span><span data-line="475">            <span class="c1"># legitimate one-or-two-event teardown race stays quiet in practice.</span>
+</span><span data-line="476">            <span class="bp">self</span><span class="o">.</span><span class="n">_error_throttler</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">"show_text_dropped_loop_gone"</span><span class="p">,</span> <span class="n">exc</span><span class="p">)</span></div>
 
-</span><span data-line="473">
-</span><span data-line="474">    <span class="k">def</span><span class="w"> </span><span class="nf">_restore_from_minimized</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="475"><span class="w">        </span><span class="sd">"""Re-show the overlay after a minimized start, on the Tk main loop.</span>
-</span><span data-line="476">
-</span><span data-line="477"><span class="sd">        Scheduled by :meth:`show_text` the first time an event is captured. Like</span>
-</span><span data-line="478"><span class="sd">        the other Tk callbacks it tolerates a torn-down window (a stale tick can</span>
-</span><span data-line="479"><span class="sd">        race teardown) and routes a failure through the throttler rather than</span>
-</span><span data-line="480"><span class="sd">        crashing the loop. Idempotent: several events may queue this before the</span>
-</span><span data-line="481"><span class="sd">        flag clears, but ``deiconify`` on a shown window is harmless.</span>
-</span><span data-line="482"><span class="sd">        """</span>
-</span><span data-line="483">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">winfo_exists</span><span class="p">():</span>
-</span><span data-line="484">            <span class="k">return</span>
-</span><span data-line="485">        <span class="k">try</span><span class="p">:</span>
-</span><span data-line="486">            <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">deiconify</span><span class="p">()</span>
-</span><span data-line="487">            <span class="c1"># The overlay is mapped for the first time here, so (like the initial</span>
-</span><span data-line="488">            <span class="c1"># show in start) macOS needs the frame re-asserted now or the</span>
-</span><span data-line="489">            <span class="c1"># deiconified window comes back decorated.</span>
-</span><span data-line="490">            <span class="bp">self</span><span class="o">.</span><span class="n">_force_frameless</span><span class="p">()</span>
-</span><span data-line="491">        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-</span><span data-line="492">            <span class="c1"># _minimized stays set (cleared only after a successful deiconify), so</span>
-</span><span data-line="493">            <span class="c1"># a persistent failure leaves the overlay hidden for the whole</span>
-</span><span data-line="494">            <span class="c1"># session. Name that user-visible consequence in the log so the</span>
-</span><span data-line="495">            <span class="c1"># throttled summary is not just an opaque recurring traceback.</span>
-</span><span data-line="496">            <span class="bp">self</span><span class="o">.</span><span class="n">_error_throttler</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
-</span><span data-line="497">                <span class="s2">"restore_minimized_error"</span><span class="p">,</span> <span class="n">exc</span><span class="p">,</span> <span class="n">consequence</span><span class="o">=</span><span class="s2">"overlay_remains_hidden"</span>
-</span><span data-line="498">            <span class="p">)</span>
-</span><span data-line="499">            <span class="k">return</span>
-</span><span data-line="500">        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
-</span><span data-line="501">            <span class="bp">self</span><span class="o">.</span><span class="n">_minimized</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span data-line="502">
+</span><span data-line="477">
+</span><span data-line="478">    <span class="k">def</span><span class="w"> </span><span class="nf">_restore_from_minimized</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="479"><span class="w">        </span><span class="sd">"""Re-show the overlay after a minimized start, on the Tk main loop.</span>
+</span><span data-line="480">
+</span><span data-line="481"><span class="sd">        Scheduled by :meth:`show_text` the first time an event is captured. Like</span>
+</span><span data-line="482"><span class="sd">        the other Tk callbacks it tolerates a torn-down window (a stale tick can</span>
+</span><span data-line="483"><span class="sd">        race teardown) and routes a failure through the throttler rather than</span>
+</span><span data-line="484"><span class="sd">        crashing the loop. Idempotent: several events may queue this before the</span>
+</span><span data-line="485"><span class="sd">        flag clears, but ``deiconify`` on a shown window is harmless.</span>
+</span><span data-line="486"><span class="sd">        """</span>
+</span><span data-line="487">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">winfo_exists</span><span class="p">():</span>
+</span><span data-line="488">            <span class="k">return</span>
+</span><span data-line="489">        <span class="k">try</span><span class="p">:</span>
+</span><span data-line="490">            <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">deiconify</span><span class="p">()</span>
+</span><span data-line="491">            <span class="c1"># The overlay is mapped for the first time here, so (like the initial</span>
+</span><span data-line="492">            <span class="c1"># show in start) macOS needs the frame re-asserted now or the</span>
+</span><span data-line="493">            <span class="c1"># deiconified window comes back decorated.</span>
+</span><span data-line="494">            <span class="bp">self</span><span class="o">.</span><span class="n">_force_frameless</span><span class="p">()</span>
+</span><span data-line="495">        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+</span><span data-line="496">            <span class="c1"># _minimized stays set (cleared only after a successful deiconify), so</span>
+</span><span data-line="497">            <span class="c1"># a persistent failure leaves the overlay hidden for the whole</span>
+</span><span data-line="498">            <span class="c1"># session. Name that user-visible consequence in the log so the</span>
+</span><span data-line="499">            <span class="c1"># throttled summary is not just an opaque recurring traceback.</span>
+</span><span data-line="500">            <span class="bp">self</span><span class="o">.</span><span class="n">_error_throttler</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
+</span><span data-line="501">                <span class="s2">"restore_minimized_error"</span><span class="p">,</span> <span class="n">exc</span><span class="p">,</span> <span class="n">consequence</span><span class="o">=</span><span class="s2">"overlay_remains_hidden"</span>
+</span><span data-line="502">            <span class="p">)</span>
+</span><span data-line="503">            <span class="k">return</span>
+</span><span data-line="504">        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+</span><span data-line="505">            <span class="bp">self</span><span class="o">.</span><span class="n">_minimized</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span data-line="506">
 <div class="viewcode-block" id="DisplayWindow.start">
 <a class="viewcode-back" href="../../modules.html#keycast.display.DisplayWindow.start">[docs]</a>
-</span><span data-line="503">    <span class="k">def</span><span class="w"> </span><span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">start_minimized</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="504"><span class="w">        </span><span class="sd">"""Start the tkinter main loop.</span>
-</span><span data-line="505">
-</span><span data-line="506"><span class="sd">        Args:</span>
-</span><span data-line="507"><span class="sd">            start_minimized: If true, withdraw the overlay before entering the</span>
-</span><span data-line="508"><span class="sd">                loop so it starts hidden; the first captured event re-shows it</span>
-</span><span data-line="509"><span class="sd">                via :meth:`_restore_from_minimized`.</span>
-</span><span data-line="510"><span class="sd">        """</span>
-</span><span data-line="511">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">:</span>
-</span><span data-line="512">            <span class="k">if</span> <span class="n">start_minimized</span><span class="p">:</span>
-</span><span data-line="513">                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
-</span><span data-line="514">                    <span class="bp">self</span><span class="o">.</span><span class="n">_minimized</span> <span class="o">=</span> <span class="kc">True</span>
-</span><span data-line="515">                <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">withdraw</span><span class="p">()</span>
-</span><span data-line="516">                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"display_starting_minimized"</span><span class="p">)</span>
-</span><span data-line="517">            <span class="c1"># After any withdrawal: on macOS the window comes up decorated unless</span>
-</span><span data-line="518">            <span class="c1"># overrideredirect is re-asserted once it is realized (see</span>
-</span><span data-line="519">            <span class="c1"># _force_frameless). Doing it post-withdraw means a minimized start</span>
-</span><span data-line="520">            <span class="c1"># stays hidden — the realize-pass cannot flash a withdrawn window.</span>
-</span><span data-line="521">            <span class="bp">self</span><span class="o">.</span><span class="n">_force_frameless</span><span class="p">()</span>
-</span><span data-line="522">            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"display_mainloop_starting"</span><span class="p">)</span>
-</span><span data-line="523">            <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">mainloop</span><span class="p">()</span></div>
+</span><span data-line="507">    <span class="k">def</span><span class="w"> </span><span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">start_minimized</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="508"><span class="w">        </span><span class="sd">"""Start the tkinter main loop.</span>
+</span><span data-line="509">
+</span><span data-line="510"><span class="sd">        Args:</span>
+</span><span data-line="511"><span class="sd">            start_minimized: If true, withdraw the overlay before entering the</span>
+</span><span data-line="512"><span class="sd">                loop so it starts hidden; the first captured event re-shows it</span>
+</span><span data-line="513"><span class="sd">                via :meth:`_restore_from_minimized`.</span>
+</span><span data-line="514"><span class="sd">        """</span>
+</span><span data-line="515">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">:</span>
+</span><span data-line="516">            <span class="k">if</span> <span class="n">start_minimized</span><span class="p">:</span>
+</span><span data-line="517">                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+</span><span data-line="518">                    <span class="bp">self</span><span class="o">.</span><span class="n">_minimized</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span data-line="519">                <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">withdraw</span><span class="p">()</span>
+</span><span data-line="520">                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"display_starting_minimized"</span><span class="p">)</span>
+</span><span data-line="521">            <span class="c1"># After any withdrawal: on macOS the window comes up decorated unless</span>
+</span><span data-line="522">            <span class="c1"># overrideredirect is re-asserted once it is realized (see</span>
+</span><span data-line="523">            <span class="c1"># _force_frameless). Doing it post-withdraw means a minimized start</span>
+</span><span data-line="524">            <span class="c1"># stays hidden — the realize-pass cannot flash a withdrawn window.</span>
+</span><span data-line="525">            <span class="bp">self</span><span class="o">.</span><span class="n">_force_frameless</span><span class="p">()</span>
+</span><span data-line="526">            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"display_mainloop_starting"</span><span class="p">)</span>
+</span><span data-line="527">            <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">mainloop</span><span class="p">()</span></div>
 
-</span><span data-line="524">
+</span><span data-line="528">
 <div class="viewcode-block" id="DisplayWindow.request_stop">
 <a class="viewcode-back" href="../../modules.html#keycast.display.DisplayWindow.request_stop">[docs]</a>
-</span><span data-line="525">    <span class="k">def</span><span class="w"> </span><span class="nf">request_stop</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="526"><span class="w">        </span><span class="sd">"""Ask the main loop to exit, safe to call from any thread.</span>
-</span><span data-line="527">
-</span><span data-line="528"><span class="sd">        Schedules ``root.quit`` on the Tk event loop so ``mainloop`` returns</span>
-</span><span data-line="529"><span class="sd">        control to the caller of :meth:`start`. The actual window teardown</span>
-</span><span data-line="530"><span class="sd">        happens later in :meth:`stop`, once we are no longer nested inside the</span>
-</span><span data-line="531"><span class="sd">        (possibly signal-interrupted) main loop, where calling ``destroy``</span>
-</span><span data-line="532"><span class="sd">        directly would raise Tcl errors.</span>
-</span><span data-line="533">
-</span><span data-line="534"><span class="sd">        Captures ``root`` under the lock and calls ``after`` *outside* it, for the</span>
-</span><span data-line="535"><span class="sd">        deadlock reason documented in :meth:`show_text`: this method is contracted</span>
-</span><span data-line="536"><span class="sd">        to be callable from any thread, and a cross-thread ``after`` blocks on the</span>
-</span><span data-line="537"><span class="sd">        main loop, which must not happen while holding the lock the main loop's</span>
-</span><span data-line="538"><span class="sd">        fade/update ticks also take. The captured local keeps the call valid even</span>
-</span><span data-line="539"><span class="sd">        if :meth:`stop` nulls/destroys ``root`` in between (it then raises and is</span>
-</span><span data-line="540"><span class="sd">        tolerated). The lock is an ``RLock`` so a signal handler invoking this on</span>
-</span><span data-line="541"><span class="sd">        the main thread mid ``_fade_timer``/``_update_display`` re-enters instead</span>
-</span><span data-line="542"><span class="sd">        of self-deadlocking — see the lock's definition in ``__init__``.</span>
-</span><span data-line="543"><span class="sd">        """</span>
-</span><span data-line="544">        <span class="kn">import</span><span class="w"> </span><span class="nn">tkinter</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tk</span>  <span class="c1"># noqa: PLC0415  # lazy: see the import note at module top</span>
-</span><span data-line="545">
-</span><span data-line="546">        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
-</span><span data-line="547">            <span class="n">root</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span>
-</span><span data-line="548">        <span class="k">if</span> <span class="n">root</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="549">            <span class="k">return</span>
-</span><span data-line="550">        <span class="k">try</span><span class="p">:</span>
-</span><span data-line="551">            <span class="n">_</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">after</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">root</span><span class="o">.</span><span class="n">quit</span><span class="p">)</span>
-</span><span data-line="552">        <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="n">tk</span><span class="o">.</span><span class="n">TclError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-</span><span data-line="553">            <span class="c1"># Loop already gone / root destroyed after we released the lock; the</span>
-</span><span data-line="554">            <span class="c1"># loop is (or is becoming) stopped anyway, so tolerate it. Logged at</span>
-</span><span data-line="555">            <span class="c1"># warning, not debug: unlike the per-event drops in show_text this</span>
-</span><span data-line="556">            <span class="c1"># fires at most once or twice per session (no noise argument), and a</span>
-</span><span data-line="557">            <span class="c1"># genuinely failed stop request — e.g. a non-thread-enabled Tcl build</span>
-</span><span data-line="558">            <span class="c1"># where a live loop rejects the cross-thread ``after`` — means the app</span>
-</span><span data-line="559">            <span class="c1"># ignores shutdown, which must be visible in the log at the default</span>
-</span><span data-line="560">            <span class="c1"># level (the user cannot raise verbosity on a process that won't quit).</span>
-</span><span data-line="561">            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">format_event</span><span class="p">(</span><span class="s2">"request_stop_loop_gone"</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)))</span></div>
+</span><span data-line="529">    <span class="k">def</span><span class="w"> </span><span class="nf">request_stop</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="530"><span class="w">        </span><span class="sd">"""Ask the main loop to exit, safe to call from any thread.</span>
+</span><span data-line="531">
+</span><span data-line="532"><span class="sd">        Schedules ``root.quit`` on the Tk event loop so ``mainloop`` returns</span>
+</span><span data-line="533"><span class="sd">        control to the caller of :meth:`start`. The actual window teardown</span>
+</span><span data-line="534"><span class="sd">        happens later in :meth:`stop`, once we are no longer nested inside the</span>
+</span><span data-line="535"><span class="sd">        (possibly signal-interrupted) main loop, where calling ``destroy``</span>
+</span><span data-line="536"><span class="sd">        directly would raise Tcl errors.</span>
+</span><span data-line="537">
+</span><span data-line="538"><span class="sd">        Captures ``root`` under the lock and calls ``after`` *outside* it, for the</span>
+</span><span data-line="539"><span class="sd">        deadlock reason documented in :meth:`show_text`: this method is contracted</span>
+</span><span data-line="540"><span class="sd">        to be callable from any thread, and a cross-thread ``after`` blocks on the</span>
+</span><span data-line="541"><span class="sd">        main loop, which must not happen while holding the lock the main loop's</span>
+</span><span data-line="542"><span class="sd">        fade/update ticks also take. The captured local keeps the call valid even</span>
+</span><span data-line="543"><span class="sd">        if :meth:`stop` nulls/destroys ``root`` in between (it then raises and is</span>
+</span><span data-line="544"><span class="sd">        tolerated). The lock is an ``RLock`` so a signal handler invoking this on</span>
+</span><span data-line="545"><span class="sd">        the main thread mid ``_fade_timer``/``_update_display`` re-enters instead</span>
+</span><span data-line="546"><span class="sd">        of self-deadlocking — see the lock's definition in ``__init__``.</span>
+</span><span data-line="547"><span class="sd">        """</span>
+</span><span data-line="548">        <span class="kn">import</span><span class="w"> </span><span class="nn">tkinter</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tk</span>  <span class="c1"># noqa: PLC0415  # lazy: see the import note at module top</span>
+</span><span data-line="549">
+</span><span data-line="550">        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+</span><span data-line="551">            <span class="n">root</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span>
+</span><span data-line="552">        <span class="k">if</span> <span class="n">root</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="553">            <span class="k">return</span>
+</span><span data-line="554">        <span class="k">try</span><span class="p">:</span>
+</span><span data-line="555">            <span class="n">_</span> <span class="o">=</span> <span class="n">root</span><span class="o">.</span><span class="n">after</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">root</span><span class="o">.</span><span class="n">quit</span><span class="p">)</span>
+</span><span data-line="556">        <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="n">tk</span><span class="o">.</span><span class="n">TclError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+</span><span data-line="557">            <span class="c1"># Loop already gone / root destroyed after we released the lock; the</span>
+</span><span data-line="558">            <span class="c1"># loop is (or is becoming) stopped anyway, so tolerate it. Logged at</span>
+</span><span data-line="559">            <span class="c1"># warning, not debug: unlike the per-event drops in show_text this</span>
+</span><span data-line="560">            <span class="c1"># fires at most once or twice per session (no noise argument), and a</span>
+</span><span data-line="561">            <span class="c1"># genuinely failed stop request — e.g. a non-thread-enabled Tcl build</span>
+</span><span data-line="562">            <span class="c1"># where a live loop rejects the cross-thread ``after`` — means the app</span>
+</span><span data-line="563">            <span class="c1"># ignores shutdown, which must be visible in the log at the default</span>
+</span><span data-line="564">            <span class="c1"># level (the user cannot raise verbosity on a process that won't quit).</span>
+</span><span data-line="565">            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">format_event</span><span class="p">(</span><span class="s2">"request_stop_loop_gone"</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)))</span></div>
 
-</span><span data-line="562">
+</span><span data-line="566">
 <div class="viewcode-block" id="DisplayWindow.stop">
 <a class="viewcode-back" href="../../modules.html#keycast.display.DisplayWindow.stop">[docs]</a>
-</span><span data-line="563">    <span class="k">def</span><span class="w"> </span><span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="564"><span class="w">        </span><span class="sd">"""Destroy the window.</span>
-</span><span data-line="565">
-</span><span data-line="566"><span class="sd">        Must run on the main thread after ``mainloop`` has returned. The normal</span>
-</span><span data-line="567"><span class="sd">        loop-exit path is :meth:`request_stop` (which schedules ``root.quit``);</span>
-</span><span data-line="568"><span class="sd">        the ``quit()`` here is belt-and-suspenders for a direct or abnormal</span>
-</span><span data-line="569"><span class="sd">        ``stop()`` call where ``request_stop`` never ran, and is a harmless no-op</span>
-</span><span data-line="570"><span class="sd">        once ``mainloop`` has already returned. ``destroy()`` is what actually</span>
-</span><span data-line="571"><span class="sd">        tears the window down.</span>
-</span><span data-line="572">
-</span><span data-line="573"><span class="sd">        ``quit``/``destroy`` are wrapped because the OS can tear the Tcl</span>
-</span><span data-line="574"><span class="sd">        application down before we get here: a native window close / app-quit</span>
-</span><span data-line="575"><span class="sd">        makes ``mainloop`` return with the app *already destroyed*, so</span>
-</span><span data-line="576"><span class="sd">        ``destroy()`` raises ``TclError: application has been destroyed``. That</span>
-</span><span data-line="577"><span class="sd">        is the desired end state, so treat it as a successful teardown rather</span>
-</span><span data-line="578"><span class="sd">        than re-raising into ``Keycast.stop``'s component-stop handler (which</span>
-</span><span data-line="579"><span class="sd">        would log a spurious ``component_stop_error`` traceback on every native</span>
-</span><span data-line="580"><span class="sd">        close).</span>
-</span><span data-line="581"><span class="sd">        """</span>
-</span><span data-line="582">        <span class="kn">import</span><span class="w"> </span><span class="nn">tkinter</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tk</span>  <span class="c1"># noqa: PLC0415  # lazy: see the import note at module top</span>
-</span><span data-line="583">
-</span><span data-line="584">        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
-</span><span data-line="585">            <span class="n">root</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span>
-</span><span data-line="586">            <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span data-line="587">        <span class="k">if</span> <span class="n">root</span><span class="p">:</span>
-</span><span data-line="588">            <span class="k">try</span><span class="p">:</span>
-</span><span data-line="589">                <span class="n">root</span><span class="o">.</span><span class="n">quit</span><span class="p">()</span>
-</span><span data-line="590">                <span class="n">root</span><span class="o">.</span><span class="n">destroy</span><span class="p">()</span>
-</span><span data-line="591">            <span class="k">except</span> <span class="n">tk</span><span class="o">.</span><span class="n">TclError</span><span class="p">:</span>
-</span><span data-line="592">                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"display_already_destroyed"</span><span class="p">)</span>
-</span><span data-line="593">            <span class="k">else</span><span class="p">:</span>
-</span><span data-line="594">                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"display_mainloop_stopped"</span><span class="p">)</span></div>
+</span><span data-line="567">    <span class="k">def</span><span class="w"> </span><span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="568"><span class="w">        </span><span class="sd">"""Destroy the window.</span>
+</span><span data-line="569">
+</span><span data-line="570"><span class="sd">        Must run on the main thread after ``mainloop`` has returned. The normal</span>
+</span><span data-line="571"><span class="sd">        loop-exit path is :meth:`request_stop` (which schedules ``root.quit``);</span>
+</span><span data-line="572"><span class="sd">        the ``quit()`` here is belt-and-suspenders for a direct or abnormal</span>
+</span><span data-line="573"><span class="sd">        ``stop()`` call where ``request_stop`` never ran, and is a harmless no-op</span>
+</span><span data-line="574"><span class="sd">        once ``mainloop`` has already returned. ``destroy()`` is what actually</span>
+</span><span data-line="575"><span class="sd">        tears the window down.</span>
+</span><span data-line="576">
+</span><span data-line="577"><span class="sd">        ``quit``/``destroy`` are wrapped because the OS can tear the Tcl</span>
+</span><span data-line="578"><span class="sd">        application down before we get here: a native window close / app-quit</span>
+</span><span data-line="579"><span class="sd">        makes ``mainloop`` return with the app *already destroyed*, so</span>
+</span><span data-line="580"><span class="sd">        ``destroy()`` raises ``TclError: application has been destroyed``. That</span>
+</span><span data-line="581"><span class="sd">        is the desired end state, so treat it as a successful teardown rather</span>
+</span><span data-line="582"><span class="sd">        than re-raising into ``Keycast.stop``'s component-stop handler (which</span>
+</span><span data-line="583"><span class="sd">        would log a spurious ``component_stop_error`` traceback on every native</span>
+</span><span data-line="584"><span class="sd">        close).</span>
+</span><span data-line="585"><span class="sd">        """</span>
+</span><span data-line="586">        <span class="kn">import</span><span class="w"> </span><span class="nn">tkinter</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tk</span>  <span class="c1"># noqa: PLC0415  # lazy: see the import note at module top</span>
+</span><span data-line="587">
+</span><span data-line="588">        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+</span><span data-line="589">            <span class="n">root</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span>
+</span><span data-line="590">            <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="591">        <span class="k">if</span> <span class="n">root</span><span class="p">:</span>
+</span><span data-line="592">            <span class="k">try</span><span class="p">:</span>
+</span><span data-line="593">                <span class="n">root</span><span class="o">.</span><span class="n">quit</span><span class="p">()</span>
+</span><span data-line="594">                <span class="n">root</span><span class="o">.</span><span class="n">destroy</span><span class="p">()</span>
+</span><span data-line="595">            <span class="k">except</span> <span class="n">tk</span><span class="o">.</span><span class="n">TclError</span><span class="p">:</span>
+</span><span data-line="596">                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"display_already_destroyed"</span><span class="p">)</span>
+</span><span data-line="597">            <span class="k">else</span><span class="p">:</span>
+</span><span data-line="598">                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"display_mainloop_stopped"</span><span class="p">)</span></div>
 </div>
 
 </span></pre></div>
