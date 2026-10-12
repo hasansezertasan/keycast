@@ -180,7 +180,13 @@ def _mas_receipt_exists() -> bool:
     Returns:
         True if running on macOS and the receipt exists inside the bundle.
     """
-    if sys.platform != "darwin":
+    # Read the platform into a plainly-typed local before branching (same
+    # literal-narrowing defeat as _installer_marker_exists below): checkers
+    # with platform pruning treat `sys.platform != "darwin"` as
+    # compile-time-known and flag the macOS-only body as unreachable on other
+    # targets.
+    host_platform: str = sys.platform
+    if host_platform != "darwin":
         return False
     try:
         return (Path(sys.executable).parent.parent / "_MASReceipt" / "receipt").exists()

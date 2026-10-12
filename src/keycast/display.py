@@ -194,14 +194,21 @@ class DisplayWindow:
         (a minimized overlay is first mapped at deiconify, so the frame must be
         re-asserted there too).
 
-        macOS-only: only the platform check lives here so the actual widget work
-        — and the only ``root`` access — sits in :meth:`_reassert_overrideredirect`,
-        a method with no platform guard. On non-macOS the early ``return`` makes
-        any following statements statically unreachable, and the type checker does
-        not narrow ``self.root`` inside unreachable code; keeping the ``root``
-        access in a separate, always-reachable method sidesteps that entirely.
+        macOS-only: the guard reads a plainly-typed ``host_platform`` local
+        rather than ``sys.platform`` (same literal-narrowing defeat as
+        secure_input.py) so checkers with platform pruning (mypy
+        ``--platform``, ty, pyrefly) never treat the macOS-only call below as
+        unreachable on other targets. The actual widget work — and the only
+        ``root`` access — still sits in :meth:`_reassert_overrideredirect`, a
+        method with no platform guard, so the non-None ``root`` narrowing is
+        never lost inside guarded code.
         """
-        if sys.platform != "darwin":
+        # Read the platform into a plainly-typed local before branching (same
+        # literal-narrowing defeat as secure_input.py): checkers with platform
+        # pruning treat `sys.platform != "darwin"` as compile-time-known and
+        # flag the macOS-only body as unreachable on other targets.
+        host_platform: str = sys.platform
+        if host_platform != "darwin":
             return
         self._reassert_overrideredirect()
 
