@@ -43,7 +43,14 @@ jobs:
         # Pin Sphinx's "today"/copyright to the last commit date so the same
         # commit always renders the same docs output (reproducible-builds.org).
         run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+      - name: Install headless X server (Linux)
+        # docs/modules.rst autodoc-imports keycast.listeners, whose
+        # module-level pynput import loads its X11 backend and aborts with no
+        # display. Xvfb provides one (mirrors the CI docs jobs).
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
       - name: Check documentation links
         env:
           PYTHONUNBUFFERED: "1"
-        run: uv run --no-default-groups --group docs sphinx-build -b linkcheck docs docs/_build/linkcheck
+        run: xvfb-run -a uv run --no-default-groups --group docs sphinx-build -b linkcheck docs docs/_build/linkcheck

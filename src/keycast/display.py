@@ -6,7 +6,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast  # pylint: disable=unused-import
+from typing import TYPE_CHECKING, cast
 
 from keycast.logging_setup import (
     _ErrorThrottler,  # pyright: ignore[reportPrivateUsage] — shared throttler, see listeners.py
@@ -37,6 +37,11 @@ if TYPE_CHECKING:
     # annotations, neither of which is evaluated at import — so this
     # TYPE_CHECKING-only import is enough to satisfy them.
     import tkinter as tk
+
+    # Quoted ``cast("Any", ...)`` at the pyobjc FFI boundary below (ruff TC006
+    # keeps the cast value quoted): the name is only ever a string forward-ref,
+    # so a TYPE_CHECKING import satisfies every checker without a runtime cost.
+    from typing import Any
 
 __all__ = ["DisplayWindow"]
 
