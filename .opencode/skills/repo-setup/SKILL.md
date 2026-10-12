@@ -2,7 +2,7 @@
 name: repo-setup
 description: "Use to perform (or resume, or verify) the one-time repository & release-automation setup this copier-pyproject-generated project needs before its automation works — squash-merge policy, workflow permissions, branch protection / ruleset, PyPI trusted publishing, GitHub Pages, Discussions, and the optional secrets/App installs. Reach for it on \"set up this repo\", \"finish setup\", \"wire up releases\", \"why hasn't the release PR opened\", or when a fresh clone needs its GitHub settings applied. The setup is invisible to CI (a green build proves nothing), so re-run this anytime to see what is still missing."
 # Content-Hash: blake3:1002c89cfc3288771d3fb3c1ae8dd4485855d5be2f2886ac7d3a40c5b6fc3793
-# Source-Hash: blake3:4065776dd96bab76a2d5efa85d269aee32031039e364ab920f65a2597b2194cc
+# Source-Hash: blake3:91ae4dec2638f843961fe552f9a2e94107153738cf7059fc35fdce89827f50d6
 ---
 
 # Set up this repository's release & maintenance automation

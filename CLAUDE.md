@@ -8,8 +8,8 @@ Use MCP server: npx -y ai-rulez@latest mcp
 Regenerate: ai-rulez generate
 
 Docs: https://github.com/Goldziher/ai-rulez
-Content-Hash: blake3:f2a4573e20b667703f5f9bf7ea8d0e27e92cccc2b1751d7e0984de85d62c2e53
-Source-Hash: blake3:4065776dd96bab76a2d5efa85d269aee32031039e364ab920f65a2597b2194cc
+Content-Hash: blake3:0529d56f6533f070087ac7f808162958c0fd11964928b292d8c491aa4d2f81e5
+Source-Hash: blake3:91ae4dec2638f843961fe552f9a2e94107153738cf7059fc35fdce89827f50d6
 -->
 
 # keycast
@@ -126,7 +126,7 @@ before opening one:
 | Run all tests | `uv run python -m pytest` |
 | Run one module | `uv run python -m pytest tests/test_settings.py` |
 | Run one test | `uv run python -m pytest -k test_rotation_defaults` |
-| Coverage (config in `pyproject.toml`) | `uv run pytest --cov` |
+| Coverage (config in `pyproject.toml`) | `uv run coverage run -m pytest && uv run coverage combine && uv run coverage report` |
 | Full test matrix | `uv run --locked tox run` |
 | Lint + type-check | `uv run --locked tox run -e style` |
 | Git hooks | `uv run --locked tox run -e prek` |

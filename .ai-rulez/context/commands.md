@@ -13,7 +13,7 @@ priority: high
 | Run all tests | `uv run python -m pytest` |
 | Run one module | `uv run python -m pytest tests/test_settings.py` |
 | Run one test | `uv run python -m pytest -k test_rotation_defaults` |
-| Coverage (config in `pyproject.toml`) | `uv run pytest --cov` |
+| Coverage (config in `pyproject.toml`) | `uv run coverage run -m pytest && uv run coverage combine && uv run coverage report` |
 | Full test matrix | `uv run --locked tox run` |
 | Lint + type-check | `uv run --locked tox run -e style` |
 | Git hooks | `uv run --locked tox run -e prek` |
