@@ -3,9 +3,14 @@
 # Produces a single self-contained executable that needs no Python on the target.
 # -*- mode: python ; coding: utf-8 -*-
 
-# The single runnable entrypoint (see src/keycast/__main__.py),
-# which runs whichever component this project enabled (CLI/GUI/TUI/web/...).
-entry_point = "src/keycast/__main__.py"
+# The frozen `keycast` executable must behave exactly like the installed
+# `keycast.cli:app` console script (see [project.scripts] in pyproject.toml):
+# `--help`/`version`/`info` stay lazy and never import the GUI stack
+# (tkinter/pynput), so the headless CI smoke-run passes, while a bare run
+# launches the overlay via main(). `src/keycast/__main__.py` is NOT the entry
+# here — it calls main() directly, ignores argv (so `--help` would launch the
+# GUI instead of printing help), and imports pynput at module import time.
+entry_point = "src/keycast/cli.py"
 
 a = Analysis(
     [entry_point],
