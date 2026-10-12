@@ -161,34 +161,43 @@ is a decomposed DAG gated on the release-please flow (see `AGENTS.md`). The
 release is **atomic** — nothing publishes unless every artifact builds:
 
 ```text
-release-please ─┬─ build-package  (sdist + wheel,  ubuntu)
-                ├─ build-macos    (.app → .dmg,    macos-15 / arm64)
-                └─ build-windows  (.exe folder → .zip + installer, windows-latest)
-                          │  publish-pypi needs ALL three
+release-please ─┬─ build           (sdist + wheel + Sigstore attestations, ubuntu)
+                ├─ sbom            (CycloneDX SBOM, ubuntu)
+                ├─ build-freezer   (single-file exe × linux/windows/macos)
+                ├─ build-macos     (.app → .dmg, macos-26 / arm64)
+                └─ build-windows   (folder → .zip + installer [+ .msix], windows-latest)
+                          │  pypi-publish needs ALL of the above
                           ▼
-                   publish-pypi    (Trusted Publishing; id-token only)
+                   pypi-publish    (Trusted Publishing; id-token only)
                           ▼
-                   publish-release (download all artifacts, attach, un-draft)
+                   attach-github-release  (attach dist/* + SBOM to the draft)
                           ▼
-                   reconcile       (close phantom PR, re-dispatch)
+                   finalize-release       (un-draft, close phantom PR, re-dispatch)
 ```
 
-- **Builders** are pure producers (`contents: read`): each builds on its own
-  runner and uploads a workflow artifact — they never touch the release. The
+- **Builders** are pure producers (`contents: read`) — `sbom`,
+  `build-freezer`, `build-macos`, `build-windows` each build on their own
+  runner and upload a workflow artifact; they never touch the release. The
+  exception is `build`, which additionally mints Sigstore build provenance
+  (`attestations` + `id-token` write) under the `publish` environment. The
   macOS/Windows builders **must** pin Astral Python 3.14.6 (see the
   build-foundation warning above); both build from the committed
   `packaging/keycast.spec` (PyInstaller's `BUNDLE` step is a no-op on Windows, so
   there it yields the `dist/keycast/` folder, which is zipped and also compiled
   into `keycast-setup.exe` via `packaging/keycast.iss`).
-- **`publish-pypi`** depends on all three builds, downloads the sdist/wheel, and
-  publishes via PyPI Trusted Publishing (`id-token: write`, no other scope).
-- **`publish-release`** downloads every artifact, attaches them to the release
-  tag, and un-drafts it (`contents: write`), marking it `--prerelease` (and not
-  "Latest") for prereleases (a no-op while the beta channel is off — see below).
+- **`pypi-publish`** depends on every builder above (including `sbom` —
+  PyPI publication is irreversible, so a failed SBOM must block it, otherwise
+  the version ships while its GitHub release stays a draft), downloads the
+  sdist/wheel, and publishes via PyPI Trusted Publishing (`id-token: write`,
+  no other scope).
+- **`attach-github-release`** downloads every artifact and attaches it to the
+  draft release (`contents: write`).
   The GitHub Release **intentionally mirrors the PyPI sdist/wheel** alongside the
   `.dmg`/`.zip`, for a complete, offline-installable release page.
-- **`reconcile`** closes the phantom release PR and re-dispatches the workflow
-  (`pull-requests` + `actions` write).
+- **`finalize-release`** publishes the draft release (marking it `--prerelease`
+  and not "Latest" for prereleases — a no-op while the beta channel is off, see
+  below), then closes the phantom release PR and re-dispatches the workflow
+  (`contents` + `pull-requests` + `actions` write).
 
 **Beta channel (designed, currently disabled).** The pipeline *can* run mainline
 as a rolling prerelease that ships `0.2.0-beta.N` (→ PEP 440 `0.2.0bN`) to **PyPI
