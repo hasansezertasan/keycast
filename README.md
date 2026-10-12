@@ -1,18 +1,46 @@
 # keycast
 
-A cross-platform keystroke and mouse click visualizer built in Python.
+[![CI](https://github.com/hasansezertasan/keycast/actions/workflows/ci.yml/badge.svg)](https://github.com/hasansezertasan/keycast/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/codecov/c/github/hasansezertasan/keycast)](https://codecov.io/gh/hasansezertasan/keycast)
+[![Documentation Status](https://img.shields.io/github/deployments/hasansezertasan/keycast/github-pages?label=docs)](https://hasansezertasan.github.io/keycast)
+[![PyPI - Version](https://img.shields.io/pypi/v/keycast.svg)](https://pypi.org/project/keycast)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/keycast.svg)](https://pypi.org/project/keycast)
+[![License - MIT](https://img.shields.io/github/license/hasansezertasan/keycast.svg)](https://opensource.org/licenses/MIT)
+[![GitHub Stars](https://img.shields.io/github/stars/hasansezertasan/keycast?style=social)](https://github.com/hasansezertasan/keycast/stargazers)
+[![Latest Commit](https://img.shields.io/github/last-commit/hasansezertasan/keycast)](https://github.com/hasansezertasan/keycast)
 
-## Features
+[![Checked with mypy](http://www.mypy-lang.org/static/mypy_badge.svg)](http://mypy-lang.org/)
+[![linting - Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/hasansezertasan/keycast/badge)](https://scorecard.dev/viewer/?uri=github.com/hasansezertasan/keycast)
+[![GitHub Tag](https://img.shields.io/github/tag/hasansezertasan/keycast?include_prereleases=&sort=semver&color=black)](https://github.com/hasansezertasan/keycast/releases/)
 
-- **Cross-platform support**: Works on macOS, Linux, and Windows
-- **Keyboard visualization**: Shows keystrokes in real-time with customizable formatting
-- **Mouse click visualization**: Displays mouse clicks with optional position information
-- **Transparent overlay**: Semi-transparent window that stays on top (when Tkinter is available)
-- **Configurable display**: Customize colors, fonts, position, and behavior
-- **Presets ("modes")**: One-word bundles — `presenter`, `minimal`, `debug` — that retune the overlay for common scenarios
-- **Key mapping**: Customizable key name mappings for better display
-- **Fade effects**: Events fade out after a configurable duration
-- **Graceful error handling**: Handles permission issues and missing dependencies gracefully
+[![Downloads](https://pepy.tech/badge/keycast)](https://pepy.tech/project/keycast)
+[![Downloads/Month](https://pepy.tech/badge/keycast/month)](https://pepy.tech/project/keycast)
+[![Downloads/Week](https://pepy.tech/badge/keycast/week)](https://pepy.tech/project/keycast)
+
+> Keycast is a cross-platform keystroke and mouse click visualizer built in Python.
+
+-----
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Updates](#updates)
+- [Support](#support-heart)
+- [Motivation](#motivation)
+- [Features](#features)
+- [About](#about)
+- [Author](#author-person_with_crown)
+- [Analysis](#analysis)
+- [Development](#development-toolbox)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing-heart)
+- [Releasing](#releasing)
+- [Credits](#credits)
+- [License](#license-scroll)
+- [Changelog](#changelog-memo)
 
 ## Installation
 
@@ -79,12 +107,40 @@ CLI (add `sudo … -g` for a global `-g` install).
 If you already have Python 3.14+ and [uv](https://docs.astral.sh/uv/):
 
 ```bash
+uv tool install keycast
+```
+
+Or run it without installing:
+
+```bash
 uvx keycast
+```
+
+See the [installation docs](https://hasansezertasan.github.io/keycast/installation.html) for pipx and from-source options.
+
+#### Verify the installation
+
+The package root is importable after installation:
+
+```pycon
+>>> from keycast import __doc__
+>>> isinstance(__doc__, str)
+True
+
 ```
 
 ## Usage
 
-### Basic Usage
+### CLI
+
+Print the version or the install-source summary without launching the overlay:
+
+```bash
+keycast version
+keycast info
+```
+
+### GUI
 
 Simply run the application:
 
@@ -326,7 +382,61 @@ matching action — it never tries to update something your package manager owns
 - **Offline / privacy:** checks only contact GitHub when enabled, time out
   quickly, and fail silently when offline. No telemetry is collected.
 
-## Development
+## Support :heart:
+
+If you have any questions or need help, feel free to open an issue on the [GitHub repository][keycast].
+
+## Motivation
+
+keycast exists because showing your input matters: in screencasts, live demos,
+and presentations, viewers cannot follow along unless they can see what you
+type and click. A lightweight overlay that visualizes keystrokes and mouse
+clicks in real time — without recording, streaming, or a heavyweight setup —
+keeps the audience oriented. See
+[Comparison / Alternatives](docs/COMPARISON.md) for how keycast differs from
+KeyCastr, Keyviz, and VS Code Screencast Mode.
+
+## Features
+
+- **Cross-platform support**: Works on macOS, Linux, and Windows
+- **Keyboard visualization**: Shows keystrokes in real-time with customizable formatting
+- **Mouse click visualization**: Displays mouse clicks with optional position information
+- **Transparent overlay**: Semi-transparent window that stays on top (when Tkinter is available)
+- **Configurable display**: Customize colors, fonts, position, and behavior
+- **Presets ("modes")**: One-word bundles — `presenter`, `minimal`, `debug` — that retune the overlay for common scenarios
+- **Key mapping**: Customizable key name mappings for better display
+- **Fade effects**: Events fade out after a configurable duration
+- **Graceful error handling**: Handles permission issues and missing dependencies gracefully
+- **CLI Application**: Command-line interface built with Typer
+- **GUI Application**: Desktop interface built with Tkinter
+- **Configuration Management**: Type-safe settings using Pydantic
+
+## About
+
+keycast is a small, focused desktop utility: one transparent overlay, driven by
+a JSON config file, with per-channel update guidance instead of a self-updater.
+For the full picture — architecture, modules, and design rationale — see the
+[Project Overview](docs/PROJECT_OVERVIEW.md).
+
+## Author :person_with_crown:
+
+This project is maintained by [Hasan Sezer Taşan][author], It's me :wave:
+
+## Analysis
+
+- [Snyk Python Package Health Analysis](https://snyk.io/advisor/python/keycast)
+- [Libraries.io - PyPI](https://libraries.io/pypi/keycast)
+- [Safety DB](https://data.safetycli.com/packages/pypi/keycast)
+- [PePy Download Stats](https://www.pepy.tech/projects/keycast)
+- [PyPI Download Stats](https://pypistats.org/packages/keycast)
+- [Pip Trends Download Stats](https://piptrends.com/package/keycast)
+- [PyPI Map Dependency Graph](https://pypimap.com/package/keycast)
+
+## Development :toolbox:
+
+See the [Contributing Guidelines](./.github/CONTRIBUTING.md#your-first-code-contribution)
+for local setup, the common development tasks (exposed via [mise](https://mise.jdx.dev)),
+building and previewing the documentation, and the VS Code debugging configurations.
 
 ### Running Tests
 
@@ -378,13 +488,6 @@ Comprehensive documentation is available in the `docs/` directory:
 - **[Design Decisions](docs/DESIGN_DECISIONS.md)** - Design rationale and trade-offs
 - **[Comparison / Alternatives](docs/COMPARISON.md)** - How keycast compares to KeyCastr, Keyviz, and VS Code Screencast Mode
 
-### Adding New Features
-
-1. Create a new branch for your feature
-2. Implement the feature with tests
-3. Update documentation if needed
-4. Submit a pull request
-
 ## Troubleshooting
 
 ### Common Issues
@@ -428,15 +531,38 @@ The "This process is not trusted!" messages you see are warnings from pynput, bu
 
 If you want to verify that permissions are working, try running keycast and see if it captures your keystrokes and mouse clicks. If it's not working, follow the accessibility permission steps above.
 
-## Contributing
+## Contributing :heart:
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass
-6. Submit a pull request
+Any contributions are welcome! Please follow the [Contributing Guidelines](./.github/CONTRIBUTING.md) to contribute to this project.
 
-## License
+## Releasing
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Versioning and releases are automated with [release-please](https://github.com/googleapis/release-please), driven by [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/) PR titles squash-merged into `main`. release-please maintains a release PR that bumps the version and `CHANGELOG.md`; merging it tags the release and publishes to PyPI. See the [Contributing Guidelines](./.github/CONTRIBUTING.md#releasing) for the commit conventions, and the [Repository setup](./docs/maintaining/setup.rst) guide for one-time configuration and optional post-launch integrations such as a social preview, downstream packaging, and Repology.
+
+Pause merges that change `.github/workflows/`, including Renovate action-pin updates, from merging a release PR until the entire Release run finishes. Workflow differences between the release commit and current `main` can block tag or release creation with a 403 when using `GITHUB_TOKEN`. See [Release recovery](./docs/maintaining/setup.rst#keep-workflow-changes-out-of-an-active-release) for prevention and recovery steps.
+
+For adoption or template-update reconciliation, ask your agent to "audit this
+template adoption/update against our existing project behavior".
+Run `ai-rulez generate` first to deliver the skill to the selected hosts.
+The shipped [template-adoption skill](./.ai-rulez/skills/template-adoption/SKILL.md)
+also supports audits after an update was applied. It compares workflow behavior,
+required checks, custom tooling, and documentation, and asks before consequential
+cleanup. Its prek-workflow example shows why duplicate commands alone do not
+justify removing a workflow. Use the sibling `repo-setup` skill for repository
+settings and release setup.
+
+## Credits
+
+This package was created with [Copier](https://github.com/copier-org/copier) and the [hasansezertasan/copier-pyproject](https://github.com/hasansezertasan/copier-pyproject) project template.
+
+## License :scroll:
+
+This project is licensed under the [MIT License](https://spdx.org/licenses/MIT.html) — see the LICENSE file for details.
+
+## Changelog :memo:
+
+For a detailed list of changes, please refer to the [CHANGELOG](./CHANGELOG.md).
+
+<!-- Refs -->
+[author]: https://github.com/hasansezertasan
+[keycast]: https://github.com/hasansezertasan/keycast
