@@ -7,8 +7,5 @@
     ".claude/skills/template-adoption/SKILL.md",
     "AGENTS.md",
     "opencode.json"
-  ],
-  "merged": {
-    "opencode.json": []
-  }
+  ]
 }
