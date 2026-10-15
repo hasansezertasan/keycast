@@ -1,6 +1,6 @@
 # Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
 ---
-_commit: v1.11.0
+_commit: v1.12.0
 _src_path: https://github.com/hasansezertasan/copier-pyproject.git
 ai_rulez_presets:
 - claude

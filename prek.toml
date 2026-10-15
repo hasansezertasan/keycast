@@ -32,12 +32,12 @@ hooks = [
   # `.gitignore` is a cobo-sealed block (hash-verified); its bytes must stay
   # verbatim, but upstream github/gitignore ships trailing whitespace on some
   # comment lines. Exclude it so the hook does not break the seal (cobo owns
-  # this file — see ADR-012).
+  # this file — see https://hasansezertasan.github.io/copier-pyproject/context/gitignore-generation/#cobo-generates-the-gitignore-with-a-hash-sealed-fence-and-lockfiles).
   # `.continue/prompts/` is the same shape: ai-rulez owns those bytes, and its
   # generated YAML header ships two trailing-space comment lines. Stripping them
   # here would be undone by the next `ai-rulez generate`, so the hook and the
-  # generator would rewrite each other forever — the non-convergence ADR-030
-  # forbids. The path is inert unless the `continue-dev` host is selected.
+  # generator would rewrite each other forever — the non-convergence
+  # that https://hasansezertasan.github.io/copier-pyproject/context/template-testing/#generated-files-must-be-formatter-canonical-not-merely-valid forbids. The path is inert unless the `continue-dev` host is selected.
   { id = "trailing-whitespace", exclude = '^(\.gitignore|\.continue/prompts/.*)$' },
   { id = "check-merge-conflict", args = [
     "--assume-in-merge",
@@ -48,9 +48,9 @@ hooks = [
   { id = "check-executables-have-shebangs" },
   { id = "check-symlinks" },
   { id = "check-xml" },
-  # Preserve cobo-owned bytes (ADR-012/030).
+  # Preserve cobo-owned bytes (https://hasansezertasan.github.io/copier-pyproject/context/gitignore-generation/#cobo-generates-the-gitignore-with-a-hash-sealed-fence-and-lockfiles, https://hasansezertasan.github.io/copier-pyproject/context/template-testing/#generated-files-must-be-formatter-canonical-not-merely-valid).
   # Windows PowerShell 5.1 needs a UTF-8 BOM for non-ASCII source literals.
-  # Also preserve ai-rulez output (ADR-035).
+  # Also preserve ai-rulez output (https://hasansezertasan.github.io/copier-pyproject/context/agent-instructions/#ai-rulez-is-the-opt-in-single-source-for-agent-instructions-with-the-prose-in-shared-macros).
   { id = "fix-byte-order-marker", exclude = '^(\.gitignore|\.continue/prompts/.*)$|(?i:\.ps[md]?1)$' },
   { id = "mixed-line-ending", args = ["--fix=auto"], exclude = '^(\.gitignore|\.continue/prompts/.*)$' },
   # auto fixes mixed endings, retaining consistent CRLF for Windows scripts.
@@ -92,7 +92,7 @@ hooks = [
   # mypy needs the installed package + deps to resolve third-party imports, so
   # like basedpyright it is a `local` `system` hook via `uv run` rather than
   # mirrors-mypy's isolated venv, which needed a hand-kept copy of every
-  # component's runtime deps in `additional_dependencies` (see ADR-005).
+  # component's runtime deps in `additional_dependencies` (see https://hasansezertasan.github.io/copier-pyproject/context/lint-orchestration/#mypys-prek-hook-runs-through-uv-like-basedpyright).
   # Filenames are not passed: mypy checks the `[tool.mypy] files` set, matching
   # tox's canonical run. Single version source: the `style` group pin.
   { id = "mypy", name = "mypy Type Checker", entry = "uv run --locked --group style mypy", language = "system", types = ["python"], pass_filenames = false },
@@ -141,7 +141,7 @@ hooks = [
   # the committed output honest — there is no `--check` mode for preset output
   # (ai-rulez's own `verify` covers plugin bundles only). Upstream ships
   # pre-commit hooks, but they carry a second version pin; going through the uv
-  # `agents` group keeps one (ADR-035). It reads the whole `.ai-rulez/` tree and
+  # `agents` group keeps one (https://hasansezertasan.github.io/copier-pyproject/context/agent-instructions/#ai-rulez-is-the-opt-in-single-source-for-agent-instructions-with-the-prose-in-shared-macros). It reads the whole `.ai-rulez/` tree and
   # writes a fixed output set, so filenames are not passed; the `files` gate
   # keeps it off unrelated commits while CI's `--all-files` run always reaches it
   # — including when someone hand-edits a generated file the gate does not match.
@@ -255,7 +255,7 @@ rev = "v0.21.0"
 # one step further along: yamlfmt prepends the `---` document start ai-rulez does
 # not emit, and the next `generate` strips it back off. A *fixing* hook that
 # disagrees with a generator does not fail once — the two rewrite each other
-# forever (ADR-030/035 §7). Inert unless the `continue-dev` host is selected.
+# forever (https://hasansezertasan.github.io/copier-pyproject/context/template-testing/#generated-files-must-be-formatter-canonical-not-merely-valid, https://hasansezertasan.github.io/copier-pyproject/context/agent-instructions/#ai-rulez-is-the-opt-in-single-source-for-agent-instructions-with-the-prose-in-shared-macros). Inert unless the `continue-dev` host is selected.
 hooks = [{ id = "yamlfmt", exclude = "^(\\.copier-answers\\.yml|\\.continue/prompts/.*)$", args = ["-conf", ".github/yamlfmt.yml"] }]
 
 [[repos]]
@@ -277,6 +277,14 @@ hooks = [
   # an activated mise shell environment (shims on PATH). It only requires `mise`
   # itself on PATH, which local contributors have and the CI `hooks` job supplies
   # via jdx/mise-action.
+  # pip-audit is a push-only hook: auditing the resolved runtime tree queries the
+  # PyPI Advisory DB, which is too slow and network-bound for every commit but
+  # cheap enough once per push, ahead of the weekly/CI `pip-audit` job in
+  # check-security.yml. It runs the same export + `uvx pip-audit` pair as that
+  # job (so pip-audit stays out of the project's dependencies) and cleans up its
+  # temp file whether or not the audit passes. `default_stages` excludes it from
+  # the commit gate; `stages` opts it into push.
+  { id = "pip-audit", name = "pip-audit", entry = "sh -c 'req=$(mktemp) && uv export --frozen --all-extras --no-dev --no-emit-project --no-hashes --format requirements.txt --output-file \"$req\" && uvx pip-audit --requirement \"$req\"; status=$?; rm -f \"$req\"; exit $status'", language = "system", stages = ["pre-push"], pass_filenames = false, always_run = true },
   { id = "ghalint", name = "ghalint", entry = "mise exec -- ghalint run", language = "system", pass_filenames = false, always_run = true },
   { id = "pytest", name = "Pytest Test Runner", entry = "uv run --locked pytest", language = "system", pass_filenames = false, always_run = true },
 ]

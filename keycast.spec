@@ -1,4 +1,4 @@
-# PyInstaller spec for keycast — see ADR-007.
+# PyInstaller spec for keycast — see https://hasansezertasan.github.io/copier-pyproject/context/standalone-executables/#executables-are-named-per-tool-and-os-and-all-target-the-package-main-module.
 # Build with: pyinstaller keycast.spec   (or: mise run freeze)
 # Produces a single self-contained executable that needs no Python on the target.
 # -*- mode: python ; coding: utf-8 -*-

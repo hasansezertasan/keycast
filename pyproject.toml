@@ -47,6 +47,8 @@ requires-python = ">=3.14"
 # everywhere, including the PyInstaller release jobs.
 dependencies = [
   "packaging==26.3",
+  "pydantic==2.13.5",
+  "pydantic-core==2.46.5",
   "pydantic-extra-types==2.11.1",
   "pydantic-settings==2.15.0",
   "pynput==1.8.2",
@@ -104,6 +106,15 @@ style = [
 sast = [
   "semgrep==1.180.0",
 ]
+# Dependency hygiene gets its own group for the same reason `sast` does: it is
+# only ever run by the on-demand `deps` tox env and the `deps` CI job, so a plain
+# `uv sync` should not install it. deptry checks the imports against the declared
+# dependencies (missing, transitive, misplaced or obsolete); creosote flags
+# declared runtime dependencies that nothing imports.
+deps = [
+  "creosote==5.2.0",
+  "deptry==0.25.1",
+]
 # ai-rulez gets its own group for the same reason `sast` does: `dev` includes
 # `style` wholesale, so folding it in would install it into every developer and
 # CI environment for a tool only the prek `ai-rulez` hook and the tox `style`
@@ -112,7 +123,7 @@ sast = [
 # the first invocation needs network. That download verifies a checksum when it
 # can fetch one and prints a warning and proceeds when it cannot, so treat it as
 # best-effort rather than a guarantee. Still a single version source, same as
-# every other pin (ADR-035).
+# every other pin (https://hasansezertasan.github.io/copier-pyproject/context/agent-instructions/#ai-rulez-is-the-opt-in-single-source-for-agent-instructions-with-the-prose-in-shared-macros).
 agents = [
   "ai-rulez==4.11.5",
 ]
@@ -138,11 +149,11 @@ docs = [
   "sphinx-paramlinks==0.6.0",
   "auto-pytabs[sphinx]==0.5.0",
   "myst-parser==4.0.1",
-  # Per-page "last updated" footer sourced from git commit dates (ADR-027);
+  # Per-page "last updated" footer sourced from git commit dates (https://hasansezertasan.github.io/copier-pyproject/context/docs-versioning/#per-page-last-updated-comes-from-git-history);
   # offline, no network. Works from full history (docs CI checks out depth 0).
   "sphinx-last-updated-by-git==0.3.8",
   # PEP 440 version parsing/sorting used by tools/build_docs.py to order
-  # published versions and pick the `latest` alias (ADR-027). Also a Sphinx
+  # published versions and pick the `latest` alias (https://hasansezertasan.github.io/copier-pyproject/context/docs-versioning/#docs-publish-only-the-current-version-and-carry-older-built-versions-forward-from-gh-pages). Also a Sphinx
   # transitive dependency; pinned here for the explicit direct use.
   "packaging>=24.0",
   # Renders the Configuration reference (docs/configuration.rst) directly from
@@ -224,6 +235,14 @@ name = "cz_conventional_commits"
 [tool.pytest.ini_options]
 # addopts = "-rXs --strict-config --strict-markers"
 addopts = "-v --tb=short --doctest-glob=README.md"
+# One marker per component, auto-applied by tests/conftest.py from each test's
+# top-level tests/<dir>/. Enables `pytest -m web` locally and per-component CI
+# jobs (issue #160, https://hasansezertasan.github.io/copier-pyproject/context/ci-topology/#per-component-markers-path-filtered-jobs-and-one-coverage-gate-per-component); `integration` (https://hasansezertasan.github.io/copier-pyproject/context/testing-strategy/#real-broker-integration-tests-testcontainers-locally-per-broker-ci-mechanism) is one axis of the scheme.
+markers = [
+  "core: core/shared component tests",
+  "cli: CLI component tests",
+  "gui: GUI component tests",
+]
 filterwarnings = [
   "error",
 ]
@@ -245,7 +264,7 @@ parallel = true
 # Store data-file paths relative to the project root so `.coverage` files produced
 # on different runners/OSes merge in the `coverage-combine` CI job without
 # absolute-path mismatches. Complements the `[tool.coverage.paths]` remap below
-# (which unifies the src/ vs site-packages layouts). See ADR-026.
+# (which unifies the src/ vs site-packages layouts). See https://hasansezertasan.github.io/copier-pyproject/context/ci-topology/#a-single-union-coverage-gate-across-the-whole-matrix.
 relative_files = true
 source_pkgs = ["keycast", "tests"]
 
@@ -267,7 +286,7 @@ keycast = ["src/keycast", "*/site-packages/keycast"]
 # patterns here: a regex matching a `def` line excludes the *whole function body*,
 # so a pattern like `def main\(` would silently un-measure any future `main()`
 # with real logic (and did mask the tested GUI/TUI entrypoints). Pragmas carry the
-# exclusion decision next to the code it affects. See ADR-008.
+# exclusion decision next to the code it affects. See https://hasansezertasan.github.io/copier-pyproject/context/testing-strategy/#coverage-exclusions-are-per-site-pragmas-and-the-globs-must-match-the-installed-layout.
 exclude_lines = [
   "no cov",
   "if __name__ == .__main__.:",
@@ -313,6 +332,32 @@ ignore_names = [
 ]
 min_confidence = 60
 paths = ["src", "tests"] # add "examples" here if/when that directory exists
+
+
+[tool.deptry]
+# `known_first_party` is explicit because the tox `deps` env installs the built
+# wheel, so without it deptry reads the project's own imports as a third-party
+# transitive dependency (DEP003). Add further `per_rule_ignores` entries for the
+# project's own findings, e.g. DEP003 for a package only importable through
+# another declared one, or DEP002 for an optional import guarded by try/except.
+# See https://deptry.com/rules-violations/.
+# Excluded: the Sphinx config, the build hook (its imports belong to
+# `[build-system].requires`, not the runtime dependencies), the benchmarks and the
+# worker probe script (neither ships in the wheel; pytest and anyio come from
+# the dev tooling). The packaging artwork scripts are likewise excluded: they
+# never ship in the wheel and provision Pillow per invocation
+# (`uv run --with pillow ...`), so PIL is deliberately not a project dependency.
+extend_exclude = [
+  "docs/conf.py",
+  "packaging/make_dmg_background.py",
+  "packaging/make_icons.py",
+]
+known_first_party = ["keycast"]
+
+[tool.deptry.per_rule_ignores]
+# tools/build_docs.py imports `packaging`, pinned in the `docs` group for that
+# script alone, so deptry reads it as a misplaced dev dependency.
+DEP004 = ["packaging"]
 
 
 [tool.slotscheck]
@@ -412,7 +457,7 @@ convention = "pep257"
 # (INP001 — dmgbuild loads its settings file by path, not import).
 "packaging/*.py" = ["T201", "S404", "S603", "S607", "INP001"]
 # The versioned-docs build orchestrator is a standalone CLI script under tools/,
-# not part of an importable package (ADR-027).
+# not part of an importable package (https://hasansezertasan.github.io/copier-pyproject/context/docs-versioning/#docs-publish-only-the-current-version-and-carry-older-built-versions-forward-from-gh-pages).
 "tools/build_docs.py" = ["INP001"]
 # settings.py deliberately prints to stderr (never the overlay/log) when the
 # config file cannot even be read: logging is not configured yet at that point.
@@ -531,7 +576,7 @@ disable = [
   # are deliberately lazy so import-linter's layering contract holds and a
   # framework is only imported when the code path that needs it actually runs.
   # Textual is the exception: the TUI imports it at module scope so `InfoApp`
-  # can be defined there and driven by the headless pilot (ADR-035).
+  # can be defined there and driven by the headless pilot (https://hasansezertasan.github.io/copier-pyproject/context/testing-strategy/#interactive-components-expose-injected-driver-seams-so-headless-ci-measures-everything-but-the-blocking-call).
   "import-outside-toplevel",
   # W0706 — the generated TUI entry point explicitly re-raises
   # KeyboardInterrupt/SystemExit ahead of a broad `except Exception` to make the
@@ -702,7 +747,7 @@ commands = [
   # would make a registry request on every `git commit`. The ruleset is named
   # explicitly rather than `--config auto` so rule selection does not depend on
   # language auto-detection; it is still fetched from the registry, which is why
-  # this cannot be vendored (see ADR-032). `--error` makes findings blocking;
+  # this cannot be vendored (see https://hasansezertasan.github.io/copier-pyproject/context/lint-orchestration/#semgrep-runs-in-the-style-env-against-a-named-registry-ruleset-never-vendored). `--error` makes findings blocking;
   # silence a false positive with a trailing `# nosemgrep: <rule-id>`.
   [
     "semgrep",
@@ -741,7 +786,7 @@ commands = [
   ],
   # Config/source validation only — the prek `ai-rulez` hook is what regenerates
   # the host files and so what catches drift. Having the check here too means a
-  # malformed `.ai-rulez/` source fails the canonical lint runner (ADR-003) even
+  # malformed `.ai-rulez/` source fails the canonical lint runner (https://hasansezertasan.github.io/copier-pyproject/context/lint-orchestration/#the-tox-style-env-is-the-sole-authoritative-lint-suite-prek-is-a-fast-gate-not-a-second-suite) even
   # on a clone whose git hooks were never installed.
   [
     "ai-rulez",
@@ -763,6 +808,32 @@ commands = [
 # resolve pytest and other test-only imports.
 dependency_groups = ["agents", "sast", "style", "test"]
 description = "Run Checkers, Linters and Formatters"
+runner = "uv-venv-lock-runner"
+
+
+# On-demand and CI-only (not in env_list, like `integration`): the `deps` job in
+# ci.yml runs it and `check` aggregates that job. `test` is included so deptry
+# and creosote can resolve the project's own test-only imports. creosote needs
+# the installed distributions to map import names, which the lock runner provides.
+[tool.tox.env.deps]
+commands = [
+  [
+    "deptry",
+    ".",
+  ],
+  [
+    "creosote",
+    "--deps-file",
+    "pyproject.toml",
+    "--section",
+    "project.dependencies",
+    # Without this creosote skips imports inside functions, so a dependency used
+    # only through a lazy import (the worker's uvloop) is reported as unused.
+    "--include-deferred",
+  ],
+]
+dependency_groups = ["deps", "test"]
+description = "Check dependency hygiene (deptry, creosote)"
 runner = "uv-venv-lock-runner"
 
 

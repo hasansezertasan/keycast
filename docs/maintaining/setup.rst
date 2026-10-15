@@ -53,13 +53,20 @@ head branches**.
 Branch protection
 -----------------
 
+Branch protection and rulesets are free on public repositories, but a
+**private** repository needs a paid GitHub plan (Pro, Team or Enterprise) for
+them to be enforced. On a free-plan private repository mark this section
+**not applicable** and skip its commands and checks.
+Continue with the remaining applicable steps.
+
 Protect ``main`` so a PR can only merge once its checks pass. Mark these check
 contexts as required (the names are the **check runs**, not the workflow files):
 
 - ``check`` — ``ci.yml``'s aggregate gate. It is the single context that covers
-  the tests, the per-component coverage gates, style, hooks and the documentation
-  build; without it a PR whose entire test suite failed still satisfies
-  protection, because the four metadata gates below say nothing about the code.
+  the tests, the coverage gate, style, dependency hygiene,
+  hooks and the documentation build; without it a PR whose entire test suite
+  failed still satisfies protection, because the four metadata gates below
+  say nothing about the code.
 - ``Validate PR title`` — the Conventional Commits PR-title lint
   (``check-pr-title.yml``), which release-please depends on.
 - ``Validate branch name`` — the Conventional Branch lint
