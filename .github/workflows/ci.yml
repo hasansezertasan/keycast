@@ -225,6 +225,11 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+    env:
+      # The `secrets` context is unavailable in `if:`, so surface CODECOV_TOKEN as
+      # a presence flag — never expose the value job-wide.
+      CODECOV_TOKEN_SET: ${{ secrets.CODECOV_TOKEN != '' }}
+      REPO_IS_PUBLIC: ${{ !github.event.repository.private }}
     steps:
       - name: System Info
         shell: bash
@@ -296,7 +301,10 @@ jobs:
         shell: bash
         run: uv run --locked --only-group test coverage xml
       - name: Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-latest'
+        # Uploads when the token is set or the repo is public (tokenless); only a
+        # private repo with no token falls through to the visible skip below.
+        # Best-effort (`fail_ci_if_error` defaults to false).
+        if: ${{ matrix.os == 'ubuntu-latest' && (env.CODECOV_TOKEN_SET == 'true' || env.REPO_IS_PUBLIC == 'true') }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5  # v7.1.1
         with:
           files: ./coverage.xml
@@ -305,6 +313,23 @@ jobs:
           # would never be computed and `if_ci_failed: error` would be inert.
           flags: unit
           token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Note skipped coverage upload
+        if: ${{ matrix.os == 'ubuntu-latest' && env.CODECOV_TOKEN_SET != 'true' && env.REPO_IS_PUBLIC != 'true' }}
+        run: echo "::notice::CODECOV_TOKEN secret is not set and this repo is private — skipping the Codecov upload. See docs/maintaining/setup.rst (Repository setup) to enable coverage reporting."
+      - name: Render coverage HTML (ubuntu only)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: uv run --locked --only-group test coverage html
+      - name: Publish coverage HTML (public repos)
+        # smokeshow uploads htmlcov to an ephemeral public URL and prints it — no
+        # account or secret required (an optional key only raises rate limits).
+        # Public repos only: a private report must not be published. Best-effort
+        # and ordered LAST — a tokenless rate-limit or outage must never fail the
+        # `check` gate nor block the authoritative Codecov/coverage.xml uploads
+        # above; smokeshow is a supplementary mirror, not load-bearing. See https://hasansezertasan.github.io/copier-pyproject/context/ci-topology/#a-tokenless-public-html-coverage-mirror-via-smokeshow.
+        if: ${{ matrix.os == 'ubuntu-latest' && env.REPO_IS_PUBLIC == 'true' }}
+        continue-on-error: true
+        run: uv run --no-project --with smokeshow smokeshow upload htmlcov
   # Build-only PR guards: build each enabled standalone executable (https://hasansezertasan.github.io/copier-pyproject/context/standalone-executables/#every-executable-toggle-adds-a-pr-time-build-check-job)
   # against the PR diff so a dependency or Python bump that breaks packaging fails
   # HERE, against the offending change, instead of silently at release time. The

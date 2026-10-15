@@ -106,6 +106,8 @@ Check particularly:
 - **Required status checks:** before deleting or renaming a workflow/job,
   inspect check names (including matrix names), aggregate gates, downstream
   references, and repository branch protection and rulesets.
+  Compare local `.github/settings.yml` / ruleset definitions with live settings when read
+  access is available. Local files alone do not prove the active requirements.
   If live requirements are unavailable, record that gap and defer removal or
   renaming of potentially required checks until the user supplies evidence.
 - **Project customizations:** preserve source behavior, meaningful tests,

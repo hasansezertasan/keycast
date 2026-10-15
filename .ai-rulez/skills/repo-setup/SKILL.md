@@ -51,6 +51,9 @@ collect blockers and report them together.
 - **Deferred integration** — an optional integration whose prerequisite is
   unavailable, as specified in the guide. Record the prerequisite, skip its
   commands and checks, and continue.
+  The Settings App needs enforceable code-owner review, so defer it on a
+  free-plan private repository, when no distinct trusted code owner can review
+  the maintainer's changes, or whenever its prerequisite check fails.
 - **Optional** — everything under the `Optional integrations` heading. A red
   check means "not configured", which is a fine end state.
 
@@ -85,6 +88,14 @@ End of walk: report the green steps, the not-applicable and deferred steps, any 
 pending human handoffs, and the optional steps left unconfigured.
 
 ## Rules
+
+- **Install the Settings App only after its code-owner-review prerequisite
+  check passes and the user confirms a distinct trusted reviewer is available.**
+  If either prerequisite is missing or unavailable, defer the integration;
+  skip the installation handoff and its installed-App check.
+- **Apply the Settings review policy only after reviewer confirmation.**
+  A pending reviewer handoff blocks the dependent policy command;
+  continue independent setup steps while deferring the integration.
 
 - **Register the PyPI publisher before the first release**, and do the
   merge-policy step first — several later steps depend on it.
