@@ -378,7 +378,12 @@ jobs:
       - name: Build with PyInstaller
         # Single-file CLI only (KEYCAST_BUILD=onefile skips the desktop bundle
         # targets in the shared spec); the onefile lands at dist/keycast-onefile.
-        run: KEYCAST_BUILD=onefile uv run --locked --group tool pyinstaller packaging/keycast.spec --clean --noconfirm
+        # KEYCAST_BUILD rides a step `env:` (not a `VAR=x` prefix) because this
+        # step runs under PowerShell on windows-latest, where that syntax is
+        # invalid; `env:` is shell-agnostic.
+        env:
+          KEYCAST_BUILD: onefile
+        run: uv run --locked --group tool pyinstaller packaging/keycast.spec --clean --noconfirm
       - name: Verify the bundle was produced
         shell: bash
         run: |

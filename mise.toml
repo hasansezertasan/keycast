@@ -87,4 +87,6 @@ echo "Virtual Environment: $VIRTUAL_ENV"
 description = "Build a self-contained offline executable with PyInstaller"
 # Single-file CLI only (KEYCAST_BUILD=onefile skips the desktop bundle targets
 # in packaging/keycast.spec); the onefile lands at dist/keycast-onefile.
-run = "KEYCAST_BUILD=onefile uv run --locked --group tool pyinstaller packaging/keycast.spec --clean --noconfirm"
+# `env:` (not a `VAR=x` prefix) so this also works on Windows shells.
+env = { KEYCAST_BUILD = "onefile" }
+run = "uv run --locked --group tool pyinstaller packaging/keycast.spec --clean --noconfirm"

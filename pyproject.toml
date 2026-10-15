@@ -85,7 +85,7 @@ style = [
   "mypy==2.4.0",
   "pylint==4.0.6",
   "pyrefly==1.2.0",
-  "ruff==0.16.1",
+  "ruff==0.17.0",
   "slotscheck==0.21.0",
   "sphinx-lint==1.0.2",
   "taplo==0.9.3",
@@ -392,7 +392,12 @@ fixable = ["ALL"]
 # portable `# noqa` comments into ruff's own `# ruff: ignore` syntax (its docs note
 # `# noqa` is needed for cross-tool compatibility), and RUF201 would rewrite every
 # rule *code* in this config's selectors into long rule *names*. Both are stylistic.
-ignore = ["COM812", "CPY", "FIX", "RUF105", "RUF201", "TD"]
+# pytest-fixture-autouse (new in ruff 0.17, still codeless so it cannot take a
+# targeted noqa) is disabled repo-wide: the two autouse fixtures (the CLI
+# update-check stub, the secure-input probe-cache reset) are documented
+# per-module test hygiene, not hidden conftest side effects; threading them
+# through every test signature would be noise.
+ignore = ["COM812", "CPY", "FIX", "RUF105", "RUF201", "TD", "pytest-fixture-autouse"]
 logger-objects = ["logging_setup.logger"]
 preview = true
 select = ["ALL"]
