@@ -71,11 +71,40 @@ the next push.
 **Administration: read and write** on this repository (the Actions
 ``GITHUB_TOKEN`` cannot manage rulesets).
 
-**[AGENT]** Store it as a repository secret:
+**[AGENT]** Restrict the ``ruleset-sync`` environment to ``main`` *before*
+storing the token. Because ``ruleset-sync.yml`` carries ``workflow_dispatch``,
+a manual run executes the workflow file **from the branch you select**, so a
+guard inside the file is not a mitigation: anyone with write access could push
+a ``ruleset-sync.yml`` with that guard removed to an unprotected branch,
+dispatch it, and exfiltrate an administration-scoped PAT. The containment is
+the environment's **deployment branch policy**, which GitHub evaluates outside
+the workflow file so editing the file cannot bypass it — and the token lives
+on that environment (never on the repository) so a run dispatched from any
+other branch resolves an empty secret. Same pattern as the ``publish``
+environment above. GitHub auto-creates the environment **unprotected** on
+first use, so do this first; the branch/tag policies are a *separate
+collection*, so delete every policy first and re-add exactly one:
 
 .. code-block:: sh
 
-   gh secret set REPO_ADMIN_TOKEN --repo hasansezertasan/keycast
+   gh api -X PUT repos/hasansezertasan/keycast/environments/ruleset-sync \
+     -F 'deployment_branch_policy[protected_branches]=false' \
+     -F 'deployment_branch_policy[custom_branch_policies]=true'
+   ids="$(gh api --paginate repos/hasansezertasan/keycast/environments/ruleset-sync/deployment-branch-policies \
+     --jq '.branch_policies[].id')"
+   for id in $ids; do
+     gh api -X DELETE "repos/hasansezertasan/keycast/environments/ruleset-sync/deployment-branch-policies/$id"
+   done
+   gh api -X POST repos/hasansezertasan/keycast/environments/ruleset-sync/deployment-branch-policies \
+     -f name=main -f type=branch
+
+**[AGENT]** Store the token as an environment secret — never a repository
+secret, which a dispatched run of an edited workflow on any branch could
+reach:
+
+.. code-block:: sh
+
+   gh secret set REPO_ADMIN_TOKEN --env ruleset-sync --repo hasansezertasan/keycast
 
 **[AGENT]** Trigger the workflow once (push a change under ``.github/rulesets/``
 or run it directly):
@@ -84,17 +113,21 @@ or run it directly):
 
    gh workflow run ruleset-sync.yml --repo hasansezertasan/keycast
 
-**[CHECK]** The ``Protect main`` ruleset is applied and active — verifying the
-end state (not just that the ``REPO_ADMIN_TOKEN`` secret exists), so a repo where
-``ruleset-sync.yml`` has not yet run, failed, or had its ruleset deleted is
-correctly reported as not-done:
+**[CHECK]** The ``Protect main`` ruleset is applied and active, and the
+environment collection is *exactly* one branch policy named ``main`` —
+verifying the end state (not just that the ``REPO_ADMIN_TOKEN`` secret
+exists), so a repo where ``ruleset-sync.yml`` has not yet run, failed, or had
+its ruleset deleted is correctly reported as not-done:
 
 .. code-block:: sh
 
    gh api --paginate repos/hasansezertasan/keycast/rulesets \
      --jq 'any(.[]; .name == "Protect main" and .enforcement == "active")' | grep -qx true
+   policies="$(gh api --paginate repos/hasansezertasan/keycast/environments/ruleset-sync/deployment-branch-policies \
+     --jq '.branch_policies[] | "\(.type // "branch"):\(.name)"')"
+   [ "$policies" = "branch:main" ]
 
-Until the ``REPO_ADMIN_TOKEN`` secret is set the workflow logs a notice and exits
+Until the ``REPO_ADMIN_TOKEN`` environment secret is set the workflow logs a notice and exits
 without error, so the repository is never blocked.
 
 .. _setup-first-pr:

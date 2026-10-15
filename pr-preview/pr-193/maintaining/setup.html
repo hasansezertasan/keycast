@@ -216,8 +216,35 @@ the next push.</p>
 <p><strong>[HUMAN]</strong> Create a <code class="docutils literal notranslate"><span class="pre">REPO_ADMIN_TOKEN</span></code> — a fine-grained PAT with
 <strong>Administration: read and write</strong> on this repository (the Actions
 <code class="docutils literal notranslate"><span class="pre">GITHUB_TOKEN</span></code> cannot manage rulesets).</p>
-<p><strong>[AGENT]</strong> Store it as a repository secret:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span data-line="1">gh<span class="w"> </span>secret<span class="w"> </span><span class="nb">set</span><span class="w"> </span>REPO_ADMIN_TOKEN<span class="w"> </span>--repo<span class="w"> </span>hasansezertasan/keycast
+<p><strong>[AGENT]</strong> Restrict the <code class="docutils literal notranslate"><span class="pre">ruleset-sync</span></code> environment to <code class="docutils literal notranslate"><span class="pre">main</span></code> <em>before</em>
+storing the token. Because <code class="docutils literal notranslate"><span class="pre">ruleset-sync.yml</span></code> carries <code class="docutils literal notranslate"><span class="pre">workflow_dispatch</span></code>,
+a manual run executes the workflow file <strong>from the branch you select</strong>, so a
+guard inside the file is not a mitigation: anyone with write access could push
+a <code class="docutils literal notranslate"><span class="pre">ruleset-sync.yml</span></code> with that guard removed to an unprotected branch,
+dispatch it, and exfiltrate an administration-scoped PAT. The containment is
+the environment’s <strong>deployment branch policy</strong>, which GitHub evaluates outside
+the workflow file so editing the file cannot bypass it — and the token lives
+on that environment (never on the repository) so a run dispatched from any
+other branch resolves an empty secret. Same pattern as the <code class="docutils literal notranslate"><span class="pre">publish</span></code>
+environment above. GitHub auto-creates the environment <strong>unprotected</strong> on
+first use, so do this first; the branch/tag policies are a <em>separate
+collection</em>, so delete every policy first and re-add exactly one:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span data-line="1">gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>repos/hasansezertasan/keycast/environments/ruleset-sync<span class="w"> </span><span class="se">\</span>
+</span><span data-line="2"><span class="w">  </span>-F<span class="w"> </span><span class="s1">'deployment_branch_policy[protected_branches]=false'</span><span class="w"> </span><span class="se">\</span>
+</span><span data-line="3"><span class="w">  </span>-F<span class="w"> </span><span class="s1">'deployment_branch_policy[custom_branch_policies]=true'</span>
+</span><span data-line="4"><span class="nv">ids</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>gh<span class="w"> </span>api<span class="w"> </span>--paginate<span class="w"> </span>repos/hasansezertasan/keycast/environments/ruleset-sync/deployment-branch-policies<span class="w"> </span><span class="se">\</span>
+</span><span data-line="5"><span class="w">  </span>--jq<span class="w"> </span><span class="s1">'.branch_policies[].id'</span><span class="k">)</span><span class="s2">"</span>
+</span><span data-line="6"><span class="k">for</span><span class="w"> </span>id<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="nv">$ids</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+</span><span data-line="7"><span class="w">  </span>gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>DELETE<span class="w"> </span><span class="s2">"repos/hasansezertasan/keycast/environments/ruleset-sync/deployment-branch-policies/</span><span class="nv">$id</span><span class="s2">"</span>
+</span><span data-line="8"><span class="k">done</span>
+</span><span data-line="9">gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>repos/hasansezertasan/keycast/environments/ruleset-sync/deployment-branch-policies<span class="w"> </span><span class="se">\</span>
+</span><span data-line="10"><span class="w">  </span>-f<span class="w"> </span><span class="nv">name</span><span class="o">=</span>main<span class="w"> </span>-f<span class="w"> </span><span class="nv">type</span><span class="o">=</span>branch
+</span></pre></div>
+</div>
+<p><strong>[AGENT]</strong> Store the token as an environment secret — never a repository
+secret, which a dispatched run of an edited workflow on any branch could
+reach:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span data-line="1">gh<span class="w"> </span>secret<span class="w"> </span><span class="nb">set</span><span class="w"> </span>REPO_ADMIN_TOKEN<span class="w"> </span>--env<span class="w"> </span>ruleset-sync<span class="w"> </span>--repo<span class="w"> </span>hasansezertasan/keycast
 </span></pre></div>
 </div>
 <p><strong>[AGENT]</strong> Trigger the workflow once (push a change under <code class="docutils literal notranslate"><span class="pre">.github/rulesets/</span></code>
@@ -225,15 +252,19 @@ or run it directly):</p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span data-line="1">gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>ruleset-sync.yml<span class="w"> </span>--repo<span class="w"> </span>hasansezertasan/keycast
 </span></pre></div>
 </div>
-<p><strong>[CHECK]</strong> The <code class="docutils literal notranslate"><span class="pre">Protect</span> <span class="pre">main</span></code> ruleset is applied and active — verifying the
-end state (not just that the <code class="docutils literal notranslate"><span class="pre">REPO_ADMIN_TOKEN</span></code> secret exists), so a repo where
-<code class="docutils literal notranslate"><span class="pre">ruleset-sync.yml</span></code> has not yet run, failed, or had its ruleset deleted is
-correctly reported as not-done:</p>
+<p><strong>[CHECK]</strong> The <code class="docutils literal notranslate"><span class="pre">Protect</span> <span class="pre">main</span></code> ruleset is applied and active, and the
+environment collection is <em>exactly</em> one branch policy named <code class="docutils literal notranslate"><span class="pre">main</span></code> —
+verifying the end state (not just that the <code class="docutils literal notranslate"><span class="pre">REPO_ADMIN_TOKEN</span></code> secret
+exists), so a repo where <code class="docutils literal notranslate"><span class="pre">ruleset-sync.yml</span></code> has not yet run, failed, or had
+its ruleset deleted is correctly reported as not-done:</p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span data-line="1">gh<span class="w"> </span>api<span class="w"> </span>--paginate<span class="w"> </span>repos/hasansezertasan/keycast/rulesets<span class="w"> </span><span class="se">\</span>
 </span><span data-line="2"><span class="w">  </span>--jq<span class="w"> </span><span class="s1">'any(.[]; .name == "Protect main" and .enforcement == "active")'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-qx<span class="w"> </span><span class="nb">true</span>
+</span><span data-line="3"><span class="nv">policies</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>gh<span class="w"> </span>api<span class="w"> </span>--paginate<span class="w"> </span>repos/hasansezertasan/keycast/environments/ruleset-sync/deployment-branch-policies<span class="w"> </span><span class="se">\</span>
+</span><span data-line="4"><span class="w">  </span>--jq<span class="w"> </span><span class="s1">'.branch_policies[] | "\(.type // "branch"):\(.name)"'</span><span class="k">)</span><span class="s2">"</span>
+</span><span data-line="5"><span class="o">[</span><span class="w"> </span><span class="s2">"</span><span class="nv">$policies</span><span class="s2">"</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"branch:main"</span><span class="w"> </span><span class="o">]</span>
 </span></pre></div>
 </div>
-<p>Until the <code class="docutils literal notranslate"><span class="pre">REPO_ADMIN_TOKEN</span></code> secret is set the workflow logs a notice and exits
+<p>Until the <code class="docutils literal notranslate"><span class="pre">REPO_ADMIN_TOKEN</span></code> environment secret is set the workflow logs a notice and exits
 without error, so the repository is never blocked.</p>
 <section id="apply-protection-after-the-first-merge">
 <span id="setup-first-pr"></span><h3>Apply protection <em>after</em> the first merge<a class="headerlink" href="#apply-protection-after-the-first-merge" title="Link to this heading">#</a></h3>
