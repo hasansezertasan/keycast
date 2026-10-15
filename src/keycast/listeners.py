@@ -1,8 +1,9 @@
 """Input event listeners for keyboard and mouse events."""
 
+from __future__ import annotations
+
 import logging
 import time
-from collections.abc import Callable
 from typing import TYPE_CHECKING, NamedTuple, Protocol
 
 from pynput import keyboard, mouse
@@ -11,11 +12,19 @@ from pynput import keyboard, mouse
 # display layer can share it without importing pynput; re-imported here for the
 # listener callbacks. Imported into this namespace so existing references to
 # ``keycast.listeners._ErrorThrottler`` keep resolving.
-from keycast.logging_setup import _ErrorThrottler, format_event
+from keycast.logging_setup import (
+    _ErrorThrottler,  # pyright: ignore[reportPrivateUsage] — shared throttler by design
+    format_event,
+)
 from keycast.secure_input import is_secure_input_active
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from keycast.settings import KeyboardSettings, MouseSettings
+
+__all__ = ["HeldModifier", "KeyListener", "MouseListener", "TextSink"]
+
 
 # A modifier physically held longer than this (continuously, without a matching
 # release) is treated as stale and dropped from the chord state. pynput can miss
@@ -26,6 +35,10 @@ if TYPE_CHECKING:
 # eviction self-heals the stuck state on the next keypress without breaking
 # legitimate held-modifier sequences (e.g. Shift held across many arrow keys).
 _MODIFIER_STALE_SECONDS = 30.0
+
+# Ctrl+<letter> arrives as a C0 control character ("\x01" to "\x1a"); there are
+# 26 such codes, remapped back to their letter for grouped-chord display.
+_CTRL_LETTER_CODE_MAX = 26
 
 
 class HeldModifier(NamedTuple):
@@ -55,11 +68,13 @@ class TextSink(Protocol):
         Args:
             text: The text to display.
         """
-        ...
 
 
 class KeyListener:
     """Keyboard event listener using pynput."""
+
+    # Listener state is inherently broad; silence the attribute-count gate.
+    # pylint: disable=too-many-instance-attributes
 
     def __init__(
         self,
@@ -81,26 +96,26 @@ class KeyListener:
                 the macOS probe :func:`keycast.secure_input.is_secure_input_active`
                 (a no-op returning ``False`` on other platforms).
         """
-        self.show_text = show_text
+        self.show_text: Callable[[str], None] = show_text
         """The callback function called when a key is pressed."""
-        self.settings = settings
+        self.settings: KeyboardSettings = settings
         """The keyboard settings."""
-        self._is_secure_input = is_secure_input
+        self._is_secure_input: Callable[[], bool] = is_secure_input
         """Predicate telling whether secure input is active (see __init__)."""
         self.listener: keyboard.Listener | None = None
         """The keyboard listener instance."""
-        self.logger = logging.getLogger(__name__)
+        self.logger: logging.Logger = logging.getLogger(__name__)
         """The logger instance."""
-        self._error_throttler = _ErrorThrottler(self.logger)
+        self._error_throttler: _ErrorThrottler = _ErrorThrottler(self.logger)
         """Throttles repeated errors from the per-keystroke callback."""
         # Chord-grouping state (only used when settings.group_chords is set).
         # Insertion-ordered so a chord lists modifiers in the order pressed.
         # Mutated only on the single pynput listener thread, so no lock is needed.
         self._held_modifiers: dict[str, HeldModifier] = {}
         """Currently held modifiers: key name -> HeldModifier(label, pressed_at)."""
-        self._chord_fired = False
+        self._chord_fired: bool = False
         """Whether a non-modifier completed a chord during the current hold."""
-        self._secure_input_active = False
+        self._secure_input_active: bool = False
         """Whether the last observed press saw secure input active.
 
         Tracks the active<->inactive edge so masking is logged once per
@@ -121,11 +136,15 @@ class KeyListener:
         Returns:
             True if the name is a ctrl/alt/shift/cmd modifier.
         """
-        return key_name is not None and key_name.startswith(
-            ("ctrl", "alt", "shift", "cmd")
-        )
+        return key_name is not None and key_name.startswith((
+            "ctrl",
+            "alt",
+            "shift",
+            "cmd",
+        ))
 
-    def _key_name(self, key: keyboard.Key | keyboard.KeyCode) -> str | None:
+    @staticmethod
+    def _key_name(key: keyboard.Key | keyboard.KeyCode) -> str | None:
         """Return the stable pynput name for a special key, or None for others.
 
         ``keyboard.Key`` members expose a reliable ``name`` attribute (e.g.
@@ -145,7 +164,7 @@ class KeyListener:
             return key.name
         return None
 
-    def _format_key(self, key: keyboard.Key | keyboard.KeyCode) -> str:
+    def _format_key(self, key: keyboard.Key | keyboard.KeyCode) -> str:  # noqa: C901 — key-kind dispatch
         """Format a key for display.
 
         Args:
@@ -163,7 +182,7 @@ class KeyListener:
                 # reads "Control Left + a" instead of an invisible/garbage glyph.
                 # Named keys like Tab/Enter/Esc/Backspace arrive as Key objects,
                 # not here, so only the 26 Ctrl+letter codes are remapped.
-                if len(key.char) == 1 and 1 <= ord(key.char) <= 26:
+                if len(key.char) == 1 and 1 <= ord(key.char) <= _CTRL_LETTER_CODE_MAX:
                     return chr(ord(key.char) + 96)
                 return key.char
             # Dead/virtual key code with no character: fall back to its repr.
@@ -297,7 +316,7 @@ class KeyListener:
         labels = [held.label for held in self._held_modifiers.values()]
         return self.settings.chord_separator.join([*labels, formatted_key])
 
-    def _on_press(self, key: keyboard.Key | keyboard.KeyCode | None) -> None:
+    def _on_press(self, key: keyboard.Key | keyboard.KeyCode | None) -> None:  # noqa: C901 — press state machine
         """Handle key press events.
 
         Args:
@@ -362,7 +381,7 @@ class KeyListener:
                 "key_sink_error", exc, key_kind=type(key).__name__
             )
 
-    def _on_release(self, key: keyboard.Key | keyboard.KeyCode | None) -> None:
+    def _on_release(self, key: keyboard.Key | keyboard.KeyCode | None) -> None:  # noqa: C901 — release state machine
         """Handle key release events, used only for chord grouping.
 
         Tracks which modifiers are currently held so :meth:`_on_press` can build
@@ -461,15 +480,15 @@ class MouseListener:
                 formatted label each time the mouse is clicked
             settings: Mouse settings
         """
-        self.show_text = show_text
+        self.show_text: Callable[[str], None] = show_text
         """The callback function called when mouse is clicked."""
-        self.settings = settings
+        self.settings: MouseSettings = settings
         """The mouse settings."""
         self.listener: mouse.Listener | None = None
         """The mouse listener instance."""
-        self.logger = logging.getLogger(__name__)
+        self.logger: logging.Logger = logging.getLogger(__name__)
         """The logger instance."""
-        self._error_throttler = _ErrorThrottler(self.logger)
+        self._error_throttler: _ErrorThrottler = _ErrorThrottler(self.logger)
         """Throttles repeated errors from the per-click callback."""
 
     def _format_button(self, button: mouse.Button) -> str:
@@ -499,7 +518,7 @@ class MouseListener:
             return "Middle Click"
         return button_name.replace("Button.", "").capitalize() + " Click"
 
-    def _on_click(self, x: int, y: int, button: mouse.Button, pressed: bool) -> None:  # noqa: FBT001
+    def _on_click(self, x: int, y: int, button: mouse.Button, pressed: bool) -> None:  # noqa: FBT001, C901 — click dispatch
         """Handle mouse click events.
 
         Args:
@@ -529,7 +548,7 @@ class MouseListener:
                 # coordinate surfaces as a throttled mouse_format_error instead of
                 # an unhandled exception that would silently kill the pynput
                 # listener thread (clicks would then stop appearing, no logs).
-                text += f" ({round(x)}, {round(y)})"
+                text += f" ({round(x)}, {round(y)})"  # noqa: RUF057 — pynput yields fractional floats; rounding is the feature
         except Exception as exc:
             self._error_throttler.log("mouse_format_error", exc, button=button)
             return

@@ -207,7 +207,8 @@ class TestMacAppStoreReceipt:
         monkeypatch.setattr(sources.sys, "executable", str(exe))
 
         def _raise(self: Path) -> bool:
-            raise OSError("probe failed")
+            msg = "probe failed"
+            raise OSError(msg)
 
         monkeypatch.setattr(sources.Path, "exists", _raise)
         assert sources._mas_receipt_exists() is False
@@ -289,7 +290,8 @@ class TestReadInstaller:
 
     def test_unreadable_metadata_is_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
         def boom(_name: str) -> object:
-            raise sources.importlib.metadata.PackageNotFoundError("keycast")
+            msg = "keycast"
+            raise sources.importlib.metadata.PackageNotFoundError(msg)
 
         monkeypatch.setattr(sources.importlib.metadata, "distribution", boom)
         assert sources._read_installer() is None

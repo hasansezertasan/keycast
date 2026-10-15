@@ -7,14 +7,17 @@ spawns a background thread unless the test opts in deterministically.
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
-
-import pytest
 
 from keycast import updates
 from keycast.updates.sources import InstallSource
 from keycast.updates.state import UpdateState
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
 
 
 class TestFormatNotice:
@@ -82,7 +85,8 @@ class TestNotifyPendingUpdate:
         updates.notify_pending_update(
             notify=notes.append, enabled=False, spawn=spawned.append
         )
-        assert notes == [] and spawned == []
+        assert notes == []
+        assert spawned == []
 
     def test_enabled_none_reads_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(updates, "_update_enabled", lambda: False)
@@ -141,7 +145,8 @@ class TestNotifyPendingUpdate:
         )
 
         def boom(_message: str) -> None:
-            raise RuntimeError("sink exploded")
+            msg = "sink exploded"
+            raise RuntimeError(msg)
 
         updates.notify_pending_update(
             notify=boom,

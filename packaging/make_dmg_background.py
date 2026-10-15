@@ -57,7 +57,14 @@ SCALE = 4  # supersampling factor for antialiasing
 
 
 def _load_font(px: int) -> ImageFont.FreeTypeFont:
-    """Load a system font that has the ⌘ glyph, at the given pixel size."""
+    """Load a system font that has the ⌘ glyph, at the given pixel size.
+
+    Returns:
+        The loaded font at ``px`` pixels.
+
+    Raises:
+        RuntimeError: No candidate font exists on this host.
+    """
     for path in FONT_CANDIDATES:
         if Path(path).exists():
             font = ImageFont.truetype(path, px)
@@ -78,7 +85,11 @@ def _load_font(px: int) -> ImageFont.FreeTypeFont:
 
 
 def render_master() -> Image.Image:
-    """Render at the @2x size times SCALE, for downsampling to @2x and @1x."""
+    """Render at the @2x size times SCALE, for downsampling to @2x and @1x.
+
+    Returns:
+        The full-resolution background image.
+    """
     k = 2 * SCALE  # logical-point -> master-pixel factor
     w, h = WIN_W * k, WIN_H * k
 
@@ -121,6 +132,11 @@ def render_master() -> Image.Image:
 
 
 def write_background(here: Path) -> None:
+    """Write the multi-resolution background TIFF (or a 1x PNG preview).
+
+    Args:
+        here: The packaging/ directory (outputs land beside this script).
+    """
     master = render_master()
     img2x = master.resize((WIN_W * 2, WIN_H * 2), Image.LANCZOS)
     img1x = master.resize((WIN_W, WIN_H), Image.LANCZOS)
@@ -157,6 +173,7 @@ def write_background(here: Path) -> None:
 
 
 def main() -> None:
+    """Regenerate the committed .dmg background from the programmatic source."""
     write_background(Path(__file__).resolve().parent)
 
 

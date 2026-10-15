@@ -1,28 +1,99 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Python Debugger",
-            "type": "debugpy",
-            "request": "launch",
-            "justMyCode": true,
-            "module": "uv",
-            "args": [
-                "run",
-                "keycast",
-                "${input:args}"
-            ]
-        }
-    ],
-	"inputs": [
-		{
-			"id": "args",
-			"type": "promptString",
-			"default": "version",
-			"description": "Arguments"
-		}
-	]
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Python: Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-v", "--tb=short"],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Python: Debug Test File",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}", "-v", "--tb=short", "-s"],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      // Mirrors the tox env_run_base invocation so the debug path measures
+      // what CI measures. Run `coverage combine && coverage report`
+      // afterwards to merge the parallel-mode data file.
+      "name": "Python: Run Tests with Coverage",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "coverage",
+      "args": ["run", "--module", "pytest", "-v", "--tb=short"],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "COVERAGE_PROCESS_START": "${workspaceFolder}/pyproject.toml"
+      }
+    },
+    {
+      "name": "Python: Attach",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "justMyCode": false
+    },
+    
+    
+    {
+      "name": "Python: CLI",
+      "type": "debugpy",
+      "request": "launch",
+      "justMyCode": true,
+      "module": "uv",
+      "args": ["run", "keycast", "${input:command}"]
+    },
+    
+    
+    
+    {
+      "name": "Python: GUI",
+      "type": "debugpy",
+      "request": "launch",
+      "justMyCode": true,
+      "module": "uv",
+      "args": ["run", "keycast"]
+    },
+    
+    
+  ],
+  "inputs": [
+    // A pickString, not a promptString: VS Code substitutes an input into a
+    // single `args` element and debugpy passes it verbatim, with no shell
+    // splitting — so free text can never express more than one bare token
+    // ("version --help" arrives as one argument and fails). Constraining the
+    // input to the subcommands this project actually renders (`version` /
+    // `info`; the bare `keycast` command launches the overlay, see the
+    // "Python: GUI" configuration above) removes the need to split. Add flags
+    // by editing the `args` array directly.
+    {
+      "id": "command",
+      "type": "pickString",
+      "options": ["version", "info"],
+      "default": "version",
+      "description": "The keycast command to debug"
+    }
+  ]
 }

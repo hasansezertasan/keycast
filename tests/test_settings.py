@@ -10,6 +10,7 @@ import pytest
 from pydantic import ValidationError
 
 from keycast.settings import (
+    _PRESET_OVERRIDES,
     DisplaySettings,
     KeyboardSettings,
     LoggingSettings,
@@ -18,7 +19,6 @@ from keycast.settings import (
     _best_effort_fsync_dir,
     _default_key_mappings,
     _fsync_data,
-    _PRESET_OVERRIDES,
     is_bare_key_name,
     is_button_string,
 )
@@ -72,11 +72,7 @@ class TestPlatformKeyLabels:
         ],
     )
     def test_super_key_labels_per_platform(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        system: str,
-        left: str,
-        right: str,
+        self, monkeypatch: pytest.MonkeyPatch, system: str, left: str, right: str
     ) -> None:
         monkeypatch.setattr(platform, "system", lambda: system)
 
@@ -194,7 +190,7 @@ class TestCreateSettingsFile:
 
         assert config_path.exists()
         # The written file is valid JSON that round-trips back to defaults.
-        on_disk = json.loads(config_path.read_text())
+        on_disk = json.loads(config_path.read_text(encoding="utf-8"))
         assert on_disk["display"]["width"] == settings.display.width
         # The atomic write (tempfile + os.replace) leaves no stray temp file
         # behind on the success path, just as the failure path cleans up.
@@ -202,7 +198,9 @@ class TestCreateSettingsFile:
 
     def test_valid_file_is_loaded(self, config_path: Path) -> None:
         """An existing valid config overrides the defaults."""
-        config_path.write_text(json.dumps({"display": {"width": 777}}))
+        config_path.write_text(
+            json.dumps({"display": {"width": 777}}), encoding="utf-8"
+        )
 
         settings = Settings.create_settings_file()
 
@@ -212,7 +210,7 @@ class TestCreateSettingsFile:
         self, config_path: Path
     ) -> None:
         """Malformed JSON is moved aside and defaults take over."""
-        config_path.write_text("{ this is not valid json ")
+        config_path.write_text("{ this is not valid json ", encoding="utf-8")
 
         settings = Settings.create_settings_file()
 
@@ -227,7 +225,7 @@ class TestCreateSettingsFile:
         """A pre-existing .bak is preserved (no data loss across bad starts)."""
         existing = config_path.parent / "config.json.111.bak"
         existing.write_text("precious original")
-        config_path.write_text("{ broken ")
+        config_path.write_text("{ broken ", encoding="utf-8")
 
         Settings.create_settings_file()
 
@@ -237,10 +235,11 @@ class TestCreateSettingsFile:
         self, config_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """If the file can't be backed up, start from defaults rather than crash."""
-        config_path.write_text("{ broken ")
+        config_path.write_text("{ broken ", encoding="utf-8")
 
         def boom(self: Path, target: Path) -> None:
-            raise OSError("read-only filesystem")
+            msg = "read-only filesystem"
+            raise OSError(msg)
 
         monkeypatch.setattr(Path, "replace", boom)
 
@@ -252,7 +251,7 @@ class TestCreateSettingsFile:
         self, config_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Recovery happens before logging is set up, so warn on stderr too."""
-        config_path.write_text("{ broken ")
+        config_path.write_text("{ broken ", encoding="utf-8")
 
         Settings.create_settings_file()
 
@@ -269,7 +268,8 @@ class TestCreateSettingsFile:
         """A failed first-run write surfaces to the user and leaves no temp file."""
 
         def boom(src: str, dst: str) -> None:
-            raise OSError("read-only filesystem")
+            msg = "read-only filesystem"
+            raise OSError(msg)
 
         monkeypatch.setattr(os, "replace", boom)
 
@@ -380,7 +380,8 @@ class TestCreateSettingsFile:
     def test_custom_colors_round_trip_through_config(self, config_path: Path) -> None:
         """User-specified colors in the config load back to the same value."""
         config_path.write_text(
-            json.dumps({"display": {"background_color": "red", "text_color": "lime"}})
+            json.dumps({"display": {"background_color": "red", "text_color": "lime"}}),
+            encoding="utf-8",
         )
 
         loaded = Settings.create_settings_file()
@@ -405,7 +406,8 @@ class TestCreateSettingsFile:
         """
 
         def always_fail(self: Settings, *args: object, **kwargs: object) -> None:
-            raise ValueError("load always fails")
+            msg = "load always fails"
+            raise ValueError(msg)
 
         monkeypatch.setattr(Settings, "__init__", always_fail)
 
@@ -424,13 +426,14 @@ class TestCreateSettingsFile:
         through recovery next launch, so ``create_settings_file`` must not write
         it: the corrupt file is moved to a backup and *not* replaced.
         """
-        config_path.write_text("{ broken ")
+        config_path.write_text("{ broken ", encoding="utf-8")
 
         # Force both the initial load and the post-backup retry to fail so
         # recovery reaches _safe_defaults; model_validate bypasses __init__ and
         # still yields a usable object.
         def always_fail(self: Settings, *args: object, **kwargs: object) -> None:
-            raise ValueError("load always fails")
+            msg = "load always fails"
+            raise ValueError(msg)
 
         monkeypatch.setattr(Settings, "__init__", always_fail)
 
@@ -473,7 +476,8 @@ class TestSafeDefaults:
         """If validating bare defaults fails, fall back to model_construct."""
 
         def boom(*args: object, **kwargs: object) -> None:
-            raise ValueError("validation unavailable")
+            msg = "validation unavailable"
+            raise ValueError(msg)
 
         monkeypatch.setattr(Settings, "model_validate", boom)
 
@@ -494,7 +498,8 @@ class TestSafeDefaults:
         """
 
         def boom(*args: object, **kwargs: object) -> None:
-            raise ValueError("validation unavailable")
+            msg = "validation unavailable"
+            raise ValueError(msg)
 
         monkeypatch.setattr(Settings, "model_validate", boom)
 
@@ -522,7 +527,8 @@ class TestButtonNamesValidation:
     ) -> None:
         """A config with bad button keys is treated as corrupt and recovered."""
         config_path.write_text(
-            json.dumps({"mouse": {"button_names": {"left": "Primary"}}})
+            json.dumps({"mouse": {"button_names": {"left": "Primary"}}}),
+            encoding="utf-8",
         )
 
         settings = Settings.create_settings_file()
@@ -555,7 +561,8 @@ class TestKeyMappingsValidation:
     ) -> None:
         """A config with bad key_mappings keys is recovered, not crashed."""
         config_path.write_text(
-            json.dumps({"keyboard": {"key_mappings": {"Ctrl": "Control"}}})
+            json.dumps({"keyboard": {"key_mappings": {"Ctrl": "Control"}}}),
+            encoding="utf-8",
         )
 
         settings = Settings.create_settings_file()
@@ -630,9 +637,10 @@ class TestMousePositionRequiresClicks:
     ) -> None:
         """A config with the inert combination is treated as corrupt and recovered."""
         config_path.write_text(
-            json.dumps(
-                {"mouse": {"show_mouse_clicks": False, "show_mouse_position": True}}
-            )
+            json.dumps({
+                "mouse": {"show_mouse_clicks": False, "show_mouse_position": True}
+            }),
+            encoding="utf-8",
         )
 
         settings = Settings.create_settings_file()
@@ -668,7 +676,7 @@ class TestStartMinimizedRequiresAutoStart:
         # create_settings_file treats it as corrupt, backs it up, and uses
         # defaults (mirrors the mouse show_mouse_position recovery test).
         config_path.write_text(
-            json.dumps({"start_minimized": True, "auto_start": False})
+            json.dumps({"start_minimized": True, "auto_start": False}), encoding="utf-8"
         )
 
         settings = Settings.create_settings_file()
@@ -738,7 +746,7 @@ class TestResolvePreset:
         assert resolved.display.font_size == 28
         assert resolved.display.fade_duration_ms == 3000
         assert resolved.display.max_events == 3
-        assert resolved.display.alpha == 0.9
+        assert resolved.display.alpha == 0.9  # noqa: RUF069 — exact literal round-trip
         assert resolved.mouse.show_mouse_clicks is True
         # The headline of the presenter preset: chord grouping on. Guards against
         # the keyboard override being silently dropped from the bundle.
@@ -749,7 +757,7 @@ class TestResolvePreset:
         assert resolved.display.font_size == 12
         assert resolved.display.fade_duration_ms == 1000
         assert resolved.display.max_events == 1
-        assert resolved.display.alpha == 0.6
+        assert resolved.display.alpha == 0.6  # noqa: RUF069 — exact literal round-trip
 
     def test_debug_preset_sets_flag_and_mouse_position(self) -> None:
         resolved = Settings.model_construct(preset="debug").resolve_preset()
@@ -777,8 +785,7 @@ class TestResolvePreset:
         # font_size is named by presenter, so the preset overrides the file value;
         # width is not named, so the file value is preserved.
         settings = Settings.model_construct(
-            preset="presenter",
-            display=DisplaySettings(font_size=10, width=800),
+            preset="presenter", display=DisplaySettings(font_size=10, width=800)
         )
         resolved = settings.resolve_preset()
         assert resolved.display.font_size == 28

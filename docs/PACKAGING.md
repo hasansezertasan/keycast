@@ -161,34 +161,55 @@ is a decomposed DAG gated on the release-please flow (see `AGENTS.md`). The
 release is **atomic** — nothing publishes unless every artifact builds:
 
 ```text
-release-please ─┬─ build-package  (sdist + wheel,  ubuntu)
-                ├─ build-macos    (.app → .dmg,    macos-15 / arm64)
-                └─ build-windows  (.exe folder → .zip + installer, windows-latest)
-                          │  publish-pypi needs ALL three
+release-please ─┬─ build           (sdist + wheel + Sigstore attestations, ubuntu)
+                ├─ sbom            (CycloneDX SBOM, ubuntu)
+                ├─ build-freezer   (single-file exe × linux/windows/macos)
+                ├─ build-macos     (.app → .dmg, macos-26 / arm64)
+                └─ build-windows   (folder → .zip + installer [+ .msix], windows-latest)
+                          │  pypi-publish needs ALL of the above
                           ▼
-                   publish-pypi    (Trusted Publishing; id-token only)
+                   pypi-publish    (Trusted Publishing; id-token only)
                           ▼
-                   publish-release (download all artifacts, attach, un-draft)
+                   attach-github-release  (attach dist/* + SBOM to the draft)
                           ▼
-                   reconcile       (close phantom PR, re-dispatch)
+                   finalize-release       (un-draft, close phantom PR, re-dispatch)
 ```
 
-- **Builders** are pure producers (`contents: read`): each builds on its own
-  runner and uploads a workflow artifact — they never touch the release. The
+- **Builders** are pure producers (`contents: read`) — `sbom`,
+  `build-freezer`, `build-macos`, `build-windows` each build on their own
+  runner and upload a workflow artifact; they never touch the release. The
+  exception is `build`, which additionally mints Sigstore build provenance
+  (`attestations` + `id-token` write) under the `publish` environment. The
   macOS/Windows builders **must** pin Astral Python 3.14.6 (see the
   build-foundation warning above); both build from the committed
   `packaging/keycast.spec` (PyInstaller's `BUNDLE` step is a no-op on Windows, so
   there it yields the `dist/keycast/` folder, which is zipped and also compiled
   into `keycast-setup.exe` via `packaging/keycast.iss`).
-- **`publish-pypi`** depends on all three builds, downloads the sdist/wheel, and
-  publishes via PyPI Trusted Publishing (`id-token: write`, no other scope).
-- **`publish-release`** downloads every artifact, attaches them to the release
-  tag, and un-drafts it (`contents: write`), marking it `--prerelease` (and not
-  "Latest") for prereleases (a no-op while the beta channel is off — see below).
+- **`packaging/keycast.spec` is the single PyInstaller recipe.** It defines two
+  targets from two entries: the `onefile` console CLI (`src/keycast/cli.py` →
+  `dist/keycast-onefile`, built by `mise run freeze`, the `build-freezer-check`
+  CI job, and the release `build-freezer` job) and the `desktop` windowed
+  onedir bundle (`packaging/entry.py` → `dist/keycast/` → `.app`/installer,
+  built by the macOS/Windows jobs). `KEYCAST_BUILD` selects the targets
+  (`onefile` | `desktop` | `all`, default `all`); the fast paths set
+  `KEYCAST_BUILD=onefile` so they do not pay for the desktop bundle. There is
+  deliberately no root-level spec: the template renders one while
+  `include_freezer` is on, but a second recipe would drift from this one, so it
+  was removed — if a future `copier update` resurrects it, delete it again and
+  keep building from `packaging/`.
+- **`pypi-publish`** depends on every builder above (including `sbom` —
+  PyPI publication is irreversible, so a failed SBOM must block it, otherwise
+  the version ships while its GitHub release stays a draft), downloads the
+  sdist/wheel, and publishes via PyPI Trusted Publishing (`id-token: write`,
+  no other scope).
+- **`attach-github-release`** downloads every artifact and attaches it to the
+  draft release (`contents: write`).
   The GitHub Release **intentionally mirrors the PyPI sdist/wheel** alongside the
   `.dmg`/`.zip`, for a complete, offline-installable release page.
-- **`reconcile`** closes the phantom release PR and re-dispatches the workflow
-  (`pull-requests` + `actions` write).
+- **`finalize-release`** publishes the draft release (marking it `--prerelease`
+  and not "Latest" for prereleases — a no-op while the beta channel is off, see
+  below), then closes the phantom release PR and re-dispatches the workflow
+  (`contents` + `pull-requests` + `actions` write).
 
 **Beta channel (designed, currently disabled).** The pipeline *can* run mainline
 as a rolling prerelease that ships `0.2.0-beta.N` (→ PEP 440 `0.2.0bN`) to **PyPI
@@ -227,24 +248,27 @@ release** (betas are skipped — see the beta-channel note above).
 so this repo deliberately keeps **no** copy of `keycast.rb` (it would only drift
 behind the live file).
 
-### How it bumps (first-party tool, PR-based)
+### How it bumps (dispatch + listener, PR-based)
 
-`release.yml`'s `bump-cask` job runs after the release is published and calls
-Homebrew's own **`brew bump-cask-pr`**, which downloads the released
-`keycast.dmg`, computes its sha256, rewrites the cask, and opens a **PR** on the
-tap (so `brew style`/`audit` run on the change). `--no-fork` pushes the PR branch
-straight to the tap you own. The dedicated wrapper actions
-(`macauley/action-homebrew-bump-cask`) are abandoned, so the first-party tool is
-called directly.
+`release.yml`'s `bump-homebrew` job runs after the release is published and
+`POST`s a `repository_dispatch` (`update-cask`) event to
+`hasansezertasan/homebrew-tap` with the new version. The listener workflow in
+the tap (`update-cask-dispatch.yml`, see
+`docs/packaging/homebrew-tap/`) receives that event, resolves the new version,
+runs Homebrew's own **`brew bump-cask-pr`** — which downloads the released
+`keycast.dmg`, computes its sha256, rewrites the cask, and opens a **PR** on
+the tap (so `brew style`/`audit` run on the change) — all inside the tap
+repository, using the tap's own `GITHUB_TOKEN`.
 
 The job is **best-effort and outside the atomic release gate**: it runs after the
 release is published, so a tap hiccup cannot block or unwind a shipped release.
 
 > **Why a PAT, not `GITHUB_TOKEN`:** the automatic token is scoped to the repo
-> whose workflow runs and cannot push to / open a PR on another repo.
-> `bump-cask-pr` is inherently cross-repo, so it needs a fine-grained PAT
-> (Contents + Pull requests: write on the tap) in the `TAP_TOKEN` secret. When
-> that secret is absent the `bump-cask` step warns and exits 0.
+> whose workflow runs and cannot POST a cross-repo dispatch, so the job needs
+> a fine-grained PAT (Contents: write on the tap) in the `HOMEBREW_TAP_TOKEN`
+> secret. The tap opens its own PR with its own `GITHUB_TOKEN`, so Pull
+> requests: write is not needed on the PAT. When that secret is absent the
+> `bump-homebrew` step warns and exits 0.
 
 > The app is **unsigned** (ad-hoc only) until an Apple Developer account is
 > available; hence the Gatekeeper caveat in the cask. Adopting Developer-ID
@@ -280,14 +304,13 @@ release is published, so a tap hiccup cannot block or unwind a shipped release.
    ```
 
 2. **Create a fine-grained PAT** scoped to **only** `hasansezertasan/homebrew-tap`
-   with **Contents: Read and write** (push the PR branch) and **Pull requests:
-   Read and write** (open the PR).
+   with **Contents: Read and write** (to fire the dispatch).
 
-3. **Store it** on the keycast repo as the `TAP_TOKEN` secret (Settings → Secrets
-   and variables → Actions). Without it, the `bump-cask` job warns and skips —
+3. **Store it** on the keycast repo as the `HOMEBREW_TAP_TOKEN` secret (Settings → Secrets
+   and variables → Actions). Without it, the `bump-homebrew` job warns and skips —
    releases still succeed.
 
-After this, the cask is edited only by `bump-cask-pr` in the tap; if a static
+After this, the cask is edited only by the tap's listener workflow; if a static
 stanza ever changes (caveats, signing later), edit it in the tap directly.
 
 ## Scoop bucket
@@ -329,12 +352,12 @@ that the package repo fires for promptness.
 `release.yml`'s `bump-scoop` job is that dispatch: after the release is published
 it `POST`s `repos/…/scoop-bucket/dispatches` so the bucket bumps immediately
 instead of waiting for its cron. The job is **best-effort and outside the atomic
-release gate** (mirrors `bump-cask`); if the dispatch is skipped or fails, the
+release gate** (mirrors `bump-homebrew`); if the dispatch is skipped or fails, the
 next scheduled run still bumps the manifests.
 
 > **Why a PAT:** `repository_dispatch` is cross-repo, which the automatic
 > `GITHUB_TOKEN` cannot do. The `bump-scoop` job needs a fine-grained PAT with
-> **Contents: write** scoped to **only** the bucket, in the `BUCKET_TOKEN`
+> **Contents: write** scoped to **only** the bucket, in the `SCOOP_BUCKET_TOKEN`
 > secret. When it is absent the step warns and exits 0 — and the bucket's cron
 > still keeps both manifests current.
 
@@ -348,7 +371,7 @@ next scheduled run still bumps the manifests.
    `bump-scoop` dispatch reaches it.
 2. **Create a fine-grained PAT** scoped to **only** `hasansezertasan/scoop-bucket`
    with **Contents: Read and write** (to fire the dispatch).
-3. **Store it** on the keycast repo as the `BUCKET_TOKEN` secret. Without
+3. **Store it** on the keycast repo as the `SCOOP_BUCKET_TOKEN` secret. Without
    it, the `bump-scoop` job warns and skips — releases still succeed.
 
 After this, the manifests are edited only by the bucket's updater; users install
@@ -505,7 +528,7 @@ usually settles it.
 
 Per [ADR-009](adr/009-microsoft-store.md), only *after* a manual submission has
 survived review once: a best-effort `submit-store` job (msstore-cli / the Store
-submission API) can mirror `bump-cask` / `bump-scoop` to push subsequent version
+submission API) can mirror `bump-homebrew` / `bump-scoop` to push subsequent version
 bumps automatically.
 
 ## Mac App Store (sandboxed)
@@ -527,7 +550,7 @@ change will add; only the install-source detection below ships today.
   `CGRequestListenEventAccess`. ADR-014 records this as a load-bearing invariant:
   any future feature that suppresses or injects events would forfeit MAS
   eligibility.
-- **Build (planned, ADR-013/014).** The same `keycast.spec` bundle, signed with
+- **Build (planned, ADR-013/014).** The same `packaging/keycast.spec` bundle, signed with
   the **Apple Distribution** certificate against a dedicated
   `packaging/entitlements-mas.plist` (`com.apple.security.app-sandbox`,
   `com.apple.security.network.client` for the ADR-002 update check, plus the

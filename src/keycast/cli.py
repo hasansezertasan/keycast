@@ -6,10 +6,10 @@ import typer
 
 from keycast import __version__
 
-app = typer.Typer(
-    name="keycast",
-    no_args_is_help=False,
-)
+__all__ = ["info", "main", "show_version"]
+
+
+app = typer.Typer(name="keycast", no_args_is_help=False)
 
 
 @app.callback(invoke_without_command=True)
@@ -76,3 +76,11 @@ def info() -> None:
     typer.echo(f"Python Version: {python_version} ({python_implementation})")
     typer.echo(f"Platform: {platform.system()}")
     typer.echo(f"Install source: {install_source_label(detect_install_source())}")
+
+
+if __name__ == "__main__":
+    # PyInstaller entry point (see keycast.spec): the frozen `keycast`
+    # executable must behave exactly like the `keycast.cli:app` console
+    # script, so `--help`/`version`/`info` never import the GUI stack
+    # (tkinter/pynput) and a bare run launches the overlay via main().
+    app()

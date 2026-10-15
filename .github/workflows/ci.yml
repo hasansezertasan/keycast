@@ -6,25 +6,214 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+    # Every job below is draft-gated, so leaving draft must explicitly start a
+    # fresh run; `ready_for_review` is not part of GitHub's default event types.
+    types: [opened, synchronize, reopened, ready_for_review]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   hooks:
     name: Run prek hooks
+    if: ${{ github.event.pull_request.draft != true }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
-          python-version-file: ".python-version"
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+          python-version-file: .python-version
+      - name: Setup uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           enable-cache: true
           cache-dependency-glob: |
             pyproject.toml
             uv.lock
-      - run: uv run --locked prek run --all-files --show-diff-on-failure
+      - name: Install mise tools
+        # ghalint has no PyPI wrapper or pre-commit hook, so the prek `ghalint`
+        # hook runs the mise-managed binary. Install mise's tools (incl. ghalint)
+        # and put them on PATH before prek runs.
+        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8  # v5.1.2
+      - name: Install headless X server (Linux)
+        # The prek `pytest` hook imports the test suite, which imports pynput;
+        # pynput imports its Xlib backend at import time and fails with no
+        # display. Xvfb provides one (mirrors the style/test jobs).
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      - name: Run prek hooks
+        run: xvfb-run -a uv run --locked --group prek prek run --all-files --show-diff-on-failure
+      - name: Verify the generated agent instruction files are committed and current
+        # The `ai-rulez` hook above regenerates AGENTS.md/CLAUDE.md/... from
+        # `.ai-rulez/`, but a *fixing* hook only fails on a **modified tracked**
+        # file: a project that never committed the generated output would have it
+        # rewritten as *untracked* files here and stay green, shipping a repo
+        # whose agent instructions exist on no branch. Gate on the working tree
+        # instead, untracked files included (https://hasansezertasan.github.io/copier-pyproject/context/agent-instructions/#two-gates-plus-a-convergence-scenario-over-every-host).
+        run: |
+          if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+            echo "::error::agent instruction files are missing or stale — run 'uv run --group agents ai-rulez generate' and commit the result"
+            git status --short --untracked-files=all
+            exit 1
+          fi
+  style:
+    name: Run style and type checks
+    # Keep style in one Linux job rather than repeating it for every component.
+    # The tox env itself sweeps mypy's Python-version and platform axes.
+    if: ${{ github.event.pull_request.draft != true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Setup uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - name: Install headless X server (Linux)
+        # slotscheck imports keycast to verify __slots__, which pulls in pynput;
+        # pynput imports its Xlib backend at import time and fails with no
+        # display. Xvfb provides one.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      - name: Run style and type checks
+        run: xvfb-run -a uv run --locked tox run -e style
+  deps:
+    name: Check dependency hygiene
+    # Own job rather than part of `style`: it needs only the small `deps` group,
+    # and a failure here should name the dependency drift, not a lint run.
+    if: ${{ github.event.pull_request.draft != true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Setup uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - name: Check dependency hygiene
+        run: uv run --locked tox run -e deps
+  docs-doctest:
+    name: Build and test documentation
+    if: ${{ github.event.pull_request.draft != true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          # sphinx-last-updated-by-git needs the full history; on a depth-1 clone
+          # it warns "Git clone too shallow" on every page and the warning gate
+          # below turns each one into an error.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Setup uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - name: Install headless X server (Linux)
+        # Sphinx autodoc imports keycast (display/listeners pull in pynput's X
+        # backend at import time); without a display the build fails before it
+        # renders anything. Xvfb provides one.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      - name: Set reproducible build epoch
+        # Pin Sphinx's "today"/copyright to the last commit date so the same
+        # commit always renders the same docs output (reproducible-builds.org).
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+      - name: Build documentation with the warning gate
+        # docs-build pairs `sphinx-build -w` with docs/check_warnings.py, which
+        # fails on any warning outside the allowlist. docs-doctest alone is
+        # `-b doctest` with no `-W`, so without this step broken references pass
+        # every required check. Runs first: a reference that does not resolve is
+        # worth reporting before the doctests that may depend on it.
+        run: xvfb-run -a uv run --locked tox run -e docs-build
+      - name: Run documentation doctests
+        run: xvfb-run -a uv run --locked tox run -e docs-doctest
+  cli-installed:
+    name: Check installed CLI on ${{ matrix.os }}
+    if: ${{ github.event.pull_request.draft != true }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Setup uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - name: Install headless X server (Linux)
+        # The installed CLI imports keycast, which pulls in pynput's X backend
+        # at import time (same reason as the test job below).
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      - name: Run the installed CLI
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            xvfb-run -a uv run --locked tox run -e cli
+          else
+            uv run --locked tox run -e cli
+          fi
+
   ci:
     strategy:
       fail-fast: false
@@ -32,7 +221,15 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     name: Run Tests on ${{ matrix.os }}
+    if: ${{ github.event.pull_request.draft != true }}
     timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      # The `secrets` context is unavailable in `if:`, so surface CODECOV_TOKEN as
+      # a presence flag — never expose the value job-wide.
+      CODECOV_TOKEN_SET: ${{ secrets.CODECOV_TOKEN != '' }}
+      REPO_IS_PUBLIC: ${{ !github.event.repository.private }}
     steps:
       - name: System Info
         shell: bash
@@ -58,11 +255,13 @@ jobs:
         run: |
           env || true
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
-          python-version-file: ".python-version"
+          python-version-file: .python-version
       - name: Setup uv
         id: setup-uv
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
@@ -85,16 +284,123 @@ jobs:
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
-            xvfb-run -a uv run --locked tox run
+            xvfb-run -a uv run --locked tox run -e 3.14
           else
-            uv run --locked tox run
+            uv run --locked tox run -e 3.14
           fi
-      - name: Upload coverage to Codecov
+      - name: Combine coverage and gate
+        # The 3.14 env measures the installed wheel; combine its per-run data
+        # and enforce the pyproject `fail_under` gate. Runs everywhere so a
+        # platform-gated miss fails against the offending diff, not the release.
+        shell: bash
+        run: |
+          uv run --locked --only-group test coverage combine
+          uv run --locked --only-group test coverage report --show-missing
+      - name: Render coverage XML (ubuntu only)
         if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: uv run --locked --only-group test coverage xml
+      - name: Upload coverage to Codecov
+        # Uploads when the token is set or the repo is public (tokenless); only a
+        # private repo with no token falls through to the visible skip below.
+        # Best-effort (`fail_ci_if_error` defaults to false).
+        if: ${{ matrix.os == 'ubuntu-latest' && (env.CODECOV_TOKEN_SET == 'true' || env.REPO_IS_PUBLIC == 'true') }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5  # v7.1.1
         with:
           files: ./coverage.xml
+          # .github/codecov.yml scopes the project status to `flags: [unit]`. An
+          # upload with no flag matches no flag-scoped status, so the 99% target
+          # would never be computed and `if_ci_failed: error` would be inert.
+          flags: unit
           token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Note skipped coverage upload
+        if: ${{ matrix.os == 'ubuntu-latest' && env.CODECOV_TOKEN_SET != 'true' && env.REPO_IS_PUBLIC != 'true' }}
+        run: echo "::notice::CODECOV_TOKEN secret is not set and this repo is private — skipping the Codecov upload. See docs/maintaining/setup.rst (Repository setup) to enable coverage reporting."
+      - name: Render coverage HTML (ubuntu only)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: uv run --locked --only-group test coverage html
+      - name: Publish coverage HTML (public repos)
+        # smokeshow uploads htmlcov to an ephemeral public URL and prints it — no
+        # account or secret required (an optional key only raises rate limits).
+        # Public repos only: a private report must not be published. Best-effort
+        # and ordered LAST — a tokenless rate-limit or outage must never fail the
+        # `check` gate nor block the authoritative Codecov/coverage.xml uploads
+        # above; smokeshow is a supplementary mirror, not load-bearing. See https://hasansezertasan.github.io/copier-pyproject/context/ci-topology/#a-tokenless-public-html-coverage-mirror-via-smokeshow.
+        if: ${{ matrix.os == 'ubuntu-latest' && env.REPO_IS_PUBLIC == 'true' }}
+        continue-on-error: true
+        run: uv run --no-project --with smokeshow smokeshow upload htmlcov
+  # Build-only PR guards: build each enabled standalone executable (https://hasansezertasan.github.io/copier-pyproject/context/standalone-executables/#every-executable-toggle-adds-a-pr-time-build-check-job)
+  # against the PR diff so a dependency or Python bump that breaks packaging fails
+  # HERE, against the offending change, instead of silently at release time. The
+  # test suite always runs the source tree, never the built binary, so these jobs
+  # are the only thing that exercises packaging before a release. Each verifies the
+  # binary was produced and uploads a 7-day preview artifact a reviewer can
+  # launch-test. A CLI project is additionally smoke-run with `--help`; non-CLI
+  # entrypoints (GUI/TUI/web/MCP/worker) block on a UI/server loop and so are only
+  # existence-checked here, never runtime-verified — a reviewer must launch the
+  # preview artifact to confirm those actually run. They closely follow the
+  # release.yml build jobs (same setup + build commands) but skip the
+  # release-only steps (the freezer's per-OS rename, and publishing).
+  build-freezer-check:
+    if: ${{ github.event.pull_request.draft != true }}
+    name: Build Freezer (PyInstaller) on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            ext: ""
+          - os: windows-latest
+            ext: ".exe"
+          - os: macos-latest
+            ext: ""
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version-file: .python-version
+      - name: Setup uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - name: Build with PyInstaller
+        # Single-file CLI only (KEYCAST_BUILD=onefile skips the desktop bundle
+        # targets in the shared spec); the onefile lands at dist/keycast-onefile.
+        # KEYCAST_BUILD rides a step `env:` (not a `VAR=x` prefix) because this
+        # step runs under PowerShell on windows-latest, where that syntax is
+        # invalid; `env:` is shell-agnostic.
+        env:
+          KEYCAST_BUILD: onefile
+        run: uv run --locked --group tool pyinstaller packaging/keycast.spec --clean --noconfirm
+      - name: Verify the bundle was produced
+        shell: bash
+        run: |
+          bin="./dist/keycast-onefile${{ matrix.ext }}"
+          test -s "$bin" || { echo "::error::PyInstaller produced no executable"; exit 1; }
+          [ "$RUNNER_OS" = Windows ] || test -x "$bin" || { echo "::error::executable is not runnable"; exit 1; }
+      - name: Smoke-run the bundle (CLI --help)
+        shell: bash
+        run: |
+          echo "Running ./dist/keycast-onefile${{ matrix.ext }} --help"
+          "./dist/keycast-onefile${{ matrix.ext }}" --help
+      - name: Upload freezer preview
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: keycast-freezer-${{ matrix.os }}-preview
+          path: './dist/keycast-onefile${{ matrix.ext }}'
+          retention-days: 7
   build-macos:
     # Build-only regression guard + preview: bundle keycast into a .app on every
     # PR/push so a dependency or Python bump that breaks PyInstaller bundling fails
@@ -109,6 +415,7 @@ jobs:
     # survives intact (same reason release.yml ships a .dmg). It is NOT the release
     # artifact; release.yml produces that.
     name: Build macOS app (check)
+    if: ${{ github.event.pull_request.draft != true }}
     # Deliberately PINNED to match release.yml's build-macos (NOT `macos-latest`):
     # the build runner sets the bundle's minimum-macOS floor, so the PR check must
     # exercise the same OS the release artifact is built on, not silently follow the
@@ -116,11 +423,15 @@ jobs:
     # above intentionally stays on `macos-latest`.
     runs-on: macos-26
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         # No fetch-depth: 0 — hatch-vcs falls back to 0.0.0 on a shallow checkout
         # (fallback-version in pyproject), which is fine for a build-only check.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
       - name: Setup uv
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
@@ -168,11 +479,16 @@ jobs:
     # (keycast.exe + deps). Uploads an unsigned, version-0.0.0 preview (7-day
     # retention); the release artifact comes from release.yml.
     name: Build Windows app (check)
+    if: ${{ github.event.pull_request.draft != true }}
     runs-on: windows-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
       - name: Setup uv
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
@@ -235,3 +551,14 @@ jobs:
             dist/keycast
             packaging/keycast-setup.exe
           retention-days: 7
+  check:
+    if: ${{ always() && github.event.pull_request.draft != true }}
+    needs: [ci, hooks, style, deps, docs-doctest, cli-installed, build-freezer-check, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Decide whether the needed jobs succeeded or failed
+        uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35  # v1.3.0
+        with:
+          jobs: ${{ toJSON(needs) }}

@@ -1,26 +1,67 @@
 [project]
 name = "keycast"
 description = "Keycast is a cross-platform keystroke and mouse click visualizer built in Python."
+license = "MIT"
 readme = "README.md"
-license = { file = "LICENSE" }
-authors = [{ name = "Hasan Sezer Taşan", email = "hasansezertasan@gmail.com" }]
+authors = [
+  { name = "Hasan Sezer Taşan", email = "hasansezertasan@gmail.com" },
+]
 maintainers = [
   { name = "Hasan Sezer Taşan", email = "hasansezertasan@gmail.com" },
 ]
-# Version is derived from git tags by hatch-vcs (see [tool.hatch.version]),
-# so there is no static version literal for release-please to bump.
 dynamic = ["version"]
-keywords = []
-classifiers = []
+# Keycast is a desktop overlay + CLI for presenters (not a generic scaffold):
+# keywords describe the project, not the tooling that builds it.
+keywords = [
+  "keystrokes",
+  "mouse",
+  "visualizer",
+  "screencast",
+  "overlay",
+  "presenter",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Natural Language :: English",
+  "Operating System :: MacOS :: MacOS X",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Topic :: Multimedia :: Graphics :: Presentation",
+  "Topic :: Utilities",
+  "Typing :: Typed",
+]
+# Keycast needs Python 3.14 (Tk 9 via the Astral builds pinned in the release
+# workflow; 3.14.3 ships broken Tk, see docs/adr/001). The template default
+# (>=3.10 with a 3.10-3.14 CI sweep) does not apply: only the 3.14 tox env and
+# type-checker pins below are meaningful here.
 requires-python = ">=3.14"
+# Runtime deps are exact-pinned (uv add-bounds = "exact" below): the overlay,
+# its settings validation, and the frozen bundles must resolve identically
+# everywhere, including the PyInstaller release jobs.
 dependencies = [
   "packaging==26.3",
+  "pydantic==2.13.5",
+  "pydantic-core==2.46.5",
   "pydantic-extra-types==2.11.1",
   "pydantic-settings==2.15.0",
   "pynput==1.8.2",
   "typer==0.27.2",
 ]
 
+[project.urls]
+changelog = "https://github.com/hasansezertasan/keycast/blob/main/CHANGELOG.md"
+documentation = "https://hasansezertasan.github.io/keycast"
+homepage = "https://github.com/hasansezertasan/keycast"
+issues = "https://github.com/hasansezertasan/keycast/issues"
+releasenotes = "https://github.com/hasansezertasan/keycast/releases"
+source = "https://github.com/hasansezertasan/keycast.git"
 
 [project.scripts]
 # Single coherent entry point: `keycast` launches the overlay, while
@@ -30,89 +71,113 @@ keycast = "keycast.cli:app"
 
 [dependency-groups]
 dev = [
-  "keycast",
-  "tox==4.64.4",
-  "tox-uv==1.36.0",
-  { include-group = "lint" },
+  "tox==4.64.10",
+  "tox-uv==1.36.1",
+  "debugpy==1.8.22",
+  { include-group = "style" },
   { include-group = "test" },
-  { include-group = "tool" },
 ]
-lint = [
-  "mypy==2.3.1",
-  "pyright==1.1.414",
-  "ty==0.0.84",
-  "pyrefly==1.3.1",
-  "ruff==0.16.10",
-  "taplo==0.9.3",
-  "typos==1.50.3",
-  "validate-pyproject[all]==0.26",
-  "vulture==2.16",
+style = [
+  "basedpyright==1.40.2",
+  "detect-secrets==1.5.0",
+  "editorconfig-checker==3.8.0",
+  "import-linter==2.15",
+  "mypy==2.4.0",
+  "pylint==4.0.6",
+  "pyrefly==1.2.0",
+  "ruff==0.17.0",
   "slotscheck==0.21.0",
-  # "shellcheck-py==0.11.0.1",
-  # "shellcheck-makefile==1.27.3",
-  # "yamllint==1.37.1",
-  # "yamlfix==1.18.0",
-  # "yamlfmt==1.1.1",
+  "sphinx-lint==1.0.2",
+  "taplo==0.9.3",
+  "ty==0.0.66",
+  "typos==1.49.0",
+  # Stubs for the untyped pynput dependency: without them every checker sees
+  # `keyboard`/`mouse` (and `Key.name`, `KeyCode.char`, ...) as Any, which fails
+  # strict `no-any-return` and unknown-import gates. Single version source here.
   "types-pynput==1.8.1.20260712",
-  "types-pyinstaller==6.22.1.20260827",
+  "zuban==0.9.1",
+]
+# semgrep is deliberately its own group rather than part of `style`: `dev`
+# includes `style` wholesale, so a plain `uv sync` — and every Windows/macOS
+# cell in ci.yml, which runs `uv run --locked tox run` — would download and
+# unpack ~215 MB (the wheel bundles a native semgrep-core) for a tool that only
+# ever executes in the Linux-only `style` job. The tox `style` env lists this
+# group explicitly. Still a single version source, same as every other pin.
+sast = [
+  "semgrep==1.180.0",
+]
+# Dependency hygiene gets its own group for the same reason `sast` does: it is
+# only ever run by the on-demand `deps` tox env and the `deps` CI job, so a plain
+# `uv sync` should not install it. deptry checks the imports against the declared
+# dependencies (missing, transitive, misplaced or obsolete); creosote flags
+# declared runtime dependencies that nothing imports.
+deps = [
+  "creosote==5.2.0",
+  "deptry==0.25.1",
+]
+# ai-rulez gets its own group for the same reason `sast` does: `dev` includes
+# `style` wholesale, so folding it in would install it into every developer and
+# CI environment for a tool only the prek `ai-rulez` hook and the tox `style`
+# env invoke. The PyPI package is a small launcher that downloads the matching
+# Go binary into a user cache on first run, so the install itself is cheap but
+# the first invocation needs network. That download verifies a checksum when it
+# can fetch one and prints a warning and proceeds when it cannot, so treat it as
+# best-effort rather than a guarantee. Still a single version source, same as
+# every other pin (https://hasansezertasan.github.io/copier-pyproject/context/agent-instructions/#ai-rulez-is-the-opt-in-single-source-for-agent-instructions-with-the-prose-in-shared-macros).
+agents = [
+  "ai-rulez==4.11.5",
 ]
 test = [
-  # "coverage-enable-subprocess==1.0",
-  "coverage[toml]~=7.4",
+  "coverage-enable-subprocess==1.0",
+  "coverage[toml]==7.16.2",
+  "pytest-mock==3.16.0",
+  "pytest-rerunfailures==16.7",
+  "pytest-xdist[psutil]==3.8.0",
   "pytest==9.1.1",
-  "pytest-cov==7.1.0",
-  # "pytest-asyncio==1.2.0",
-  # "pytest-sugar",
-  # "pytest-dependency>=0.6.0",
-  # "pytest-mock~=3.12",
-  # "pytest-rerunfailures~=14.0",
-  # "pytest-xdist[psutil]~=3.5",
+  "pytest-sugar",
+  "dirty-equals",
+  "inline-snapshot",
+  "pytest-deadfixtures==3.1.0",
+]
+docs = [
+  "sphinx==8.1.3",
+  "shibuya==2026.7.12",
+  "sphinx-autobuild==2024.10.3", # 2025.x drops Python 3.10 (requires-python >= 3.11)
+  "sphinx-copybutton==0.5.2",
+  "sphinx-design==0.6.1", # 0.7.0 drops Python 3.10 (requires-python >= 3.11)
+  "sphinx-togglebutton==0.4.5",
+  "sphinx-paramlinks==0.6.0",
+  "auto-pytabs[sphinx]==0.5.0",
+  "myst-parser==4.0.1",
+  # Per-page "last updated" footer sourced from git commit dates (https://hasansezertasan.github.io/copier-pyproject/context/docs-versioning/#per-page-last-updated-comes-from-git-history);
+  # offline, no network. Works from full history (docs CI checks out depth 0).
+  "sphinx-last-updated-by-git==0.3.8",
+  # PEP 440 version parsing/sorting used by tools/build_docs.py to order
+  # published versions and pick the `latest` alias (https://hasansezertasan.github.io/copier-pyproject/context/docs-versioning/#docs-publish-only-the-current-version-and-carry-older-built-versions-forward-from-gh-pages). Also a Sphinx
+  # transitive dependency; pinned here for the explicit direct use.
+  "packaging>=24.0",
+  # Renders the Configuration reference (docs/configuration.rst) directly from
+  # the live ``settings`` Settings model so documented fields/types/
+  # defaults never drift from the source.
+  "autodoc-pydantic==2.2.0",
 ]
 tool = [
-  "prek==0.5.4", # git hook runner used by the `hooks` CI job and locally
-  # "marimo==0.17.0",
-  # "pyinstaller==6.16.0",
+  "commitizen==4.17.0",
+  "pyinstaller>=6.0.0",
+  # "marimo==0.15.2",
+  # "inflection==0.5.1",
+  # "copier==9.11.0",
+]
+prek = [
+  "prek==0.4.12",
 ]
 
 
 [build-system]
-requires = [
-  "hatchling==1.32.4",
-  "hatch-vcs==0.5.0",
-  # "hatch-babel==0.1.2",
-  # "setuptools-scm==9.2.1",
-  # "hatch-autorun==1.1.0",
-]
+
+requires = ["hatchling", "hatch-vcs"]
+
 build-backend = "hatchling.build"
-
-
-[tool.hatch.metadata]
-allow-direct-references = true
-
-
-[tool.hatch.version]
-# Single source of truth for the version is the git tag. On a clean checkout
-# of a release tag (the `publish` job uses fetch-depth: 0) this resolves to the
-# exact `X.Y.Z`; with `only-version` below and no tag yet, it falls back to
-# `fallback-version`.
-source = "vcs"
-# A source tree with no tags/history (e.g. a shallow checkout) would otherwise
-# fail the version computation; fall back to 0.0.0 instead of erroring.
-fallback-version = "0.0.0"
-
-
-[tool.hatch.version.raw-options]
-# Use the tag version exactly rather than guessing the next release, and drop
-# the PEP 440 local segment (+g<hash>): PyPI rejects local versions, so this
-# keeps non-tag builds uploadable.
-version_scheme = "only-version"
-local_scheme = "no-local-version"
-
-
-[tool.hatch.build]
-# Write the computed version to a generated, git-ignored module so the package
-# exposes `keycast.__version__` without an importlib.metadata lookup.
-hooks.vcs.version-file = "src/keycast/_version.py"
 
 
 [tool.uv]
@@ -121,87 +186,124 @@ cache-keys = [
   { file = "pyproject.toml" },
   { git = { commit = true, tags = true } },
 ]
+package = true
 trusted-publishing = "always"
 
 
-# Ruff 0.16 expanded its default rule set. Pin the project policy explicitly
-# so upgrading Ruff or its prek hook does not silently turn new diagnostics into
-# unrelated dependency-PR failures. These are Ruff's historical defaults.
-[tool.ruff.lint]
-select = ["E4", "E7", "E9", "F"]
+[tool.hatch.version]
+source = "vcs"
+# Last-resort sentinel: only used when a build sees neither a .git directory nor
+# an expanded .git_archival.txt (e.g. an archive of a commit with no reachable
+# tag). "0.0.0" reads clearly as "version could not be determined" rather than
+# masquerading as a real early release. See .git_archival.txt + .gitattributes
+# `export-subst` for the archive path that recovers the real tag-derived version.
+fallback-version = "0.0.0"
+
+
+[tool.hatch.build]
+hooks.vcs.version-file = "src/keycast/_version.py"
+
+
+[tool.hatch.version.raw-options]
+version_scheme = "only-version"
+local_scheme = "no-local-version"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+
+[tool.hatch.build.targets.sdist]
+# The package uses a src layout, so the source tree lives under /src (not
+# /keycast); including /src ships the actual modules -- and, for
+# C-extension projects, the .pyx/.pxd sources needed to compile from the sdist.
+include = [
+  "/README.md",
+  "LICENSE",
+  "/src",
+  "/tests",
+  "/docs/examples",
+]
+
+
+[tool.commitizen]
+# Commit-authoring and message linting only. release-please owns version
+# bumping, git tagging, and CHANGELOG.md (see .github/release-please-config.json),
+# so the bump/tag/changelog settings are intentionally omitted here to avoid two
+# tools competing over the same tags and changelog file.
+name = "cz_conventional_commits"
+
+[tool.pytest.ini_options]
+# addopts = "-rXs --strict-config --strict-markers"
+addopts = "-v --tb=short --doctest-glob=README.md"
+# One marker per component, auto-applied by tests/conftest.py from each test's
+# top-level tests/<dir>/. Enables `pytest -m web` locally and per-component CI
+# jobs (issue #160, https://hasansezertasan.github.io/copier-pyproject/context/ci-topology/#per-component-markers-path-filtered-jobs-and-one-coverage-gate-per-component); `integration` (https://hasansezertasan.github.io/copier-pyproject/context/testing-strategy/#real-broker-integration-tests-testcontainers-locally-per-broker-ci-mechanism) is one axis of the scheme.
+markers = [
+  "core: core/shared component tests",
+  "cli: CLI component tests",
+  "gui: GUI component tests",
+]
+filterwarnings = [
+  "error",
+]
+# The project README is the deliberately small Markdown doctest surface. Other
+# Markdown files can use illustrative snippets without becoming pytest inputs.
+testpaths = ["tests", "README.md"]
+doctest_optionflags = "ELLIPSIS IGNORE_EXCEPTION_DETAIL NORMALIZE_WHITESPACE"
+xfail_strict = true
 
 
 [tool.coverage.run]
 branch = true
-parallel = true # tox runs tests in an installed-wheel env; keep per-run data files
-source_pkgs = ["keycast"]
-omit = [
-  "*/keycast/__main__.py", # entry-point shim, exercised by running the module
-]
+# Match `_version.py` wherever it resolves: `src/...` in editable dev installs and
+# `.../site-packages/...` when tox/CI installs the built (non-editable) wheel. A
+# `src/**`-only pattern silently misses the installed copy and reports it at 0%.
+# `__main__.py` is an entry-point shim exercised by running the module, not the suite.
+omit = ["*/_version.py", "*/__main__.py"]
+parallel = true
+# Store data-file paths relative to the project root so `.coverage` files produced
+# on different runners/OSes merge in the `coverage-combine` CI job without
+# absolute-path mismatches. Complements the `[tool.coverage.paths]` remap below
+# (which unifies the src/ vs site-packages layouts). See https://hasansezertasan.github.io/copier-pyproject/context/ci-topology/#a-single-union-coverage-gate-across-the-whole-matrix.
+relative_files = true
+source_pkgs = ["keycast", "tests"]
 
-# Map the installed-wheel location measured under tox back onto the source tree
-# so `coverage combine`/`report` attribute lines to src/keycast, not site-packages.
+
 [tool.coverage.paths]
+# Unify coverage data across environments. tox installs the built wheel into
+# each env's site-packages, so the same source file is measured under a different
+# `.tox/<env>/.../site-packages/keycast` path per interpreter. Without
+# remapping those back to the canonical `src/` tree, `coverage combine` keeps a
+# separate copy per env and a version-gated line covered in one interpreter but not
+# another is wrongly counted as missed — silently failing the `fail_under` gate.
+# `tests` needs no remapping: it is never installed, so every environment measures
+# it at the same repo-local path.
 keycast = ["src/keycast", "*/site-packages/keycast"]
 
+
 [tool.coverage.report]
-show_missing = true
-exclude_also = [
-  "if TYPE_CHECKING:",
-  "raise NotImplementedError",
-  "\\.\\.\\.",
+# Untestable code is excluded per site with `# pragma: no cover`, not with blanket
+# patterns here: a regex matching a `def` line excludes the *whole function body*,
+# so a pattern like `def main\(` would silently un-measure any future `main()`
+# with real logic (and did mask the tested GUI/TUI entrypoints). Pragmas carry the
+# exclusion decision next to the code it affects. See https://hasansezertasan.github.io/copier-pyproject/context/testing-strategy/#coverage-exclusions-are-per-site-pragmas-and-the-globs-must-match-the-installed-layout.
+exclude_lines = [
+  "no cov",
   "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
 ]
+fail_under = 99
+# Patterns match both the `src/` (editable) and installed (`site-packages`)
+# layouts (see [tool.coverage.run] omit).
+omit = ["*/_version.py", "*/__main__.py"]
+show_missing = true
+skip_covered = true
 
-
-[tool.pytest.ini_options]
-addopts = "--tb=short"
-testpaths = ["tests"]
-
-
-# Type checkers are scoped to `src` only: the test suite intentionally passes
-# plain dicts where the runtime accepts read-only mappings, which the checkers
-# would (correctly) reject. Production code must stay clean; tests need not.
-[tool.mypy]
-files = ["src"]
-python_version = "3.14"
-pretty = true
-show_error_codes = true
-
-[tool.pyright]
-include = ["src"]
-
-[tool.pyrefly]
-python-version = "3.14"
-project-includes = ["src"]
-
-[tool.ty.src]
-include = ["src"]
-
-[tool.ty.environment]
-python-version = "3.14"
-
-[tool.typos.default]
-# release-please writes commit links like `[00ba092]` into CHANGELOG.md; the
-# abbreviated SHA can read as a word fragment (e.g. `ba`). Ignore the bracketed
-# hash token wholesale. `{7,40}` covers git extending the abbreviation past 7
-# chars on collision, up to the full 40-char hash.
-extend-ignore-re = ["\\[[0-9a-f]{7,40}\\]"]
-
-[tool.typos.default.extend-identifiers]
-# `plain_serializer_function_ser_schema` is a real pydantic-core API name; the
-# `ser` fragment is not a misspelling of `set`.
-plain_serializer_function_ser_schema = "plain_serializer_function_ser_schema"
-
-[tool.typos.default.extend-words]
-# `datas` is the real PyInstaller field name (`Analysis(datas=...)`,
-# `COLLECT(a.datas)`), not a misspelling of `data`. See packaging/keycast.spec.
-datas = "datas"
 
 [tool.vulture]
-# Callables registered via these decorators are invoked by the framework, not by
-# our code, so vulture cannot see the call site. Suppress by decorator (precise)
-# rather than naming each validator.
+# Framework-invoked handlers: Typer commands and pydantic validators are called
+# by their frameworks, not by our code, so vulture cannot see the call sites.
+# Suppress by decorator (precise) rather than naming each validator.
 ignore_decorators = [
   "@app.command",
   "@field_validator",
@@ -214,9 +316,9 @@ ignore_decorators = [
 # signature, so vulture cannot see why they exist.
 ignore_names = [
   # pydantic protocol hooks: required positional/keyword names we don't consume
-  "source",                     # __get_pydantic_core_schema__(cls, source, handler)
+  "source", # __get_pydantic_core_schema__(cls, source, handler)
   "settings_customise_sources",
-  "init_settings",              # settings_customise_sources(...): keycast loads JSON only
+  "init_settings", # settings_customise_sources(...): keycast loads JSON only
   "env_settings",
   "dotenv_settings",
   "file_secret_settings",
@@ -231,23 +333,331 @@ ignore_names = [
 min_confidence = 60
 paths = ["src", "tests"] # add "examples" here if/when that directory exists
 
-# NOTE: taplo only discovers config from .taplo.toml/taplo.toml — it does NOT read
-# [tool.taplo] here. So instead of a config file with an exclude list, the style env
-# below passes taplo the exact files we own; it never descends into .venv/.tox.
 
+[tool.deptry]
+# `known_first_party` is explicit because the tox `deps` env installs the built
+# wheel, so without it deptry reads the project's own imports as a third-party
+# transitive dependency (DEP003). Add further `per_rule_ignores` entries for the
+# project's own findings, e.g. DEP003 for a package only importable through
+# another declared one, or DEP002 for an optional import guarded by try/except.
+# See https://deptry.com/rules-violations/.
+# Excluded: the Sphinx config, the build hook (its imports belong to
+# `[build-system].requires`, not the runtime dependencies), the benchmarks and the
+# worker probe script (neither ships in the wheel; pytest and anyio come from
+# the dev tooling). The packaging artwork scripts are likewise excluded: they
+# never ship in the wheel and provision Pillow per invocation
+# (`uv run --with pillow ...`), so PIL is deliberately not a project dependency.
+extend_exclude = [
+  "docs/conf.py",
+  "packaging/make_dmg_background.py",
+  "packaging/make_icons.py",
+]
+known_first_party = ["keycast"]
+
+[tool.deptry.per_rule_ignores]
+# tools/build_docs.py imports `packaging`, pinned in the `docs` group for that
+# script alone, so deptry reads it as a misplaced dev dependency.
+DEP004 = ["packaging"]
+
+
+[tool.slotscheck]
+strict-imports = false
+
+
+[tool.ruff]
+fix = true
+output-format = "full"
+preview = true
+show-fixes = true
+src = ["src", "tests"]
+target-version = "py314"
+unsafe-fixes = true
+
+
+[tool.ruff.analyze]
+detect-string-imports = true
+preview = true
+
+
+[tool.ruff.format]
+docstring-code-format = true
+line-ending = "lf"
+preview = true
+skip-magic-trailing-comma = true
+
+
+[tool.ruff.lint]
+fixable = ["ALL"]
+# Two opinionated ruff 0.16 preview rules are disabled: RUF105 would rewrite the
+# portable `# noqa` comments into ruff's own `# ruff: ignore` syntax (its docs note
+# `# noqa` is needed for cross-tool compatibility), and RUF201 would rewrite every
+# rule *code* in this config's selectors into long rule *names*. Both are stylistic.
+# pytest-fixture-autouse (new in ruff 0.17, still codeless so it cannot take a
+# targeted noqa) is disabled repo-wide: the two autouse fixtures (the CLI
+# update-check stub, the secure-input probe-cache reset) are documented
+# per-module test hygiene, not hidden conftest side effects; threading them
+# through every test signature would be noise.
+ignore = ["COM812", "CPY", "FIX", "RUF105", "RUF201", "TD", "pytest-fixture-autouse"]
+logger-objects = ["logging_setup.logger"]
+preview = true
+select = ["ALL"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+# skip-magic-trailing-comma = true
+split-on-trailing-comma = false
+
+[tool.ruff.lint.flake8-copyright]
+author = "Hasan Sezer Taşan <hasansezertasan@gmail.com>"
+
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.flake8-type-checking]
+# Pydantic evaluates annotations at runtime, so imports used only in model
+# field annotations (e.g. `pathlib.Path`) must NOT be moved into a
+# `TYPE_CHECKING` block — doing so breaks model construction.
+runtime-evaluated-base-classes = [
+  "pydantic.BaseModel",
+  "pydantic_settings.BaseSettings",
+]
+
+
+[tool.ruff.lint.mccabe]
+max-complexity = 5
+
+
+[tool.ruff.lint.pycodestyle]
+ignore-overlong-task-comments = true
+
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+
+[tool.ruff.lint.per-file-ignores]
+# Tests are specification, not product: they group cases in classes whose
+# methods take fixtures instead of `self` (PLR6301), reach into package
+# internals white-box style (SLF001), use asserts/magic values, and skip
+# docstring/return-value ceremony (D, DOC201, PLC2701, PLR2004, S101).
+# Test doubles keep framework signatures (unused args are parity, not waste)
+# and import lazily to simulate missing modules (ARG, PLC0415). They raise
+# stdlib errors with descriptive messages to simulate real failures (TRY003),
+# group many cases per class (PLR0904), and branch through realistic scenarios
+# (C901) — restructuring them would churn the suite without changing behavior.
+"tests/**/*.py" = ["D", "DOC201", "S101", "PLR2004", "PLC2701", "PLR6301", "SLF001", "ARG", "PLC0415", "TRY003", "C901", "PLR0904"]
+# cli.py imports lazily on purpose: `version`/`info` stay instant and never pay
+# for tkinter/pynput, and the GUI launch defers failing imports to an actionable
+# error path (see the comments at each import).
+"src/keycast/cli.py" = ["PLC0415"]
+# The Sphinx config is a standalone module, not part of an importable package.
+"docs/conf.py" = ["INP001"]
+# The docs warning-allowlist gate is a standalone script (not an importable
+# package) whose whole job is to print GitHub `::error::` annotations to stdout.
+"docs/check_warnings.py" = ["INP001", "T201"]
+# Build-time asset scripts (icon/dmg generation): developer tooling run by hand
+# on macOS, not the shipped product. They print progress to stdout (T201),
+# shell out to fixed local tools (S404/S603/S607), and live outside any package
+# (INP001 — dmgbuild loads its settings file by path, not import).
+"packaging/*.py" = ["T201", "S404", "S603", "S607", "INP001"]
+# The versioned-docs build orchestrator is a standalone CLI script under tools/,
+# not part of an importable package (https://hasansezertasan.github.io/copier-pyproject/context/docs-versioning/#docs-publish-only-the-current-version-and-carry-older-built-versions-forward-from-gh-pages).
+"tools/build_docs.py" = ["INP001"]
+# settings.py deliberately prints to stderr (never the overlay/log) when the
+# config file cannot even be read: logging is not configured yet at that point.
+# Its pydantic field annotations are runtime-evaluated, so typing-only imports
+# used there must stay at module scope; `__get_pydantic_core_schema__` is a real
+# pydantic hook, not a bad dunder name. Settings-load handlers share the
+# degrade-gracefully policy (a corrupt config recovers, never crashes).
+"src/keycast/settings.py" = ["T201", "TC003", "PLW3201", "S101", "PLW0717", "BLE001"]
+# `sources.py` fails fast at import when a new InstallSource lacks wiring
+# (label/upgrade-command tables), turning a latent KeyError into a loud error.
+"src/keycast/updates/sources.py" = ["S101"]
+# Input-capture code degrades gracefully by design: a listener/display failure
+# must never crash the overlay, so broad `except Exception` handlers (BLE001)
+# and the multi-statement try blocks around them (PLW0717) are the error policy,
+# not tech debt. Probe caching uses module-level globals (PLW0603) for the same
+# lazy-init reason the imports stay function-local (PLC0415).
+"src/keycast/display.py" = ["BLE001", "PLW0717"]
+"src/keycast/listeners.py" = ["BLE001", "PLW0717"]
+"src/keycast/secure_input.py" = ["BLE001", "PLW0603", "PLC0415"]
+# The same degrade-gracefully policy in the orchestration layers: startup,
+# shutdown, and settings-load handlers must not let an input/logging failure
+# escape and crash the app (mirrors the pylint broad-exception-caught disable).
+"src/keycast/application.py" = ["BLE001"]
+"src/keycast/main.py" = ["BLE001"]
+"src/keycast/logging_setup.py" = ["BLE001"]
+"src/keycast/updates/*.py" = ["BLE001", "PLW0717", "PLR0913", "PLR0911"]
+"src/keycast/updates/__init__.py" = ["RUF067", "PLC0415"]
+
+
+[tool.ruff.lint.pyupgrade]
+keep-runtime-typing = true
+
+
+[tool.ruff.lint.ruff]
+# `parenthesize-tuple-in-subscript = true` (the template default) rewrites
+# `dict[str, str]` into `dict[(str, str)]`, whose parenthesized form zuban's
+# parser rejects (gate failure). Unparenthesized is valid for every checker,
+# so the tuple parens stay off project-wide.
+parenthesize-tuple-in-subscript = false
+
+
+[tool.mypy]
+files = ["src"]
+pretty = true
+python_version = "3.14"
+strict = true
+
+
+[tool.basedpyright]
+exclude = [".venv"]
+include = ["src/keycast"]
+pythonVersion = "3.14"
+venv = ".venv"
+# venvPath is the directory *containing* the venv, not the venv itself; ".venv"
+# here would make basedpyright look for ".venv/.venv". Use "." so both the venv
+# and basedpyright's strict ruleset resolve the project's installed deps.
+venvPath = "."
+# Adjacent-string continuation (the idiomatic way to wrap long messages and
+# descriptions) is project style, governed by ruff format — not a diagnostic.
+reportImplicitStringConcatenation = false
+# keycast integrates dynamic runtimes whose types are unknowable statically:
+# the pyobjc bridge (display.py), ctypes handles (application.py), and
+# decoded JSON / stdlib duck-types (urllib response, settings presets, update
+# state). Unknown-typed values at those boundaries are inherent, so the
+# Any/Unknown family is off; the structural rules that remain (unannotated
+# attributes, unused results, overrides, private usage) still gate real defects,
+# and mypy strict keeps enforcing the annotated surface.
+reportAny = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+
+
+# Type checkers are scoped to `src` only: the test suite intentionally passes
+# plain dicts where the runtime accepts read-only mappings, which the checkers
+# would (correctly) reject. Production code must stay clean; tests need not.
+[tool.ty.src]
+include = ["src"]
+respect-ignore-files = false
+
+
+[tool.ty.environment]
+python-version = "3.14"
+
+
+[tool.ty.terminal]
+error-on-warning = true
+
+
+[tool.pyrefly]
+python-version = "3.14"
+project-includes = ["src"]
+
+[tool.pylint.main]
+# pylint runs as an always-on gate that deliberately overlaps ruff's PL* rules.
+# Its canonical invocation is `pylint src`, so it never descends into tests; this
+# ignore-paths is a defensive scope guard for broader invocations (`pylint .`,
+# filename-passing hooks). Tests are linted by ruff, not pylint.
+ignore-paths = ["^tests/.*$"]
+# `.pyi` stubs (the c-extension type stub) are signature-only: their bodies are
+# `...` and every parameter is unused by construction, so pylint's unused-argument
+# check is a guaranteed false positive there. Stubs are type-checked by the
+# type-checker gate, not pylint.
+ignore-patterns = ['.*\.pyi$']
+
+[tool.pylint."messages control"]
+# Only formatter-owned checks, the docstring family, and too-few-public-methods
+# are disabled so pylint is usable out of the box; everything else stays on.
+disable = [
+  "line-too-long", # C0301 — ruff-format owns line length
+  "missing-module-docstring", # C0114
+  "missing-class-docstring", # C0115
+  "missing-function-docstring", # C0116
+  "too-few-public-methods", # R0903 — trips dataclasses / config / Protocol classes
+  # C0415 — the cli->tui/gui/web dispatch, and each component's own heavy or
+  # platform-conditional import (tkinter, uvicorn, the worker's uvloop probe),
+  # are deliberately lazy so import-linter's layering contract holds and a
+  # framework is only imported when the code path that needs it actually runs.
+  # Textual is the exception: the TUI imports it at module scope so `InfoApp`
+  # can be defined there and driven by the headless pilot (https://hasansezertasan.github.io/copier-pyproject/context/testing-strategy/#interactive-components-expose-injected-driver-seams-so-headless-ci-measures-everything-but-the-blocking-call).
+  "import-outside-toplevel",
+  # W0706 — the generated TUI entry point explicitly re-raises
+  # KeyboardInterrupt/SystemExit ahead of a broad `except Exception` to make the
+  # "let these propagate" intent obvious to readers, even though BaseException
+  # subclasses wouldn't be caught by the Exception clause anyway.
+  "try-except-raise",
+  # W0718 — keycast's error policy is degrade-gracefully (a listener/display
+  # failure must never crash the overlay), so broad `except Exception` handlers
+  # are the design, not tech debt. Ruff encodes the same policy per file
+  # ([tool.ruff.lint.per-file-ignores] BLE001 entries); pylint cannot scope by
+  # file, hence this global disable with the policy stated once, here.
+  # R0801 — the updates subpackage re-exports its public names through parallel
+  # `__all__` blocks plus identical TYPE_CHECKING import headers per module.
+  # That structural symmetry is the package's public-API pattern, not copy-paste
+  # debt, and R0801 cannot be suppressed inline at the use site.
+  "duplicate-code",
+  # W0718 — keycast's error policy is degrade-gracefully (a listener/display
+  # failure must never crash the overlay), so broad `except Exception` handlers
+  # are the design, not tech debt. Ruff encodes the same policy per file
+  # ([tool.ruff.lint.per-file-ignores] BLE001 entries); pylint cannot scope by
+  # file, hence this global disable with the policy stated once, here.
+  "broad-exception-caught",
+]
+
+[tool.pylint.design]
+max-args = 10
+max-positional-arguments = 10
+max-branches = 20
+
+[tool.typos.files]
+# copier records `_commit` as a `git describe` string (`v1.2.3-4-g<hash>`) when
+# the template is rendered from an untagged ref, and a fragment of the hex hash
+# can read as a misspelled word, failing the check on a hash nobody chose. The
+# file is machine-written with no prose to check. The prek hook passes
+# `--force-exclude`, so the exclusion holds there as well as in `tox -e style`.
+extend-exclude = [
+  ".copier-answers.yml",
+]
+
+[tool.typos.default]
+# release-please writes commit links like `[00ba092]` into CHANGELOG.md; the
+# abbreviated SHA can read as a word fragment (e.g. `ba`). Ignore the bracketed
+# hash token wholesale. `{7,40}` covers git extending the abbreviation past 7
+# chars on collision, up to the full 40-char hash.
+extend-ignore-re = ["\\[[0-9a-f]{7,40}\\]"]
+
+[tool.typos.default.extend-identifiers]
+# `datas` is the PyInstaller `Analysis(datas=...)` / `a.datas` field in
+# packaging/keycast.spec. typos misreads it as `data`, and its pre-commit
+# hook auto-writes fixes, so allowlist it to keep the spec from being rewritten.
+datas = "datas"
+# `plain_serializer_function_ser_schema` is a real pydantic-core API name; the
+# `ser` fragment is not a misspelling of `set`.
+plain_serializer_function_ser_schema = "plain_serializer_function_ser_schema"
 
 [tool.tox]
-env_list = ["style", "run", "3.14", "cov"]
+# Keycast is 3.14-only (see requires-python above), so the template's 3.10-3.13
+# interpreter sweep does not apply: `tox run` exercises style, the docs
+# doctests, the installed CLI, and the suite on 3.14.
+env_list = [
+  "style",
+  # Inline ``>>>`` snippets are part of the tested-documentation contract,
+  # so run them in the default CI ``tox run`` invocation.
+  "docs-doctest",
+  "cli",
+  "3.14",
+]
 requires = ["tox>=4"]
 
+
 [tool.tox.env_run_base]
-# Test the built wheel (not the source tree) so coverage exercises the same
-# artifact that ships to PyPI; coverage.paths maps it back to src for reporting.
 commands = [
   [
     "coverage",
     "run",
-    "-m",
+    "--module",
     "pytest",
     "-v",
     "--tb=short",
@@ -256,42 +666,62 @@ commands = [
     ], extend = true },
   ],
 ]
-constrain_package_deps = true
 dependency_groups = ["test"]
 description = "Run the tests under {base_python}"
 env_tmp_dir = "{toxworkdir}/tmp/{envname}"
+# Arms coverage-enable-subprocess so xdist/subprocess workers are measured too;
+# `coverage run` plus `parallel = true` writes per-env data files that the CI
+# `coverage combine` step merges.
+set_env = { COVERAGE_PROCESS_START = "{tox_root}/pyproject.toml" }
+# Non-editable: `uv sync --no-editable` builds the project and installs it into
+# site-packages, the layout `[tool.coverage.paths]` remaps for reporting.
 package = "wheel"
 # tox scrubs the environment; importing keycast pulls in pynput, whose X backend
 # needs DISPLAY (provided by xvfb-run on Linux CI). Forward it into the commands.
 pass_env = ["DISPLAY", "XAUTHORITY"]
-runner = "uv-venv-runner"
-use_frozen_constraints = true
-wheel_build_env = ".pkg"
+# Every env installs from uv.lock (`uv sync --locked`), so tox tests and lints
+# the exact versions the lockfile pins. The plain `uv-venv-runner` resolves the
+# project's own dependencies fresh on every env creation (tox's
+# `use_frozen_constraints` never reaches its `uv pip install`), so a newer
+# release could float in and clash with a pinned tool such as semgrep.
+runner = "uv-venv-lock-runner"
+
 
 [tool.tox.env.style]
 base_python = ["3.14"]
-dependency_groups = ["lint"]
-runner = "uv-venv-runner"
-description = "Run linters and formatters"
-pass_env = [
-  "DISPLAY",
-  "XAUTHORITY",
-] # slotscheck imports keycast -> pynput (needs DISPLAY)
 commands = [
   [
     "ruff",
     "check",
+    "--no-fix",
   ],
   [
     "ruff",
     "format",
     "--check",
+    "--diff",
+  ],
+  # Keycast is 3.14-only, so a single-version mypy run suffices (the template's
+  # 3.10 sweep targets its 3.10 floor, which does not apply here).
+  [
+    "mypy",
+    "--python-version",
+    "3.14",
+  ],
+  # Style runs once on Linux, so explicitly sweep platform-gated branches that
+  # mypy would otherwise prune as unreachable on the host platform.
+  [
+    "mypy",
+    "--platform",
+    "win32",
   ],
   [
     "mypy",
+    "--platform",
+    "darwin",
   ],
   [
-    "pyright",
+    "basedpyright",
   ],
   [
     "ty",
@@ -302,57 +732,181 @@ commands = [
     "check",
   ],
   [
-    "vulture",
+    "zuban",
+    "check",
+    "src",
   ],
   [
+    "pylint",
+    "src",
+  ],
+  [
+    "python",
+    "-m",
     "slotscheck",
     "-m",
     "keycast",
   ],
+  # Rules-database SAST. Deliberately style-env-only (like ty/pyrefly/zuban) and
+  # not a prek hook: semgrep keeps no on-disk rule cache, so a pre-commit hook
+  # would make a registry request on every `git commit`. The ruleset is named
+  # explicitly rather than `--config auto` so rule selection does not depend on
+  # language auto-detection; it is still fetched from the registry, which is why
+  # this cannot be vendored (see https://hasansezertasan.github.io/copier-pyproject/context/lint-orchestration/#semgrep-runs-in-the-style-env-against-a-named-registry-ruleset-never-vendored). `--error` makes findings blocking;
+  # silence a false positive with a trailing `# nosemgrep: <rule-id>`.
+  [
+    "semgrep",
+    "scan",
+    "--config",
+    "p/python",
+    "--error",
+    "--metrics=off",
+    "src",
+  ],
   [
     "taplo",
     "lint",
-    "pyproject.toml",
-    "prek.toml",
+    "*.toml",
   ],
+  # A strict `--check` gate, not fix mode: a generated file that taplo would
+  # rewrite fails its own CI on first push and drifts on every `copier update`.
+  # `.taplo.toml` disables array auto expand/collapse so the shipped layout is
+  # the canonical one regardless of which components are enabled. The `*.toml`
+  # glob is non-recursive, so it scopes taplo to this project's own root TOML
+  # (pyproject/prek/mise/taplo) without walking vendored `.tox`/`.venv`/
+  # site-packages trees — no `.taplo.toml` exclude config needed.
   [
     "taplo",
     "format",
     "--check",
-    "pyproject.toml",
-    "prek.toml",
-  ],
-  [
-    "validate-pyproject",
-    "pyproject.toml",
+    "--diff",
+    "*.toml",
   ],
   [
     "typos",
+    "--diff",
+  ],
+  [
+    "ec",
+  ],
+  # Config/source validation only — the prek `ai-rulez` hook is what regenerates
+  # the host files and so what catches drift. Having the check here too means a
+  # malformed `.ai-rulez/` source fails the canonical lint runner (https://hasansezertasan.github.io/copier-pyproject/context/lint-orchestration/#the-tox-style-env-is-the-sole-authoritative-lint-suite-prek-is-a-fast-gate-not-a-second-suite) even
+  # on a clone whose git hooks were never installed.
+  [
+    "ai-rulez",
+    "validate",
+  ],
+  [
+    "sphinx-lint",
+    "docs",
+  ],
+  # Collects (does not run) the suite and flags fixtures that are never used --
+  # cheap, deterministic, and a natural fit next to the other whole-program
+  # analyzers above (slotscheck, pylint).
+  [
+    "pytest",
+    "--dead-fixtures",
   ],
 ]
+# `test` is included so the type checkers that scope tests (e.g. ty) can
+# resolve pytest and other test-only imports.
+dependency_groups = ["agents", "sast", "style", "test"]
+description = "Run Checkers, Linters and Formatters"
+runner = "uv-venv-lock-runner"
 
-[tool.tox.env.run]
-commands = [["keycast", "version", { replace = "posargs", extend = true }]]
-description = "Run the application"
 
-[tool.tox.env.cov]
-base_python = ["3.14"]
-dependency_groups = ["test"]
-depends = ["3.14"]
-description = "Combine coverage data and emit XML/report"
-runner = "uv-venv-runner"
-skip_install = true
+# On-demand and CI-only (not in env_list, like `integration`): the `deps` job in
+# ci.yml runs it and `check` aggregates that job. `test` is included so deptry
+# and creosote can resolve the project's own test-only imports. creosote needs
+# the installed distributions to map import names, which the lock runner provides.
+[tool.tox.env.deps]
 commands = [
   [
-    "coverage",
-    "combine",
+    "deptry",
+    ".",
   ],
   [
-    "coverage",
-    "xml",
-  ],
-  [
-    "coverage",
-    "report",
+    "creosote",
+    "--deps-file",
+    "pyproject.toml",
+    "--section",
+    "project.dependencies",
+    # Without this creosote skips imports inside functions, so a dependency used
+    # only through a lazy import (the worker's uvloop) is reported as unused.
+    "--include-deferred",
   ],
 ]
+dependency_groups = ["deps", "test"]
+description = "Check dependency hygiene (deptry, creosote)"
+runner = "uv-venv-lock-runner"
+
+
+[tool.tox.env.prek]
+commands = [["prek", "run", "--all-files"]]
+dependency_groups = ["prek"]
+description = "Run prek hooks"
+# The hooks that need the project call `uv run --locked`, which syncs it (and the
+# groups they name) into this env through the runner's UV_PROJECT_ENVIRONMENT;
+# installing the wheel here too would only be swapped for that install each run.
+package = "skip"
+runner = "uv-venv-lock-runner"
+
+
+[tool.tox.env.docs-build]
+# Write the warning stream to a file (`-w`) instead of `-W` turning the first
+# warning into a hard error, then let docs/check_warnings.py own the pass/fail:
+# it diffs the emitted warnings against the docs/expected_warnings.txt allowlist,
+# failing on both unexpected new warnings and expected ones that vanished.
+commands = [
+  ["sphinx-build", "-w", "docs/_build/warnings.txt", "-b", "html", "docs", "docs/_build/html"],
+  ["python", "docs/check_warnings.py"],
+]
+dependency_groups = ["docs"]
+description = "Build Docs"
+runner = "uv-venv-lock-runner"
+# Keep build log output unbuffered/ordered. Reproducible builds pin Sphinx's
+# "today"/copyright to SOURCE_DATE_EPOCH, which the CI docs steps
+# (docs-preview.yml, release.yml) export from the last commit date before
+# invoking sphinx-build directly. Local `tox` runs deliberately do NOT export
+# it: an empty value ("{env:SOURCE_DATE_EPOCH:}") is *present but blank*, which
+# breaks hatchling's get_reproducible_timestamp (`int("")`), so we leave it
+# unset locally and conf.py falls back to the current year.
+set_env = { PYTHONUNBUFFERED = "1" }
+
+
+[tool.tox.env.docs-server]
+# ``--ignore`` the machine-generated ``docs/_generated/`` tree: ``conf.py``
+# rewrites it on every Sphinx build, so watching it would make each rebuild
+# trigger the next in an endless live-reload loop.
+commands = [["sphinx-autobuild", "--ignore", "*/_generated/*", "docs", "docs/_build/html"]]
+dependency_groups = ["docs"]
+description = "Start the live-reloading docs server"
+runner = "uv-venv-lock-runner"
+set_env = { PYTHONUNBUFFERED = "1" }
+
+
+[tool.tox.env.docs-doctest]
+# ``literalinclude`` keeps complete examples in tested Python modules; this
+# separate builder executes the occasional ``>>>`` snippet that belongs inline
+# with prose.
+commands = [["sphinx-build", "-b", "doctest", "docs", "docs/_build/doctest"]]
+dependency_groups = ["docs"]
+description = "Run documentation doctests"
+runner = "uv-venv-lock-runner"
+set_env = { PYTHONUNBUFFERED = "1" }
+
+
+[tool.tox.env.docs-linkcheck]
+# On-demand link checker. Also run weekly (non-blocking) by docs-linkcheck.yml.
+# Hits the network, so it is deliberately not part of the `style` env or PR CI.
+commands = [["sphinx-build", "-b", "linkcheck", "docs", "docs/_build/linkcheck"]]
+dependency_groups = ["docs"]
+description = "Check documentation for broken links"
+runner = "uv-venv-lock-runner"
+set_env = { PYTHONUNBUFFERED = "1" }
+
+[tool.tox.env.cli]
+commands = [["keycast", { replace = "posargs", default = ["version"], extend = true }]]
+description = "Run the CLI application."
+runner = "uv-venv-lock-runner"

@@ -28,6 +28,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import tempfile
+from contextlib import suppress
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -77,21 +78,31 @@ MSIX_ASSETS = [
 
 
 def _load_font(px: int) -> ImageFont.FreeTypeFont:
-    """Load a bold system font that has the ⌘ glyph, at the given pixel size."""
+    """Load a bold system font that has the ⌘ glyph, at the given pixel size.
+
+    Returns:
+        The loaded font at ``px`` pixels.
+
+    Raises:
+        RuntimeError: No candidate font exists on this host.
+    """
     for path in FONT_CANDIDATES:
         if Path(path).exists():
             font = ImageFont.truetype(path, px)
-            try:  # SFNS.ttf is a variable font; pin the Bold instance.
+            with suppress(OSError, ValueError):
+                # SFNS.ttf is a variable font; pin the Bold instance.
                 font.set_variation_by_name("Bold")
-            except OSError, ValueError:
-                pass
             return font
     msg = f"no system font with the ⌘ glyph found in {FONT_CANDIDATES}"
     raise RuntimeError(msg)
 
 
-def render_master() -> Image.Image:
-    """Render the icon at BASE*SCALE, then downsample to BASE for clean edges."""
+def render_master() -> Image.Image:  # noqa: PLR0914 — pixel-by-pixel icon routine
+    """Render the icon at BASE*SCALE, then downsample to BASE for clean edges.
+
+    Returns:
+        The finished BASE-by-BASE icon image.
+    """
     s = BASE * SCALE
     img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
 
@@ -143,6 +154,11 @@ RUNTIME_PNG = 512
 
 
 def write_assets(here: Path) -> None:
+    """Write the .ico, MSIX ONGs, runtime PNG, and (on macOS) the .icns.
+
+    Args:
+        here: The packaging/ directory (outputs land beside this script).
+    """
     master = render_master()
 
     ico_path = here / "keycast.ico"
@@ -174,13 +190,13 @@ def write_assets(here: Path) -> None:
             master.resize((size, size), Image.LANCZOS).save(iconset / name)
         icns_path = here / "keycast.icns"
         subprocess.run(
-            ["iconutil", "-c", "icns", str(iconset), "-o", str(icns_path)],
-            check=True,
+            ["iconutil", "-c", "icns", str(iconset), "-o", str(icns_path)], check=True
         )
         print(f"wrote {icns_path.relative_to(here.parent)}")
 
 
 def main() -> None:
+    """Regenerate every committed icon asset from the programmatic source."""
     write_assets(Path(__file__).resolve().parent)
 
 

@@ -1,12 +1,15 @@
 """Tests for the Keycast application lifecycle."""
 
-from collections.abc import Iterator
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, call, patch
 
 import pytest
 
 import keycast.application as application_module
 from keycast.application import Keycast
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 _InputSourceStatus = application_module._InputSourceStatus
 _PermissionPrecheck = application_module._PermissionPrecheck
@@ -280,7 +283,10 @@ class TestStart:
         )
 
     def test_startup_status_suppressed_when_disabled(self, keycast: Keycast) -> None:
-        """With the flag off, active listeners produce no status line, only the splash."""
+        """With the flag off, active listeners produce no status line.
+
+        Only the splash shows.
+        """
         keycast.settings.auto_start = True
         keycast.settings.start_minimized = False
         keycast.settings.show_startup_status = False
@@ -538,7 +544,10 @@ class TestStart:
     def test_start_minimized_ignored_when_all_listeners_disabled(
         self, keycast: Keycast, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """No live source ⇒ keep the overlay visible (a hidden one could never return)."""
+        """No live source, so keep the overlay visible.
+
+        A hidden overlay could never return.
+        """
         keycast.settings.auto_start = True
         keycast.settings.start_minimized = True
         keycast.mouse_listener.settings.enabled = False
@@ -647,7 +656,7 @@ class TestMacOSPermissionPrecheck:
         [(False, True), (True, False), (False, False)],
     )
     def test_denied_when_any_check_fails(
-        self, accessibility: bool, input_monitoring: bool
+        self, *, accessibility: bool, input_monitoring: bool
     ) -> None:
         lib = _fake_app_services(
             accessibility=accessibility, input_monitoring=input_monitoring
@@ -715,9 +724,7 @@ class TestUpdateCheck:
             keycast.start()
 
         application_module.notify_pending_update.assert_called_once_with(
-            notify=keycast.display_window.show_text,
-            current="1.2.3",
-            enabled=True,
+            notify=keycast.display_window.show_text, current="1.2.3", enabled=True
         )
 
     def test_skipped_on_minimized_start(self, keycast: Keycast) -> None:
@@ -885,7 +892,10 @@ class TestRun:
     def test_run_swallows_keyboard_interrupt_and_cleans_up(
         self, keycast: Keycast
     ) -> None:
-        """Ctrl-C during start is logged and swallowed (no SystemExit), then cleaned up."""
+        """Ctrl-C during start is logged and swallowed, then cleaned up.
+
+        No SystemExit escapes.
+        """
         keycast.display_window.start.side_effect = KeyboardInterrupt
 
         with patch("keycast.application.signal.signal"):

@@ -1,7 +1,7 @@
 """Tests for the display module."""
 
 import threading
-from collections.abc import Callable, Iterator
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, call, patch
 
 import pytest
@@ -9,6 +9,9 @@ from pydantic_extra_types.color import Color
 
 from keycast.display import _MAX_RETAINED_EVENTS, DisplayWindow
 from keycast.settings import DisplaySettings
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
 
 
 @pytest.fixture
@@ -54,7 +57,7 @@ class TestDisplayWindow:
         assert window.settings.font_family == "Arial"
         assert window.settings.font_size == 16
         assert window.settings.font_weight == "bold"
-        assert window.settings.alpha == 0.8
+        assert window.settings.alpha == 0.8  # noqa: RUF069 — exact literal round-trip
         assert window.settings.always_on_top is True
         assert window.settings.fade_duration_ms == 2000
         assert window.settings.max_events == 5
@@ -87,7 +90,7 @@ class TestDisplayWindow:
         assert window.settings.font_family == "Courier"
         assert window.settings.font_size == 20
         assert window.settings.font_weight == "normal"
-        assert window.settings.alpha == 0.5
+        assert window.settings.alpha == 0.5  # noqa: RUF069 — exact literal round-trip
         assert window.settings.always_on_top is False
         assert window.settings.fade_duration_ms == 3000
         assert window.settings.max_events == 10
@@ -557,7 +560,8 @@ class TestDisplayWindow:
         # Deferred, not run inline: nothing executed on the producer thread, and
         # the update was enqueued with delay 0.
         assert update_threads == []
-        assert queued and queued[0][0] == 0
+        assert queued
+        assert queued[0][0] == 0
 
         # Draining the queue (as the main loop would) is the only place the
         # widget update actually runs — and not on the producer thread.
@@ -632,7 +636,7 @@ class TestDisplayWindow:
         concurrently many times must leave no escaped exception and a cleared
         root.
         """
-        mock_root, _ = mock_tk
+        _mock_root, _ = mock_tk
         errors: list[BaseException] = []
 
         for _ in range(200):
@@ -825,7 +829,10 @@ class TestStartMinimized:
         window._restore_from_minimized()  # must not raise
 
     def test_restore_logs_on_deiconify_error(self, mock_tk: tuple[Mock, Mock]) -> None:
-        """A deiconify failure is throttled, not raised (mirrors the other Tk callbacks)."""
+        """A deiconify failure is throttled, not raised.
+
+        Mirrors the other Tk callbacks.
+        """
         mock_root, _ = mock_tk
         window = DisplayWindow(DisplaySettings())
         window._error_throttler = Mock()
@@ -855,7 +862,10 @@ class TestForceFrameless:
         reassert.assert_called_once_with()
 
     def test_skips_reassert_off_macos(self, mock_tk: tuple[Mock, Mock]) -> None:
-        """Other platforms strip the frame on the first call, so the toggle is skipped."""
+        """Other platforms strip the frame on the first call.
+
+        The toggle is skipped there.
+        """
         window = DisplayWindow(DisplaySettings())
         with (
             patch("keycast.display.sys.platform", "win32"),
@@ -868,7 +878,10 @@ class TestForceFrameless:
     def test_reassert_toggles_overrideredirect_off_then_on(
         self, mock_tk: tuple[Mock, Mock]
     ) -> None:
-        """The off/on flip after a layout pass is what makes Aqua re-evaluate the frame."""
+        """The off/on flip after a layout pass re-evaluates the frame.
+
+        That is what makes Aqua pick the change up.
+        """
         mock_root, _ = mock_tk
         window = DisplayWindow(DisplaySettings())
         # _setup_window already called overrideredirect once; isolate the toggle.
@@ -942,7 +955,8 @@ class TestWindowIcon:
             window._apply_window_icon()
 
         photo_cls.assert_called_once()
-        root.iconphoto.assert_called_once_with(True, photo)
+        # Asserted positionally: production code passes `default` positionally.
+        root.iconphoto.assert_called_once_with(True, photo)  # noqa: FBT003
         # Held on the instance so Tk's GC doesn't blank the icon.
         assert window._icon_image is photo
 

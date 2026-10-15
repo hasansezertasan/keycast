@@ -1,0 +1,56 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/docker-existing-docker-compose
+{
+  "name": "Dev Container",
+  // Update the 'dockerComposeFile' list if you have more compose files or use different names.
+  // The .devcontainer/docker-compose.yml file contains any overrides you need/want to make.
+  "dockerComposeFile": ["docker-compose.yml"],
+  // The 'service' property is the name of the service for the container that VS Code should
+  // use. Update this value and .devcontainer/docker-compose.yml to the real service name.
+  "service": "devcontainer",
+  // The optional 'workspaceFolder' property is the path VS Code should open by default when
+  // connected. This is typically a file mount in .devcontainer/docker-compose.yml
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  // Features to add to the dev container. More info: https://containers.dev/features.
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers-extra/features/mise:1": {}
+  },
+  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  // "forwardPorts": [8000],
+  // Uncomment the next line if you want start specific services in your Docker Compose config.
+  // "runServices": [],
+  // Uncomment the next line if you want to keep your containers running after VS Code shuts down.
+  "shutdownAction": "stopCompose",
+  // Uncomment the next line to run commands after the container is created.
+  // xvfb runs as the image's default (root) user: the test suite and the
+  // Sphinx docs build import pynput, whose X11 backend aborts with no display
+  // (same reason CI wraps those jobs in xvfb-run), so the documented
+  // pytest/tox commands need it installed before the first run.
+  "postCreateCommand": "apt-get update && apt-get install -y xvfb && uv sync",
+  // Keep a headless X server on :99 across restarts and point every integrated
+  // terminal at it. The trailing sleep keeps the step green when a server from
+  // a previous start is still holding the display (the fresh Xvfb then exits,
+  // the old one keeps serving).
+  "postStartCommand": "rm -f /tmp/.X99-lock; Xvfb :99 -screen 0 1280x800x24 >/tmp/xvfb.log 2>&1 & sleep 1",
+  "remoteEnv": {
+    "DISPLAY": ":99"
+  },
+  // Configure tool-specific properties.
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "GitHub.copilot",
+        "charliermarsh.ruff",
+        "donjayamanne.githistory",
+        "eamodio.gitlens",
+        "hverlin.mise-vscode",
+        "ms-azuretools.vscode-docker",
+        "ms-python.black-formatter",
+        "ms-python.debugpy"
+      ]
+    }
+  }
+  // Uncomment to connect as an existing user other than the container default. More info: https://aka.ms/dev-containers-non-root.
+  // "remoteUser": "devcontainer"
+}

@@ -1,0 +1,38 @@
+# ai-rulez configuration: the single source of truth for this project's agent
+# instructions. Edit the sources in this directory — never the files
+# `ai-rulez generate` writes from them (AGENTS.md, CLAUDE.md, ...), which carry
+# a DO-NOT-EDIT banner and a content hash. See https://hasansezertasan.github.io/copier-pyproject/context/agent-instructions/#ai-rulez-is-the-opt-in-single-source-for-agent-instructions-with-the-prose-in-shared-macros.
+#
+# Free-text answers are rendered through `to_json`, which supplies the quotes
+# and the escaping: a description carrying a double quote, a backslash or a
+# non-ASCII character would otherwise produce TOML that does not parse, and
+# copier would still report a successful render. `github_repo_name` is validated
+# to a Python identifier, so it is interpolated bare on purpose.
+version = "4.0"
+name = "keycast"
+description = "Keycast is a cross-platform keystroke and mouse click visualizer built in Python."
+# `.gitignore` is a cobo-sealed, sha256-verified block (https://hasansezertasan.github.io/copier-pyproject/context/gitignore-generation/#cobo-generates-the-gitignore-with-a-hash-sealed-fence-and-lockfiles). ai-rulez
+# defaults this to `true` and would rewrite the file to ignore its own output —
+# breaking the seal, failing `gitignore-drift.yml`, and hiding the very files
+# GitHub has to read from the repository (Copilot reads
+# `.github/copilot-instructions.md` server-side). The output is committed here.
+gitignore = false
+# No builtin domains. Every universal domain either restates a rule this
+# project's CI already enforces (conventional commits, branch names) or
+# contradicts it — the `code-quality` domain mandates complexity 20 and 120
+# columns against ruff's 5 and 88, and the `python` domain asks for Google-style
+# docstrings and 80% coverage against pep257 and `fail_under = 99`. A rule an
+# agent obeys and a gate that fails it must not be two separately-maintained
+# sentences, so the rules below are the only ones shipped (https://hasansezertasan.github.io/copier-pyproject/context/agent-instructions/#no-builtin-ai-rulez-domains-and-ai-rulez-never-touches-gitignore).
+builtins = false
+presets = [
+  "claude",
+  "codex",
+  "copilot",
+  "opencode",
+]
+
+[header]
+# Generated files are committed, so a timestamp would rewrite every one of them
+# on every run and make the drift check meaningless.
+timestamp = false

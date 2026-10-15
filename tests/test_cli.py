@@ -1,7 +1,7 @@
 """Test cases for the main application commands using Typer's CLI runner."""
 
 import platform
-from collections.abc import Iterator
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
@@ -9,6 +9,9 @@ from typer.testing import CliRunner
 
 from keycast import __version__
 from keycast.cli import app
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 runner = CliRunner()
 

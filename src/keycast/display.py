@@ -6,9 +6,17 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
-from keycast.logging_setup import _ErrorThrottler, format_event
+from keycast.logging_setup import (
+    _ErrorThrottler,  # pyright: ignore[reportPrivateUsage] — shared throttler, see listeners.py
+    format_event,
+)
+
+# Runtime import (not TYPE_CHECKING): Sphinx autodoc evaluates annotations to
+# render signatures. Safe headless — pydantic/settings pull in no GUI toolkit.
+# `noqa: TC001` — the typing-only placement would break the docs build.
+from keycast.settings import DisplaySettings  # noqa: TC001
 
 # Runaway backstop for the retained-events list. The fade timer prunes events
 # older than fade_duration_ms every 100ms, so in normal operation ``events``
@@ -30,11 +38,19 @@ if TYPE_CHECKING:
     # TYPE_CHECKING-only import is enough to satisfy them.
     import tkinter as tk
 
-    from keycast.settings import DisplaySettings
+    # Quoted ``cast("Any", ...)`` at the pyobjc FFI boundary below (ruff TC006
+    # keeps the cast value quoted): the name is only ever a string forward-ref,
+    # so a TYPE_CHECKING import satisfies every checker without a runtime cost.
+    from typing import Any
+
+__all__ = ["DisplayWindow"]
 
 
 class DisplayWindow:
     """A transparent overlay window that displays events."""
+
+    # Overlay state is inherently broad; silence the attribute-count gate.
+    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, settings: DisplaySettings) -> None:
         """Initialize the display window.
@@ -42,9 +58,9 @@ class DisplayWindow:
         Args:
             settings: Display settings
         """
-        self.settings = settings
+        self.settings: DisplaySettings = settings
 
-        self.logger = logging.getLogger(__name__)
+        self.logger: logging.Logger = logging.getLogger(__name__)
         self.root: tk.Tk | None = None
         self.label: tk.Label | None = None
         # Holds the runtime icon's PhotoImage. Tk's garbage collector blanks an
@@ -74,23 +90,23 @@ class DisplayWindow:
         # ``_update_display``) — holding it across ``after`` deadlocks. Callers
         # (``show_text``, ``request_stop``) capture ``root`` under the lock and
         # call ``after`` outside it; any future caller must do the same.
-        self._lock = threading.RLock()
+        self._lock: threading.RLock = threading.RLock()
         # Throttles repeated errors from the Tk callbacks (``_fade_timer`` and
         # ``_update_display``), which fire continuously: the fade tick every
         # 100ms and the update on every event. Without this, a persistent
         # rendering fault (e.g. a font tkinter rejects on every ``label.config``)
         # would write a full traceback many times a second. Both callbacks run
         # on the Tk main loop, so a single, lock-free throttler is safe here.
-        self._error_throttler = _ErrorThrottler(self.logger)
+        self._error_throttler: _ErrorThrottler = _ErrorThrottler(self.logger)
         # Set when started with start_minimized: the overlay is withdrawn until
         # the first captured event re-shows it (see _restore_from_minimized).
         # Read on pynput threads (show_text) and written on the Tk main loop, so
         # access is guarded by _lock.
-        self._minimized = False
+        self._minimized: bool = False
         # Cursor offset within the window at drag start, used by the optional
         # drag-to-move handlers so the window follows the cursor without jumping.
-        self._drag_offset_x = 0
-        self._drag_offset_y = 0
+        self._drag_offset_x: int = 0
+        self._drag_offset_y: int = 0
         self._setup_window()
 
     def _setup_window(self) -> None:
@@ -102,17 +118,19 @@ class DisplayWindow:
         self._apply_window_icon()
 
         # Configure window properties
-        self.root.configure(bg=str(self.settings.background_color))
-        self.root.overrideredirect(boolean=True)  # Remove window decorations
+        _ = self.root.configure(bg=str(self.settings.background_color))
+        # Remove window decorations. zuban's Tk stubs type this as returning
+        # None, so the result cannot be assigned (unlike the sibling calls).
+        self.root.overrideredirect(boolean=True)
         # Lock the size independently of decorations. overrideredirect is meant to
         # strip the frame (and with it the resize grips), but on macOS Aqua Tk 9
         # it is unreliable, leaving the window resizable; resizable(False, False)
         # disables resize/zoom regardless of whether the frame is actually gone.
         self.root.resizable(width=False, height=False)
-        self.root.attributes("-alpha", self.settings.alpha)
+        _ = self.root.attributes("-alpha", self.settings.alpha)
 
         if self.settings.always_on_top:
-            self.root.attributes("-topmost", True)  # noqa: FBT003
+            _ = self.root.attributes("-topmost", True)  # noqa: FBT003
 
         # Position window. The settings bounds on x/y are only a generous sanity
         # check (they reject absurd values but not merely off-screen ones), so
@@ -181,14 +199,21 @@ class DisplayWindow:
         (a minimized overlay is first mapped at deiconify, so the frame must be
         re-asserted there too).
 
-        macOS-only: only the platform check lives here so the actual widget work
-        — and the only ``root`` access — sits in :meth:`_reassert_overrideredirect`,
-        a method with no platform guard. On non-macOS the early ``return`` makes
-        any following statements statically unreachable, and the type checker does
-        not narrow ``self.root`` inside unreachable code; keeping the ``root``
-        access in a separate, always-reachable method sidesteps that entirely.
+        macOS-only: the guard reads a plainly-typed ``host_platform`` local
+        rather than ``sys.platform`` (same literal-narrowing defeat as
+        secure_input.py) so checkers with platform pruning (mypy
+        ``--platform``, ty, pyrefly) never treat the macOS-only call below as
+        unreachable on other targets. The actual widget work — and the only
+        ``root`` access — still sits in :meth:`_reassert_overrideredirect`, a
+        method with no platform guard, so the non-None ``root`` narrowing is
+        never lost inside guarded code.
         """
-        if sys.platform != "darwin":
+        # Read the platform into a plainly-typed local before branching (same
+        # literal-narrowing defeat as secure_input.py): checkers with platform
+        # pruning treat `sys.platform != "darwin"` as compile-time-known and
+        # flag the macOS-only body as unreachable on other targets.
+        host_platform: str = sys.platform
+        if host_platform != "darwin":
             return
         self._reassert_overrideredirect()
 
@@ -217,7 +242,7 @@ class DisplayWindow:
         except tk.TclError as exc:
             self.logger.debug("could not force frameless window: %s", exc)
 
-    def _apply_window_icon(self) -> None:
+    def _apply_window_icon(self) -> None:  # noqa: C901 — per-platform icon branches
         """Brand the taskbar / dock icon when keycast runs from source.
 
         The packaged ``.app``/``.exe`` get their icon from PyInstaller
@@ -261,16 +286,20 @@ class DisplayWindow:
                 # time and ships no stubs. Cast the dynamic module to ``Any`` at
                 # this FFI boundary so all supported checkers analyze the same
                 # cross-platform source without brittle version-specific ignores.
-                appkit = cast(Any, importlib.import_module("AppKit"))
+                # The ``Any`` annotation is load-bearing, not redundant: ruff
+                # TC006 keeps the cast value quoted (a string forward-ref the
+                # unused-import queries do not count as a use), so the name
+                # needs this real annotation reference to stay imported.
+                appkit: Any = cast("Any", importlib.import_module("AppKit"))  # pyright: ignore[reportExplicitAny] — pyobjc is dynamic
                 ns_image = appkit.NSImage
                 ns_app = appkit.NSApplication
                 image = ns_image.alloc().initWithContentsOfFile_(str(icon_path))
                 if image is not None:
                     ns_app.sharedApplication().setApplicationIconImage_(image)
-            except Exception as exc:  # noqa: BLE001 — pyobjc raises many unrelated types
+            except Exception as exc:  # pyobjc raises many unrelated types
                 self.logger.debug("could not set macOS dock icon: %s", exc)
 
-    def _enable_dragging(self, root: "tk.Tk", label: "tk.Label") -> None:
+    def _enable_dragging(self, root: tk.Tk, label: tk.Label) -> None:
         """Bind press-and-drag handlers so the overlay can be moved by mouse.
 
         ``overrideredirect(True)`` removes the title bar, so the window manager
@@ -284,10 +313,10 @@ class DisplayWindow:
             label: The label widget filling the window.
         """
         for widget in (root, label):
-            widget.bind("<Button-1>", self._on_drag_start)
-            widget.bind("<B1-Motion>", self._on_drag_motion)
+            _ = widget.bind("<Button-1>", self._on_drag_start)
+            _ = widget.bind("<B1-Motion>", self._on_drag_motion)
 
-    def _on_drag_start(self, event: "tk.Event[tk.Misc]") -> None:
+    def _on_drag_start(self, event: tk.Event[tk.Misc]) -> None:
         """Record where inside the window the drag began.
 
         Args:
@@ -296,11 +325,11 @@ class DisplayWindow:
         self._drag_offset_x = event.x
         self._drag_offset_y = event.y
 
-    def _on_drag_motion(self, event: "tk.Event[tk.Misc]") -> None:
+    def _on_drag_motion(self, _event: tk.Event[tk.Misc]) -> None:
         """Move the window to follow the cursor during a drag.
 
         Args:
-            event: The motion event (unused; absolute pointer position is read
+            _event: The motion event (unused; absolute pointer position is read
                 from the root so the math is independent of which widget the
                 cursor is currently over).
         """
@@ -346,7 +375,7 @@ class DisplayWindow:
             # torn-down root from being rescheduled (which would raise TclError)
             # should the teardown lifecycle ever change.
             if self.root:
-                self.root.after(100, self._fade_timer)
+                _ = self.root.after(100, self._fade_timer)
 
     def _update_display(self) -> None:
         """Update the display with current events.
@@ -376,7 +405,7 @@ class DisplayWindow:
             event_texts = [event_text for event_text, _ in recent_events]
             display_text = "\n".join(event_texts)
 
-            self.label.config(text=display_text)
+            _ = self.label.config(text=display_text)
         except Exception as exc:
             self._error_throttler.log("update_display_error", exc)
 
@@ -428,8 +457,8 @@ class DisplayWindow:
             # widgets may only be touched from the thread owning the main loop —
             # the same reason _update_display is marshalled via after.
             if minimized:
-                root.after(0, self._restore_from_minimized)
-            root.after(0, self._update_display)
+                _ = root.after(0, self._restore_from_minimized)
+            _ = root.after(0, self._update_display)
         except (RuntimeError, tk.TclError) as exc:
             # The Tk loop can be dead while ``root`` still exists (external app
             # teardown between mainloop() returning and stop() nulling root), or
@@ -523,7 +552,7 @@ class DisplayWindow:
         if root is None:
             return
         try:
-            root.after(0, root.quit)
+            _ = root.after(0, root.quit)
         except (RuntimeError, tk.TclError) as exc:
             # Loop already gone / root destroyed after we released the lock; the
             # loop is (or is becoming) stopped anyway, so tolerate it. Logged at

@@ -6,9 +6,11 @@ import sys
 from keycast.application import Keycast
 from keycast.logging_setup import format_event
 
+__all__ = ["main"]
+
 
 def main() -> None:
-    """Main entry point for the keycast application.
+    """Run the keycast application.
 
     ``Keycast()`` builds the tkinter window during construction (before
     ``run()``'s own error handling is entered), so a failure there would

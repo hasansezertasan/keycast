@@ -19,6 +19,9 @@ from pathlib import Path
 
 from keycast.settings import UPDATE_CHECK_FILE_PATH
 
+__all__ = ["UpdateState", "due_for_check", "read_state", "write_state"]
+
+
 logger = logging.getLogger(__name__)
 
 CHECK_INTERVAL_SECONDS: float = 24 * 60 * 60
@@ -89,7 +92,7 @@ def write_state(state: UpdateState, path: Path = UPDATE_CHECK_FILE_PATH) -> None
                 # Derive the JSON keys from the dataclass fields so a future
                 # field rename can't silently drift the on-disk schema.
                 json.dump(dataclasses.asdict(state), tmp_file)
-            os.replace(tmp_name, path)
+            _ = Path(tmp_name).replace(path)
         except BaseException:
             Path(tmp_name).unlink(missing_ok=True)
             raise

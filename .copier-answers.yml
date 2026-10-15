@@ -1,0 +1,53 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+---
+_commit: v1.12.0
+_src_path: https://github.com/hasansezertasan/copier-pyproject.git
+ai_rulez_presets:
+- claude
+- codex
+- copilot
+- opencode
+async_style: none
+author_email: hasansezertasan@gmail.com
+author_family_names: Taşan
+author_full_name: Hasan Sezer Taşan
+author_given_names: Hasan Sezer
+cli_framework: typer
+docs_version_granularity: minor
+github_repo_name: keycast
+github_user: hasansezertasan
+include_ai_rulez: true
+include_all_contributors: false
+include_benchmarks: false
+include_c_extensions: false
+include_cli: true
+include_compiler: false
+include_dbeaver: false
+include_docs: true
+include_examples: false
+include_freezer: true
+include_gui: true
+include_homebrew: true
+include_launcher: false
+include_mcp: false
+include_megalinter: false
+include_postgres: false
+include_profiling: false
+include_pydantic_settings: true
+include_pypi_publish: true
+include_redis: false
+include_repo_ruleset: true
+include_repo_settings: true
+include_scoop: true
+include_smokeshow: true
+include_sonarcloud: false
+include_sourcery: false
+include_tui: false
+include_vpn: false
+include_web: false
+include_worker: false
+package_keywords: keystrokes, mouse, visualizer, screencast, overlay, presenter
+preset: tool
+repository_topics: ''
+short_description: Keycast is a cross-platform keystroke and mouse click visualizer
+    built in Python.

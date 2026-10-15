@@ -1,5 +1,9 @@
 """Python module for keycast configuration and paths."""
 
+# The settings model is one cohesive unit (sections + validators + presets);
+# splitting it would scatter the config surface reviewers configure in one place.
+# pylint: disable=too-many-lines
+
 import errno
 import logging
 import os
@@ -10,7 +14,7 @@ import time
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import Annotated, Literal, get_args
+from typing import Annotated, ClassVar, Literal, TypeAlias, get_args, override
 
 from pydantic import (
     BaseModel,
@@ -30,6 +34,16 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 
+__all__ = [
+    "DisplaySettings",
+    "KeyboardSettings",
+    "LoggingSettings",
+    "MouseSettings",
+    "Settings",
+    "is_bare_key_name",
+    "is_button_string",
+]
+
 
 class _ReadOnlyStrMap:
     """Pydantic marker: validate a ``dict[str, str]`` then freeze it.
@@ -45,7 +59,11 @@ class _ReadOnlyStrMap:
 
     @classmethod
     def __get_pydantic_core_schema__(
-        cls, source: object, handler: GetCoreSchemaHandler
+        # `source` is unused but required by the pydantic hook signature.
+        # pylint: disable=unused-argument
+        cls,
+        source: object,
+        handler: GetCoreSchemaHandler,
     ) -> core_schema.CoreSchema:
         """Build a schema that validates a ``dict[str, str]`` and wraps it.
 
@@ -78,6 +96,9 @@ def is_bare_key_name(name: str) -> bool:
     (which rejects malformed config keys) and the lookup in
     ``KeyListener._format_key`` (which looks names up by ``key.name``) rely on
     this same grammar; keeping it here stops the two sides from drifting.
+
+    Returns:
+        True when ``name`` is a bare pynput key name.
     """
     return "." not in name and name == name.lower()
 
@@ -90,6 +111,9 @@ def is_button_string(name: str) -> bool:
     ``MouseSettings._validate_button_names`` and the lookup in
     ``MouseListener._format_button`` (which keys off ``str(button)``) rely on
     this grammar; keeping it here stops the two sides from drifting.
+
+    Returns:
+        True when ``name`` has the ``"Button.<name>"`` shape.
     """
     return name.startswith("Button.")
 
@@ -101,13 +125,11 @@ def is_button_string(name: str) -> bool:
 # config is preserved instead of being overwritten by an unflushed file. EINVAL
 # is what Linux returns for an fd/FS that cannot fsync; ENOTSUP/EOPNOTSUPP is the
 # BSD/macOS equivalent. (getattr guards platforms lacking the ENOTSUP alias.)
-_FSYNC_UNSUPPORTED_ERRNOS = frozenset(
-    {
-        errno.EINVAL,
-        getattr(errno, "ENOTSUP", errno.EINVAL),
-        getattr(errno, "EOPNOTSUPP", errno.EINVAL),
-    }
-)
+_FSYNC_UNSUPPORTED_ERRNOS = frozenset({
+    errno.EINVAL,
+    getattr(errno, "ENOTSUP", errno.EINVAL),
+    getattr(errno, "EOPNOTSUPP", errno.EINVAL),
+})
 
 
 def _fsync_data(fd: int) -> None:
@@ -181,20 +203,14 @@ must not live in the user's config. See ``keycast.updates``."""
 class DisplaySettings(BaseModel):
     """Display window configuration settings."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     # Window dimensions and position
     width: int = Field(
-        default=400,
-        ge=100,
-        le=2000,
-        description="Window width in pixels",
+        default=400, ge=100, le=2000, description="Window width in pixels"
     )
     height: int = Field(
-        default=100,
-        ge=50,
-        le=1000,
-        description="Window height in pixels",
+        default=100, ge=50, le=1000, description="Window height in pixels"
     )
     # The configurability is intentionally asymmetric: x supports an explicit
     # "center" value (the overlay's natural horizontal placement), while y has
@@ -221,41 +237,23 @@ class DisplaySettings(BaseModel):
 
     # Visual appearance
     background_color: Color = Field(
-        default=Color("black"),
-        description="Background color",
+        default=Color("black"), description="Background color"
     )
-    text_color: Color = Field(
-        default=Color("white"),
-        description="Text color",
-    )
+    text_color: Color = Field(default=Color("white"), description="Text color")
     font_family: str = Field(
         default="Arial",
         min_length=1,
         description="Font family name (tkinter falls back to a default if the "
         "named family is unavailable on the system)",
     )
-    font_size: int = Field(
-        default=16,
-        ge=8,
-        le=72,
-        description="Font size in points",
-    )
+    font_size: int = Field(default=16, ge=8, le=72, description="Font size in points")
     font_weight: Literal["normal", "bold"] = Field(
-        default="bold",
-        description="Font weight",
+        default="bold", description="Font weight"
     )
-    alpha: float = Field(
-        default=0.8,
-        ge=0.1,
-        le=1.0,
-        description="Window transparency",
-    )
+    alpha: float = Field(default=0.8, ge=0.1, le=1.0, description="Window transparency")
 
     # Window behavior
-    always_on_top: bool = Field(
-        default=True,
-        description="Whether window stays on top",
-    )
+    always_on_top: bool = Field(default=True, description="Whether window stays on top")
     draggable: bool = Field(
         default=False,
         description="Allow repositioning the overlay by dragging it with the "
@@ -269,10 +267,7 @@ class DisplaySettings(BaseModel):
         description="How long events stay visible in milliseconds",
     )
     max_events: int = Field(
-        default=5,
-        ge=1,
-        le=20,
-        description="Maximum number of events to display",
+        default=5, ge=1, le=20, description="Maximum number of events to display"
     )
 
 
@@ -339,23 +334,19 @@ def _default_key_mappings() -> dict[str, str]:
 class KeyboardSettings(BaseModel):
     """Keyboard listener configuration settings."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     enabled: bool = Field(
-        default=True,
-        description="Whether to enable the keyboard listener",
+        default=True, description="Whether to enable the keyboard listener"
     )
     show_modifier_keys: bool = Field(
-        default=True,
-        description="Whether to show modifier keys (Ctrl, Alt, etc.)",
+        default=True, description="Whether to show modifier keys (Ctrl, Alt, etc.)"
     )
     show_function_keys: bool = Field(
-        default=True,
-        description="Whether to show function keys (F1, F2, etc.)",
+        default=True, description="Whether to show function keys (F1, F2, etc.)"
     )
     show_special_keys: bool = Field(
-        default=True,
-        description="Whether to show special keys (Enter, Space, etc.)",
+        default=True, description="Whether to show special keys (Enter, Space, etc.)"
     )
     mask_secure_input: bool = Field(
         default=True,
@@ -428,19 +419,16 @@ class KeyboardSettings(BaseModel):
 class MouseSettings(BaseModel):
     """Mouse listener configuration settings."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     enabled: bool = Field(
-        default=True,
-        description="Whether to enable the mouse listener",
+        default=True, description="Whether to enable the mouse listener"
     )
     show_mouse_clicks: bool = Field(
-        default=True,
-        description="Whether to show mouse clicks",
+        default=True, description="Whether to show mouse clicks"
     )
     show_mouse_position: bool = Field(
-        default=False,
-        description="Whether to show mouse position coordinates",
+        default=False, description="Whether to show mouse position coordinates"
     )
     # See ``KeyboardSettings.key_mappings``: ``ReadOnlyStrMap`` validates,
     # freezes, and serializes the mapping; ``validate_default`` freezes the
@@ -484,7 +472,7 @@ class MouseSettings(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def _validate_position_requires_clicks(self) -> "MouseSettings":
+    def _validate_position_requires_clicks(self) -> MouseSettings:
         """Reject ``show_mouse_position`` without ``show_mouse_clicks``.
 
         ``MouseListener._on_click`` appends the position only inside the
@@ -513,26 +501,21 @@ class MouseSettings(BaseModel):
 class LoggingSettings(BaseModel):
     """Logging configuration settings."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     # pyrefly: ignore[bad-assignment]  # Field(default=...) can't be narrowed to the Literal; mypy/pyright/ty accept it.
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
-        default="INFO",
-        description="Logging level",
+        default="INFO", description="Logging level"
     )
     format: str = Field(
         default="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         description="Log message format",
     )
     file_path: Path | None = Field(
-        default=LOG_FILE_PATH,
-        description="Log file path (None for console only)",
+        default=LOG_FILE_PATH, description="Log file path (None for console only)"
     )
     max_file_size_mb: int = Field(
-        default=10,
-        ge=1,
-        le=100,
-        description="Maximum log file size in MB",
+        default=10, ge=1, le=100, description="Maximum log file size in MB"
     )
     backup_count: int = Field(
         default=5,
@@ -562,7 +545,7 @@ class LoggingSettings(BaseModel):
             ValueError: If the format string is not a valid logging format.
         """
         try:
-            logging.Formatter(value)
+            _ = logging.Formatter(value)
         except (ValueError, TypeError) as exc:
             msg = f"Invalid logging format string: {exc}"
             raise ValueError(msg) from exc
@@ -575,7 +558,10 @@ class LoggingSettings(BaseModel):
 # checking, and the invariant "every non-custom preset has an override bundle"
 # is asserted at import (see below). ``"custom"`` is deliberately not a member —
 # it names no overrides.
-PresetName = Literal["presenter", "minimal", "debug"]
+# UP040 prefers the PEP 695 `type` statement, but `get_args(PresetName)` below
+# introspects the alias at import time and `type` aliases are opaque to it —
+# keep the explicit TypeAlias form so the preset/override coupling guard works.
+PresetName: TypeAlias = Literal["presenter", "minimal", "debug"]  # noqa: UP040
 
 _PRESET_OVERRIDES: dict[PresetName, dict[str, object]] = {
     # Screencast / demo: large, legible, lingers a little longer, clicks shown.
@@ -596,7 +582,7 @@ _PRESET_OVERRIDES: dict[PresetName, dict[str, object]] = {
             "fade_duration_ms": 1000,
             "max_events": 1,
             "alpha": 0.6,
-        },
+        }
     },
     # Troubleshooting: verbose logging plus everything visible, kept on screen.
     "debug": {
@@ -628,29 +614,22 @@ assert set(_PRESET_OVERRIDES) == set(get_args(PresetName)), (
 class Settings(BaseSettings):
     """Main settings class for the keycast application."""
 
-    model_config = SettingsConfigDict(
-        json_file=CONFIG_FILE_PATH,
-        case_sensitive=True,
-        extra="ignore",
-        frozen=True,
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
+        json_file=CONFIG_FILE_PATH, case_sensitive=True, extra="ignore", frozen=True
     )
 
     # Component settings
     display: DisplaySettings = Field(
-        default_factory=DisplaySettings,
-        description="Display window settings",
+        default_factory=DisplaySettings, description="Display window settings"
     )
     keyboard: KeyboardSettings = Field(
-        default_factory=KeyboardSettings,
-        description="Keyboard listener settings",
+        default_factory=KeyboardSettings, description="Keyboard listener settings"
     )
     mouse: MouseSettings = Field(
-        default_factory=MouseSettings,
-        description="Mouse listener settings",
+        default_factory=MouseSettings, description="Mouse listener settings"
     )
     logging: LoggingSettings = Field(
-        default_factory=LoggingSettings,
-        description="Logging settings",
+        default_factory=LoggingSettings, description="Logging settings"
     )
 
     # App-wide flags
@@ -731,7 +710,7 @@ class Settings(BaseSettings):
     # auto_start is the app-level master switch layered above them.
 
     @model_validator(mode="after")
-    def _validate_minimized_requires_autostart(self) -> "Settings":
+    def _validate_minimized_requires_autostart(self) -> Settings:
         """Reject ``start_minimized`` without ``auto_start``.
 
         A minimized start hides the overlay until the first captured event re-shows
@@ -778,9 +757,14 @@ class Settings(BaseSettings):
         # exactly as configured (so debug never changes normal operation).
         if not self.debug:
             return self.logging
-        return self.logging.model_copy(update={"level": "DEBUG"})
+        # Pylint infers FieldInfo here (it sees the Field() default, not the
+        # validated instance attribute), so the copy is silenced locally.
+        # pylint: disable=no-member
+        logging_settings: LoggingSettings = self.logging
+        return logging_settings.model_copy(update={"level": "DEBUG"})
+        # pylint: enable=no-member
 
-    def resolve_preset(self) -> "Settings":
+    def resolve_preset(self) -> Settings:
         """Return the settings to apply, with the selected ``preset`` layered on.
 
         ``preset`` names a built-in override bundle (see :data:`_PRESET_OVERRIDES`)
@@ -834,13 +818,14 @@ class Settings(BaseSettings):
         return self.model_copy(update=updates)
 
     @classmethod
+    @override
     def settings_customise_sources(
         cls,
         settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,  # noqa: ARG003
-        env_settings: PydanticBaseSettingsSource,  # noqa: ARG003
-        dotenv_settings: PydanticBaseSettingsSource,  # noqa: ARG003
-        file_secret_settings: PydanticBaseSettingsSource,  # noqa: ARG003
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         """Customize the settings sources used to load the settings.
 
@@ -863,7 +848,7 @@ class Settings(BaseSettings):
         return (JsonConfigSettingsSource(settings_cls),)
 
     @classmethod
-    def create_settings_file(cls) -> "Settings":
+    def create_settings_file(cls) -> Settings:
         """Load settings, recovering from a corrupt file and persisting defaults.
 
         On first run (no config file) the defaults are written to disk. If the
@@ -919,7 +904,7 @@ class Settings(BaseSettings):
     @classmethod
     def _recover_from_invalid_config(
         cls, json_file: Path, exc: Exception
-    ) -> "tuple[Settings, bool]":
+    ) -> tuple[Settings, bool]:
         """Back up an invalid config file and return settings from defaults.
 
         The backup never overwrites a previous one (a timestamp suffix keeps the
@@ -947,7 +932,7 @@ class Settings(BaseSettings):
             # impossible without changing the ``config.json.<digits>.bak`` shape.
             backup = json_file.with_name(f"{json_file.name}.{time.time_ns()}.bak")
             try:
-                json_file.replace(backup)
+                _ = json_file.replace(backup)
             except OSError:
                 logger.exception(
                     "Invalid config at %s (%s) could not be backed up; "
@@ -991,7 +976,7 @@ class Settings(BaseSettings):
             return cls._safe_defaults(), False
 
     @classmethod
-    def _safe_defaults(cls) -> "Settings":
+    def _safe_defaults(cls) -> Settings:
         """Return a defaults-only ``Settings``, validated where possible.
 
         Prefers ``model_validate({})`` so the recovery result still passes field
@@ -1026,7 +1011,7 @@ class Settings(BaseSettings):
             return cls.model_construct()
 
     @classmethod
-    def _write_settings(cls, json_file: Path, settings: "Settings") -> None:
+    def _write_settings(cls, json_file: Path, settings: Settings) -> None:
         """Atomically write settings to ``json_file``.
 
         Writes to a temporary file in the same directory and replaces the target
@@ -1046,7 +1031,7 @@ class Settings(BaseSettings):
             # orphaned ``*.tmp`` in ~/.keycast on every failed launch.
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as tmp_file:
-                    tmp_file.write(settings.model_dump_json())
+                    _ = tmp_file.write(settings.model_dump_json())
                     # flush the Python buffer, then fsync the fd so the bytes
                     # reach the disk (not just the OS page cache) before the
                     # rename. Without this a power loss just after os.replace can
@@ -1058,7 +1043,7 @@ class Settings(BaseSettings):
                     # atomic replace still guarantees no torn file). See _fsync_data.
                     tmp_file.flush()
                     _fsync_data(tmp_file.fileno())
-                os.replace(tmp_name, json_file)
+                _ = Path(tmp_name).replace(json_file)
                 # fsync the directory so the rename itself is durable. Also
                 # best-effort: Windows cannot open a directory fd, and some
                 # filesystems reject it -- neither should undo a successful write.

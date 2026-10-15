@@ -1,0 +1,59 @@
+---
+# Add 'documentation' label to any changes within 'docs' folder or any subfolders
+documentation:
+  - changed-files:
+      # The .ai-rulez sources are the agent-facing documentation; the files they
+      # generate are build output nobody edits by hand.
+      - any-glob-to-any-file: ['docs/**', '.ai-rulez/**']
+# Apply area labels from the component and cross-cutting paths a PR changes.
+# The package layout is flat (src/keycast/*.py, no per-component packages),
+# so each rule names its modules and their mirrored tests explicitly.
+area:core:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/keycast/application.py'
+          - 'src/keycast/settings.py'
+          - 'src/keycast/logging_setup.py'
+          - 'src/keycast/secure_input.py'
+          - 'src/keycast/updates/**'
+          - 'tests/test_application.py'
+          - 'tests/test_settings.py'
+          - 'tests/test_logging_setup.py'
+          - 'tests/test_secure_input.py'
+          - 'tests/test_updates_*.py'
+area:cli:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/keycast/cli.py'
+          - 'src/keycast/main.py'
+          - 'src/keycast/__main__.py'
+          - 'tests/test_cli.py'
+          - 'tests/test_main.py'
+          - 'tests/test_smoke.py'
+area:gui:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/keycast/display.py'
+          - 'src/keycast/listeners.py'
+          - 'tests/test_display.py'
+          - 'tests/test_listeners.py'
+area:docs:
+  - changed-files:
+      - any-glob-to-any-file: ['docs/**', '.ai-rulez/**', '**/*.md', '**/*.rst']
+area:ci:
+  - changed-files:
+      - any-glob-to-any-file: .github/workflows/**
+area:deps:
+  - changed-files:
+      - any-glob-to-any-file: ['pyproject.toml', 'uv.lock']
+# Add 'release' label to any PR where the head branch name starts with 'release'
+release:
+  - head-branch: ['^release']
+bug:
+  - head-branch: ['^bugfix', '^bug/', '^fix/', '^hotfix']
+github_actions:
+  - changed-files:
+      - any-glob-to-any-file: ['.github/workflows/**', '.github/*labeler*.yml']
+tests:
+  - changed-files:
+      - any-glob-to-any-file: tests/**

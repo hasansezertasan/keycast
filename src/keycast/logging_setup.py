@@ -3,10 +3,13 @@
 import logging
 from collections import OrderedDict
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from keycast.settings import LoggingSettings
+# Runtime import (not TYPE_CHECKING): Sphinx autodoc evaluates annotations to
+# render signatures. Safe — settings imports no logging_setup (no cycle).
+# `noqa: TC001` — the typing-only placement would break the docs build.
+from keycast.settings import LoggingSettings  # noqa: TC001
+
+__all__ = ["format_event", "setup_logging"]
 
 
 def _needs_quoting(value: str) -> bool:
@@ -17,6 +20,9 @@ def _needs_quoting(value: str) -> bool:
     looks like a missing value), contains ``=`` (``key=a=b`` is ambiguous about
     where the value starts), or contains whitespace (splits into multiple
     tokens). In those cases ``repr`` keeps the whole value one greppable token.
+
+    Returns:
+        True when the value needs quoting.
     """
     return not value or "=" in value or any(char.isspace() for char in value)
 
@@ -48,7 +54,7 @@ def format_event(event: str, **fields: object) -> str:
     return f"{event} {rendered}"
 
 
-class _ErrorThrottler:
+class _ErrorThrottler:  # pyright: ignore[reportUnusedClass] — consumed cross-module via private import
     """Throttle repeated exception logging from a hot callback.
 
     A persistent bug in a frequently-invoked callback would otherwise log an
@@ -78,9 +84,9 @@ class _ErrorThrottler:
                 recurring error, refreshed on every occurrence, is never evicted
                 and so keeps an accurate repeat count.
         """
-        self._logger = logger
-        self._summary_interval = summary_interval
-        self._max_distinct = max_distinct
+        self._logger: logging.Logger = logger
+        self._summary_interval: int = summary_interval
+        self._max_distinct: int = max_distinct
         # Ordered by recency of last occurrence so eviction can drop the oldest
         # distinct error instead of clearing every counter (which would reset a
         # recurring error's running count and re-flood its traceback).
@@ -142,7 +148,7 @@ class _ErrorThrottler:
         # target and its count survives a burst of unrelated one-off errors.
         self._counts.move_to_end(key)
         while len(self._counts) > self._max_distinct:
-            self._counts.popitem(last=False)
+            _ = self._counts.popitem(last=False)
 
         if count == 1:
             self._logger.error(format_event(event, **fields), exc_info=exc)
@@ -152,16 +158,14 @@ class _ErrorThrottler:
             )
 
 
-def setup_logging(settings: LoggingSettings) -> None:
+def setup_logging(settings: LoggingSettings) -> None:  # noqa: C901 — handler/file/console wiring
     """Set up logging configuration.
 
     Args:
         settings: Logging settings
     """
     logging.basicConfig(
-        level=getattr(logging, settings.level),
-        format=settings.format,
-        force=True,
+        level=getattr(logging, settings.level), format=settings.format, force=True
     )
     # Configure file logging if specified. A problem opening the log file
     # (unwritable directory, read-only home, disk full) must not crash the
@@ -190,9 +194,7 @@ def setup_logging(settings: LoggingSettings) -> None:
             # config load), so this cannot raise here. If that validator is ever
             # removed, a bad format would raise *after* basicConfig succeeded and
             # escape setup_logging — re-add the validation if you touch it.
-            file_handler.setFormatter(
-                logging.Formatter(settings.format),
-            )
+            file_handler.setFormatter(logging.Formatter(settings.format))
             root_logger = logging.getLogger()
             # basicConfig(force=True) above closes the stream handlers it manages
             # but not handlers we added ourselves. Remove any RotatingFileHandler

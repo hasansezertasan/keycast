@@ -1,0 +1,16 @@
+# Allowlist of tolerated Sphinx build warnings, one normalized line each.
+#
+# The healthy default is empty: zero tolerated warnings. The docs-build tox env
+# runs docs/check_warnings.py, which fails on any emitted warning NOT listed
+# here and on any listed warning that is no longer emitted (so the list can't
+# rot). Add a genuinely-unavoidable upstream warning's exact normalized line
+# (path prefix stripped back to "docs/") in the same PR that introduces it.
+#
+# Lines starting with "#" and blank lines are ignored.
+
+# autodoc-pydantic renders the field summary from the JSON schema; the custom
+# read-only mapping types (validated by __get_pydantic_core_schema__, not a
+# JSON-schema-able annotation) cannot produce one. Unavoidable upstream
+# limitation — the fields are still documented from their descriptions.
+docs/autodoc_pydantic.rst: WARNING: JSON schema can't be generated for 'keycast.settings.KeyboardSettings' because the following pydantic fields can't be serialized properly: ['key_mappings'].
+docs/autodoc_pydantic.rst: WARNING: JSON schema can't be generated for 'keycast.settings.MouseSettings' because the following pydantic fields can't be serialized properly: ['button_names'].

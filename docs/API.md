@@ -434,11 +434,7 @@ string):
 from keycast.listeners import MouseListener
 from keycast.settings import MouseSettings
 
-button_names = {
-    "Button.left": "LMB",
-    "Button.right": "RMB",
-    "Button.middle": "MMB",
-}
+button_names = {"Button.left": "LMB", "Button.right": "RMB", "Button.middle": "MMB"}
 
 settings = MouseSettings(button_names=button_names)
 listener = MouseListener(show_text=print, settings=settings)

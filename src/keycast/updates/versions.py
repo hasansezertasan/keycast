@@ -18,6 +18,9 @@ from packaging.version import InvalidVersion, Version
 
 from keycast import __version__
 
+__all__ = ["fetch_latest_release_tag", "is_newer", "strip_v"]
+
+
 logger = logging.getLogger(__name__)
 
 LATEST_RELEASE_API_URL = (
@@ -101,7 +104,9 @@ def fetch_latest_release_tag(timeout: float = REQUEST_TIMEOUT_SECONDS) -> str | 
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        # S310: the target is a fixed https://api.github.com URL (not user
+        # input), and the redirect guard below rejects any off-host landing.
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
             # Reject a redirect that left HTTPS-on-GitHub before trusting the body.
             final_url = response.geturl()
             if not final_url.startswith(_ALLOWED_URL_PREFIX):
