@@ -9,7 +9,7 @@ Regenerate: ai-rulez generate
 
 Docs: https://github.com/Goldziher/ai-rulez
 Content-Hash: blake3:7b75707653c062f76be540bba7a9b9f6c97cb8724b20953609371e39db0c7857
-Source-Hash: blake3:2c2e7583f73ecc436b82a4cff74eb78c614f427228e80c597fd3e41b2584a1f4
+Source-Hash: blake3:160300b84de9e4aa829fbe917859ea6852fbe85eb0a63966e9f4ada0ac325ad0
 -->
 
 # keycast
