@@ -201,50 +201,40 @@ head branches</strong>.</p>
 </section>
 <section id="branch-protection">
 <h2>Branch protection<a class="headerlink" href="#branch-protection" title="Link to this heading">#</a></h2>
-<p>Protect <code class="docutils literal notranslate"><span class="pre">main</span></code> so a PR can only merge once its checks pass. Mark these check
-contexts as required (the names are the <strong>check runs</strong>, not the workflow files):</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">check</span></code> — <code class="docutils literal notranslate"><span class="pre">ci.yml</span></code>’s aggregate gate. It is the single context that covers
-the tests, the per-component coverage gates, style, hooks and the documentation
-build; without it a PR whose entire test suite failed still satisfies
-protection, because the four metadata gates below say nothing about the code.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">Validate</span> <span class="pre">PR</span> <span class="pre">title</span></code> — the Conventional Commits PR-title lint
-(<code class="docutils literal notranslate"><span class="pre">check-pr-title.yml</span></code>), which release-please depends on.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">Validate</span> <span class="pre">branch</span> <span class="pre">name</span></code> — the Conventional Branch lint
-(<code class="docutils literal notranslate"><span class="pre">check-branch-name.yml</span></code>), which fails a PR whose head branch name does not
-follow the <code class="docutils literal notranslate"><span class="pre">&lt;type&gt;/&lt;description&gt;</span></code> format.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">Verify</span> <span class="pre">linked</span> <span class="pre">issue</span></code> — the linked-issue check (<code class="docutils literal notranslate"><span class="pre">check-linked-issues.yml</span></code>),
-which fails a PR with no linked issue.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">Task</span> <span class="pre">Completed</span> <span class="pre">Checker</span></code> — the PR task-list gate (<code class="docutils literal notranslate"><span class="pre">task-completed-check.yml</span></code>),
-which fails while any unticked checkbox remains in the PR description. This is
-the name of the <strong>check run</strong> the action publishes, not of the job around it
-(<code class="docutils literal notranslate"><span class="pre">Check</span> <span class="pre">PR</span> <span class="pre">task</span> <span class="pre">list</span></code>) — the job is green even when boxes are unticked, so
-requiring the job name would not gate anything.</p></li>
-</ul>
-<p><strong>[AGENT]</strong></p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span data-line="1">gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>repos/hasansezertasan/keycast/branches/main/protection<span class="w"> </span><span class="se">\</span>
-</span><span data-line="2"><span class="w">  </span>--input<span class="w"> </span>-<span class="w"> </span><span class="s">&lt;&lt;'JSON'</span>
-</span><span data-line="3"><span class="s">{</span>
-</span><span data-line="4"><span class="s">  "required_status_checks": {</span>
-</span><span data-line="5"><span class="s">    "strict": true,</span>
-</span><span data-line="6"><span class="s">    "contexts": ["check", "Validate PR title", "Validate branch name", "Verify linked issue", "Task Completed Checker"]</span>
-</span><span data-line="7"><span class="s">  },</span>
-</span><span data-line="8"><span class="s">  "enforce_admins": null,</span>
-</span><span data-line="9"><span class="s">  "required_pull_request_reviews": null,</span>
-</span><span data-line="10"><span class="s">  "restrictions": null</span>
-</span><span data-line="11"><span class="s">}</span>
-</span><span data-line="12"><span class="s">JSON</span>
+<p>Branch protection and rulesets are free on public repositories, but a
+<strong>private</strong> repository needs a paid GitHub plan (Pro, Team or Enterprise) for
+them to be enforced. On a free-plan private repository mark this section
+<strong>not applicable</strong> and skip its commands and checks.
+Also defer the Settings App installation below until required code-owner review
+can be enforced; its review safeguard depends on branch protection.
+Continue with the remaining applicable steps.</p>
+<p>This project ships its branch protection as a repository ruleset
+(<code class="docutils literal notranslate"><span class="pre">.github/rulesets/main.json</span></code>) applied by the <code class="docutils literal notranslate"><span class="pre">ruleset-sync.yml</span></code> workflow on
+every push to the default branch. It enforces squash-only merges, linear
+history, and the required CI checks; manual edits in the web UI are reverted on
+the next push.</p>
+<p><strong>[HUMAN]</strong> Create a <code class="docutils literal notranslate"><span class="pre">REPO_ADMIN_TOKEN</span></code> — a fine-grained PAT with
+<strong>Administration: read and write</strong> on this repository (the Actions
+<code class="docutils literal notranslate"><span class="pre">GITHUB_TOKEN</span></code> cannot manage rulesets).</p>
+<p><strong>[AGENT]</strong> Store it as a repository secret:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span data-line="1">gh<span class="w"> </span>secret<span class="w"> </span><span class="nb">set</span><span class="w"> </span>REPO_ADMIN_TOKEN<span class="w"> </span>--repo<span class="w"> </span>hasansezertasan/keycast
 </span></pre></div>
 </div>
-<p><strong>[CHECK]</strong></p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span data-line="1">gh<span class="w"> </span>api<span class="w"> </span>repos/hasansezertasan/keycast/branches/main/protection<span class="w"> </span><span class="se">\</span>
-</span><span data-line="2"><span class="w">  </span>--jq<span class="w"> </span><span class="s1">'(.required_status_checks.strict == true) and ((["check","Validate PR title","Validate branch name","Verify linked issue","Task Completed Checker"] - (.required_status_checks.contexts // [])) == [])'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-qx<span class="w"> </span><span class="nb">true</span>
+<p><strong>[AGENT]</strong> Trigger the workflow once (push a change under <code class="docutils literal notranslate"><span class="pre">.github/rulesets/</span></code>
+or run it directly):</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span data-line="1">gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>ruleset-sync.yml<span class="w"> </span>--repo<span class="w"> </span>hasansezertasan/keycast
 </span></pre></div>
 </div>
-<p>UI equivalent: <strong>Settings → Branches → Add branch ruleset</strong> (or <strong>Add rule</strong> for
-<code class="docutils literal notranslate"><span class="pre">main</span></code>) — enable <strong>Require status checks to pass before merging</strong>, then search
-for and add the five contexts above. The contexts only appear in the picker
-after each check has run at least once.</p>
+<p><strong>[CHECK]</strong> The <code class="docutils literal notranslate"><span class="pre">Protect</span> <span class="pre">main</span></code> ruleset is applied and active — verifying the
+end state (not just that the <code class="docutils literal notranslate"><span class="pre">REPO_ADMIN_TOKEN</span></code> secret exists), so a repo where
+<code class="docutils literal notranslate"><span class="pre">ruleset-sync.yml</span></code> has not yet run, failed, or had its ruleset deleted is
+correctly reported as not-done:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span data-line="1">gh<span class="w"> </span>api<span class="w"> </span>--paginate<span class="w"> </span>repos/hasansezertasan/keycast/rulesets<span class="w"> </span><span class="se">\</span>
+</span><span data-line="2"><span class="w">  </span>--jq<span class="w"> </span><span class="s1">'any(.[]; .name == "Protect main" and .enforcement == "active")'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-qx<span class="w"> </span><span class="nb">true</span>
+</span></pre></div>
+</div>
+<p>Until the <code class="docutils literal notranslate"><span class="pre">REPO_ADMIN_TOKEN</span></code> secret is set the workflow logs a notice and exits
+without error, so the repository is never blocked.</p>
 <section id="apply-protection-after-the-first-merge">
 <span id="setup-first-pr"></span><h3>Apply protection <em>after</em> the first merge<a class="headerlink" href="#apply-protection-after-the-first-merge" title="Link to this heading">#</a></h3>
 <p><code class="docutils literal notranslate"><span class="pre">check-pr-title.yml</span></code>, <code class="docutils literal notranslate"><span class="pre">check-branch-name.yml</span></code>, <code class="docutils literal notranslate"><span class="pre">check-linked-issues.yml</span></code>
@@ -660,7 +650,58 @@ opens its own PR with its own <code class="docutils literal notranslate"><span c
 </span><span data-line="2"><span class="w">  </span>--jq<span class="w"> </span><span class="s1">'any(.[]; .name == "SCOOP_BUCKET_TOKEN")'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-qx<span class="w"> </span><span class="nb">true</span>
 </span></pre></div>
 </div>
-<p>When unset, the <code class="docutils literal notranslate"><span class="pre">bump-scoop</span></code> job skips with a notice (never fails the release).</p>
+<p>When unset, the <code class="docutils literal notranslate"><span class="pre">bump-scoop</span></code> job skips with a notice (never fails the release).
+Repository settings (“Settings” App)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~</p>
+<p><code class="docutils literal notranslate"><span class="pre">.github/settings.yml</span></code> declares this repository’s description, homepage, and
+(when the <code class="docutils literal notranslate"><span class="pre">repository_topics</span></code> template answer is set) topics. It is applied by
+the <a class="reference external" href="https://github.com/apps/settings">Settings GitHub App</a> on every push to
+the default branch. Nothing syncs until it is installed.</p>
+<p>Before installing, enforce <strong>Require review from Code Owners</strong> on the default
+branch as described below. On a free-plan private repository, <strong>defer the
+Settings App</strong> until that safeguard can be enforced. Record this integration
+as deferred and skip its installation and check; the metadata file can stay
+in the repository without the App.</p>
+<p><strong>[HUMAN]</strong> Confirm that a distinct trusted reviewer with write access can
+approve changes authored by the maintainer and is listed in CODEOWNERS for
+<code class="docutils literal notranslate"><span class="pre">.github/settings.yml</span></code> and <code class="docutils literal notranslate"><span class="pre">.github/CODEOWNERS</span></code>.
+A sole maintainer cannot approve their own pull requests;
+defer the Settings App until that reviewer is available.</p>
+<p><strong>[HUMAN]</strong> Once that reviewer is available, use GitHub to edit
+<code class="docutils literal notranslate"><span class="pre">.github/rulesets/main.json</span></code> and set the <code class="docutils literal notranslate"><span class="pre">pull_request</span></code> rule’s
+<code class="docutils literal notranslate"><span class="pre">require_code_owner_review</span></code> to <code class="docutils literal notranslate"><span class="pre">true</span></code>.
+Land this policy change through a reviewed pull request;
+<code class="docutils literal notranslate"><span class="pre">ruleset-sync.yml</span></code> applies it after merge.
+The shipped ruleset leaves this flag off so a solo maintainer’s ordinary PRs
+remain mergeable before this optional integration is configured.
+Keep the committed source in sync; an edit only in the ruleset UI is reverted
+by the sync workflow.</p>
+<p><strong>[CHECK]</strong> Prerequisite: required code-owner review is enforced on <code class="docutils literal notranslate"><span class="pre">main</span></code>.
+If the check fails or cannot be verified, defer installation and return to that
+policy step; a CODEOWNERS file alone does not enforce review.</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span data-line="1">gh<span class="w"> </span>api<span class="w"> </span>--paginate<span class="w"> </span>repos/hasansezertasan/keycast/rules/branches/main<span class="w"> </span><span class="se">\</span>
+</span><span data-line="2"><span class="w">  </span>--jq<span class="w"> </span><span class="s1">'any(.[]; .type == "pull_request" and .parameters.require_code_owner_review == true)'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-qx<span class="w"> </span><span class="nb">true</span>
+</span></pre></div>
+</div>
+<p><strong>[HUMAN]</strong> Only after the prerequisite check passes, install it once on this repository (or your account) from the
+<a class="reference external" href="https://github.com/apps/settings">App page</a>.</p>
+<p><strong>[CHECK]</strong> No scriptable check — confirm the Settings GitHub App is installed.</p>
+<div class="admonition caution">
+<p class="admonition-title">Caution</p>
+<p>The Settings App <strong>escalates anyone with push access to admin</strong>: a merge to
+the default branch syncs whatever is in <code class="docutils literal notranslate"><span class="pre">settings.yml</span></code>. Mitigate this with
+CODEOWNERS — this project already makes <code class="docutils literal notranslate"><span class="pre">&#64;hasansezertasan</span></code> the code owner of
+every file (<code class="docutils literal notranslate"><span class="pre">.github/CODEOWNERS</span></code>), so enabling branch protection’s <strong>Require
+review from Code Owners</strong> on the default branch means a <code class="docutils literal notranslate"><span class="pre">settings.yml</span></code>
+change cannot merge without your review. Note that with the shipped
+<code class="docutils literal notranslate"><span class="pre">*</span> <span class="pre">&#64;hasansezertasan</span></code> ownership this requires code-owner review for <em>all</em>
+files (the whole branch); to scope the requirement to just <code class="docutils literal notranslate"><span class="pre">settings.yml</span></code>,
+narrow <code class="docutils literal notranslate"><span class="pre">.github/CODEOWNERS</span></code> to <code class="docutils literal notranslate"><span class="pre">/.github/settings.yml</span> <span class="pre">&#64;hasansezertasan</span></code>.</p>
+</div>
+<p>The “Include in the home page” activity toggles (Releases / Packages /
+Deployments in the About sidebar) are <strong>not</strong> settable through any GitHub API,
+so neither this App nor any workflow can manage them — set those in the web UI.
+Labels are managed separately by <code class="docutils literal notranslate"><span class="pre">.github/labels.yml</span></code>, not here.</p>
 </section>
 </section>
 <section id="optional-post-launch-integrations">
