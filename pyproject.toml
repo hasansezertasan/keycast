@@ -625,7 +625,7 @@ extend-ignore-re = ["\\[[0-9a-f]{7,40}\\]"]
 
 [tool.typos.default.extend-identifiers]
 # `datas` is the PyInstaller `Analysis(datas=...)` / `a.datas` field in
-# keycast.spec. typos misreads it as `data`, and its pre-commit
+# packaging/keycast.spec. typos misreads it as `data`, and its pre-commit
 # hook auto-writes fixes, so allowlist it to keep the spec from being rewritten.
 datas = "datas"
 # `plain_serializer_function_ser_schema` is a real pydantic-core API name; the

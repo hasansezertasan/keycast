@@ -40,7 +40,7 @@ jobs:
         # ghalint has no PyPI wrapper or pre-commit hook, so the prek `ghalint`
         # hook runs the mise-managed binary. Install mise's tools (incl. ghalint)
         # and put them on PATH before prek runs.
-        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca  # v5.1.1
+        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8  # v5.1.2
       - name: Install headless X server (Linux)
         # The prek `pytest` hook imports the test suite, which imports pynput;
         # pynput imports its Xlib backend at import time and fails with no
@@ -376,23 +376,25 @@ jobs:
             pyproject.toml
             uv.lock
       - name: Build with PyInstaller
-        run: uv run --locked --group tool pyinstaller keycast.spec --clean --noconfirm
+        # Single-file CLI only (KEYCAST_BUILD=onefile skips the desktop bundle
+        # targets in the shared spec); the onefile lands at dist/keycast-onefile.
+        run: KEYCAST_BUILD=onefile uv run --locked --group tool pyinstaller packaging/keycast.spec --clean --noconfirm
       - name: Verify the bundle was produced
         shell: bash
         run: |
-          bin="./dist/keycast${{ matrix.ext }}"
+          bin="./dist/keycast-onefile${{ matrix.ext }}"
           test -s "$bin" || { echo "::error::PyInstaller produced no executable"; exit 1; }
           [ "$RUNNER_OS" = Windows ] || test -x "$bin" || { echo "::error::executable is not runnable"; exit 1; }
       - name: Smoke-run the bundle (CLI --help)
         shell: bash
         run: |
-          echo "Running ./dist/keycast${{ matrix.ext }} --help"
-          "./dist/keycast${{ matrix.ext }}" --help
+          echo "Running ./dist/keycast-onefile${{ matrix.ext }} --help"
+          "./dist/keycast-onefile${{ matrix.ext }}" --help
       - name: Upload freezer preview
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: keycast-freezer-${{ matrix.os }}-preview
-          path: './dist/keycast${{ matrix.ext }}'
+          path: './dist/keycast-onefile${{ matrix.ext }}'
           retention-days: 7
   build-macos:
     # Build-only regression guard + preview: bundle keycast into a .app on every

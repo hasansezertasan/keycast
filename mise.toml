@@ -85,4 +85,6 @@ echo "Virtual Environment: $VIRTUAL_ENV"
 
 [tasks.freeze]
 description = "Build a self-contained offline executable with PyInstaller"
-run = "uv run --locked --group tool pyinstaller keycast.spec --clean --noconfirm"
+# Single-file CLI only (KEYCAST_BUILD=onefile skips the desktop bundle targets
+# in packaging/keycast.spec); the onefile lands at dist/keycast-onefile.
+run = "KEYCAST_BUILD=onefile uv run --locked --group tool pyinstaller packaging/keycast.spec --clean --noconfirm"

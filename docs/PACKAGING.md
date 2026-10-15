@@ -185,6 +185,18 @@ release-please ─┬─ build           (sdist + wheel + Sigstore attestations,
   `packaging/keycast.spec` (PyInstaller's `BUNDLE` step is a no-op on Windows, so
   there it yields the `dist/keycast/` folder, which is zipped and also compiled
   into `keycast-setup.exe` via `packaging/keycast.iss`).
+- **`packaging/keycast.spec` is the single PyInstaller recipe.** It defines two
+  targets from two entries: the `onefile` console CLI (`src/keycast/cli.py` →
+  `dist/keycast-onefile`, built by `mise run freeze`, the `build-freezer-check`
+  CI job, and the release `build-freezer` job) and the `desktop` windowed
+  onedir bundle (`packaging/entry.py` → `dist/keycast/` → `.app`/installer,
+  built by the macOS/Windows jobs). `KEYCAST_BUILD` selects the targets
+  (`onefile` | `desktop` | `all`, default `all`); the fast paths set
+  `KEYCAST_BUILD=onefile` so they do not pay for the desktop bundle. There is
+  deliberately no root-level spec: the template renders one while
+  `include_freezer` is on, but a second recipe would drift from this one, so it
+  was removed — if a future `copier update` resurrects it, delete it again and
+  keep building from `packaging/`.
 - **`pypi-publish`** depends on every builder above (including `sbom` —
   PyPI publication is irreversible, so a failed SBOM must block it, otherwise
   the version ships while its GitHub release stays a draft), downloads the
@@ -538,7 +550,7 @@ change will add; only the install-source detection below ships today.
   `CGRequestListenEventAccess`. ADR-014 records this as a load-bearing invariant:
   any future feature that suppresses or injects events would forfeit MAS
   eligibility.
-- **Build (planned, ADR-013/014).** The same `keycast.spec` bundle, signed with
+- **Build (planned, ADR-013/014).** The same `packaging/keycast.spec` bundle, signed with
   the **Apple Distribution** certificate against a dedicated
   `packaging/entitlements-mas.plist` (`com.apple.security.app-sandbox`,
   `com.apple.security.network.client` for the ADR-002 update check, plus the

@@ -180,22 +180,26 @@ jobs:
             pyproject.toml
             uv.lock
       - name: Build with PyInstaller
-        # The spec's static name="keycast" can't see the matrix, so
+        # The spec's static name="keycast-onefile" can't see the matrix, so
         # rename the built binary to a unique per-OS name afterwards (bash is used
         # for a portable mv across the Linux/macOS/Windows runners).
+        # KEYCAST_BUILD=onefile skips the desktop bundle targets in the shared
+        # spec (see packaging/keycast.spec).
         shell: bash
         run: |
-          uv run --locked --group tool pyinstaller keycast.spec --clean --noconfirm
-          mv "dist/keycast${{ matrix.ext }}" "dist/keycast-freezer-${{ matrix.label }}${{ matrix.ext }}"
+          KEYCAST_BUILD=onefile uv run --locked --group tool pyinstaller packaging/keycast.spec --clean --noconfirm
+          mv "dist/keycast-onefile${{ matrix.ext }}" "dist/keycast-freezer-${{ matrix.label }}${{ matrix.ext }}"
       - name: Upload executable
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: keycast-executable-freezer-${{ matrix.os }}
           path: './dist/keycast-freezer-${{ matrix.label }}${{ matrix.ext }}'
-  # Full desktop bundles, built on top of the template's freezer job above: the
-  # freezer produces single-file binaries, while these jobs wrap the committed
-  # `packaging/keycast.spec` onedir bundle into the shippable macOS .dmg and
-  # Windows .zip + installer that the Homebrew cask / Scoop bucket consume.
+  # Full desktop bundles, built from the same committed spec as the freezer
+  # above: the onefile and desktop targets both live in
+  # `packaging/keycast.spec` (selected with KEYCAST_BUILD), so there is exactly
+  # one PyInstaller recipe. These jobs build the desktop target into the
+  # shippable macOS .dmg and Windows .zip + installer that the Homebrew cask /
+  # Scoop bucket consume.
   build-macos:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
