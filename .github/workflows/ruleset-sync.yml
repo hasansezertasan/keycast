@@ -5,11 +5,24 @@ name: Sync repository ruleset
 # thereafter (idempotent). `.github/rulesets/*.json` is the single source of
 # truth — manual edits in the web UI are reverted on the next push.
 #
-# Requires a `REPO_ADMIN_TOKEN` secret: a fine-grained PAT with
+# Requires a `REPO_ADMIN_TOKEN` environment secret on the `ruleset-sync`
+# environment: a fine-grained PAT with
 # `Administration: read and write` on this repository. The Actions
 # `GITHUB_TOKEN` cannot manage rulesets (it has no `administration` scope).
+# The token lives on the environment, never on the repository, so a run
+# dispatched from any other branch resolves an empty secret.
 # When the secret is absent the job logs a notice and exits successfully, so a
-# freshly generated repository is never blocked. See CONTRIBUTING.md.
+# freshly generated repository is never blocked. See
+# docs/maintaining/setup.rst ("Restrict the ruleset-sync environment").
+#
+# DO NOT REMOVE workflow_dispatch. It looks like a token-exfiltration surface —
+# a manual run executes this file from the *selected branch*, so any guard
+# inside this file is not a mitigation — but one-time activation runs
+# `gh workflow run ruleset-sync.yml`, and that API requires the trigger to
+# exist. The containment is the `ruleset-sync` environment's deployment-branch
+# policy, which GitHub evaluates OUTSIDE this file so a branch edit cannot
+# bypass it — same pattern as the `publish` environment in release.yml.
+# Verify that policy is in place rather than deleting this trigger.
 on:
   # Reconcile on every push to the default branch (both main- and master-default
   # repos) so a ruleset changed in the web UI is reverted on the next push, not
@@ -26,6 +39,7 @@ jobs:
     name: Sync repository ruleset
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: ruleset-sync
     permissions:
       contents: read  # only needed to check out on private/internal repos
     steps:
