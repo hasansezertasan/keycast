@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en" data-accent-color="amber" data-content_root="./">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Configuration - keycast</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Repository setup" href="maintaining/setup.html" /><link rel="prev" title="Modules" href="modules.html" /><script>
+    function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
+    setColorMode(localStorage._theme||"auto");
+  </script><link rel="stylesheet" type="text/css" href="_static/pygments.css?v=e1a1ceaf" />
+    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=2ceb65ce" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="_static/togglebutton.css?v=9c3e77be" />
+    <link rel="stylesheet" type="text/css" href="_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx_paramlinks.css" />
+    <link media="print" rel="stylesheet" type="text/css" href="_static/print.css?v=20ff2c19" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sy-f-text: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+  --sy-f-heading: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+}
+</style>
+    
+  <meta property="og:type" content="website"/><meta property="og:title" content="Configuration"/>
+    <meta name="twitter:card" content="summary"/>
+  </head>
+<body><div class="sy-head">
+  <div class="sy-head-blur"></div>
+  <div class="sy-head-inner sy-container mx-auto">
+    <a class="sy-head-brand" href="index.html">
+      
+      
+      <strong>keycast</strong>
+    </a>
+    <div class="sy-head-nav" id="head-nav">
+      <nav class="sy-head-links"></nav>
+      <div class="sy-head-extra flex items-center print:hidden"><form class="searchbox flex items-center" action="search.html" method="get">
+  <input type="text" name="q" placeholder="Search" />
+  <kbd>/</kbd>
+</form><div class="sy-head-socials">
+  <a href="https://github.com/hasansezertasan/keycast" aria-label="GitHub">
+    <iconify-icon icon="simple-icons:github"></iconify-icon>
+  </a></div></div>
+    </div>
+    <div class="sy-head-actions flex items-center shrink-0 print:hidden"><button class="js-theme theme-switch flex items-center"
+data-aria-auto="Switch to light color mode"
+data-aria-light="Switch to dark color mode"
+data-aria-dark="Switch to auto color mode">
+<i class="i-lucide theme-icon"></i>
+</button><button class="md:hidden flex items-center js-menu" aria-label="Menu" type="button" aria-controls="head-nav" aria-expanded="false">
+        <div class="hamburger">
+          <span class="hamburger_1"></span>
+          <span class="hamburger_2"></span>
+          <span class="hamburger_3"></span>
+        </div>
+      </button>
+    </div>
+  </div>
+</div>
+<div class="sy-page sy-container flex mx-auto">
+  <aside id="lside" class="sy-lside md:w-72 md:shrink-0 print:hidden">
+    <div class="sy-lside-inner md:sticky">
+      <div class="sy-scrollbar p-6">
+        <div class="globaltoc" data-expand-depth="0"><p class="caption" role="heading" aria-level="3"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli-reference.html">CLI reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">Modules</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Configuration</a></li>
+</ul>
+<p class="caption" role="heading" aria-level="3"><span class="caption-text">Maintainer guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="maintaining/setup.html">Repository setup</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="packaging/homebrew-tap/README.html">Homebrew tap setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="packaging/scoop-bucket/README.html">Scoop bucket setup</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="lside-overlay js-menu" role="button" aria-label="Close left sidebar" aria-controls="lside" aria-expanded="false"></div>
+  <aside id="rside" class="sy-rside pb-3 w-64 shrink-0 order-last">
+    <button class="rside-close js-menu xl:hidden" aria-label="Close Table of Contents" type="button" aria-controls="rside" aria-expanded="false">
+      <i class="i-lucide close"></i>
+    </button>
+    <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div class="localtoc"><h3>On this page</h3><ul>
+<li><a class="reference internal" href="#top-level-flags">Top-level flags</a></li>
+</ul>
+</div><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div></div>
+  </aside>
+  <div class="rside-overlay js-menu" role="button" aria-label="Close Table of Contents" aria-controls="rside" aria-expanded="false"></div>
+  <main class="sy-main w-full max-sm:max-w-full print:pt-6">
+<div class="sy-breadcrumbs" role="navigation">
+  <div class="sy-breadcrumbs-inner flex items-center">
+    <div class="md:hidden mr-3">
+      <button class="js-menu" aria-label="Menu" type="button" aria-controls="lside" aria-expanded="false">
+        <i class="i-lucide menu"></i>
+      </button>
+    </div>
+    <ol class="flex-1" itemscope itemtype="https://schema.org/BreadcrumbList"><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="index.html"><span itemprop="name">keycast</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="1" />
+      </li><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <strong itemprop="name">Configuration</strong>
+        <meta itemprop="position" content="2" />
+      </li></ol>
+    <div class="xl:hidden ml-1">
+      <button class="js-menu" aria-label="Show table of contents" type="button" aria-controls="rside"
+        aria-expanded="false">
+        <i class="i-lucide outdent"></i>
+      </button>
+    </div>
+  </div>
+</div><div class="flex flex-col break-words justify-between">
+      <div class="relative min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
+  <article class="yue" role="main">
+          <section id="configuration">
+<h1>Configuration<a class="headerlink" href="#configuration" title="Link to this heading">#</a></h1>
+<p>keycast is configured through a JSON file validated by a Pydantic settings
+model — not environment variables. On the first launch the app writes defaults
+to <code class="docutils literal notranslate"><span class="pre">~/.keycast/config.json</span></code> (all platforms); edit that file to configure it.
+A corrupt file is moved aside to <code class="docutils literal notranslate"><span class="pre">config.json.&lt;epoch&gt;.bak</span></code> and defaults are
+used, so a bad edit never bricks the app.</p>
+<p>The reference below is generated on every docs build directly from the live
+<a class="reference internal" href="modules.html#keycast.settings.Settings" title="keycast.settings.Settings"><code class="xref py py-class docutils literal notranslate"><span class="pre">Settings</span></code></a> model (via
+<a class="reference external" href="https://autodoc-pydantic.readthedocs.io/">autodoc-pydantic</a>), so the
+documented fields, types, defaults, and constraints stay in lockstep with the
+code and each field’s <code class="docutils literal notranslate"><span class="pre">description=</span></code>.</p>
+<dl class="py class pydantic_settings">
+<dt class="sig sig-object py">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">settings</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">keycast.settings.</span></span><span class="sig-name descname"><span class="pre">Settings</span></span><a class="reference internal" href="_modules/keycast/settings.html#Settings"><span class="viewcode-link"><span class="pre">[source]</span></span></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://pydantic.dev/docs/validation/latest/api/pydantic_settings/#pydantic_settings.BaseSettings" title="(in Pydantic v0.0.0)"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseSettings</span></code></a></p>
+<p>Main settings class for the keycast application.</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Config<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>extra</strong>: <em>str = ignore</em></p></li>
+<li><p><strong>case_sensitive</strong>: <em>bool = True</em></p></li>
+<li><p><strong>json_file</strong>: <em>PosixPath = /home/runner/.keycast/config.json</em></p></li>
+<li><p><strong>frozen</strong>: <em>bool = True</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Fields<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="modules.html#keycast.settings.Settings.auto_start" title="keycast.settings.Settings.auto_start"><code class="xref py py-obj docutils literal notranslate"><span class="pre">auto_start</span> <span class="pre">(bool)</span></code></a></p></li>
+<li><p><a class="reference internal" href="modules.html#keycast.settings.Settings.check_for_updates" title="keycast.settings.Settings.check_for_updates"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_for_updates</span> <span class="pre">(bool)</span></code></a></p></li>
+<li><p><a class="reference internal" href="modules.html#keycast.settings.Settings.debug" title="keycast.settings.Settings.debug"><code class="xref py py-obj docutils literal notranslate"><span class="pre">debug</span> <span class="pre">(bool)</span></code></a></p></li>
+<li><p><a class="reference internal" href="modules.html#keycast.settings.Settings.display" title="keycast.settings.Settings.display"><code class="xref py py-obj docutils literal notranslate"><span class="pre">display</span> <span class="pre">(keycast.settings.DisplaySettings)</span></code></a></p></li>
+<li><p><a class="reference internal" href="modules.html#keycast.settings.Settings.keyboard" title="keycast.settings.Settings.keyboard"><code class="xref py py-obj docutils literal notranslate"><span class="pre">keyboard</span> <span class="pre">(keycast.settings.KeyboardSettings)</span></code></a></p></li>
+<li><p><a class="reference internal" href="modules.html#keycast.settings.Settings.logging" title="keycast.settings.Settings.logging"><code class="xref py py-obj docutils literal notranslate"><span class="pre">logging</span> <span class="pre">(keycast.settings.LoggingSettings)</span></code></a></p></li>
+<li><p><a class="reference internal" href="modules.html#keycast.settings.Settings.mouse" title="keycast.settings.Settings.mouse"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mouse</span> <span class="pre">(keycast.settings.MouseSettings)</span></code></a></p></li>
+<li><p><a class="reference internal" href="modules.html#keycast.settings.Settings.preset" title="keycast.settings.Settings.preset"><code class="xref py py-obj docutils literal notranslate"><span class="pre">preset</span> <span class="pre">(Literal['custom',</span> <span class="pre">'presenter',</span> <span class="pre">'minimal',</span> <span class="pre">'debug'])</span></code></a></p></li>
+<li><p><a class="reference internal" href="modules.html#keycast.settings.Settings.show_startup_status" title="keycast.settings.Settings.show_startup_status"><code class="xref py py-obj docutils literal notranslate"><span class="pre">show_startup_status</span> <span class="pre">(bool)</span></code></a></p></li>
+<li><p><a class="reference internal" href="modules.html#keycast.settings.Settings.start_minimized" title="keycast.settings.Settings.start_minimized"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start_minimized</span> <span class="pre">(bool)</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">display</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="modules.html#keycast.settings.DisplaySettings" title="keycast.settings.DisplaySettings"><span class="pre">DisplaySettings</span></a></em><em class="property"> <span class="pre">[Optional]</span></em></dt>
+<dd><p>Display window settings</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">_validate_minimized_requires_autostart</span></code></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">keyboard</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="modules.html#keycast.settings.KeyboardSettings" title="keycast.settings.KeyboardSettings"><span class="pre">KeyboardSettings</span></a></em><em class="property"> <span class="pre">[Optional]</span></em></dt>
+<dd><p>Keyboard listener settings</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">_validate_minimized_requires_autostart</span></code></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">mouse</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="modules.html#keycast.settings.MouseSettings" title="keycast.settings.MouseSettings"><span class="pre">MouseSettings</span></a></em><em class="property"> <span class="pre">[Optional]</span></em></dt>
+<dd><p>Mouse listener settings</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">_validate_minimized_requires_autostart</span></code></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">logging</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="modules.html#keycast.settings.LoggingSettings" title="keycast.settings.LoggingSettings"><span class="pre">LoggingSettings</span></a></em><em class="property"> <span class="pre">[Optional]</span></em></dt>
+<dd><p>Logging settings</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">_validate_minimized_requires_autostart</span></code></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">debug</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><span class="pre">bool</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em></dt>
+<dd><p>Enable debug mode: surface verbose diagnostics regardless of the configured logging level. See effective_logging for how this combines with logging.level.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">_validate_minimized_requires_autostart</span></code></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">start_minimized</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><span class="pre">bool</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em></dt>
+<dd><p>Start with the overlay hidden; it appears automatically the first time a key or click is captured. Requires auto_start (input must be captured for the overlay to ever appear).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">_validate_minimized_requires_autostart</span></code></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">auto_start</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><span class="pre">bool</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></em></dt>
+<dd><p>Start the input listeners on launch. When false, no listeners start regardless of keyboard.enabled / mouse.enabled — a master switch that captures nothing until re-enabled in config.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">_validate_minimized_requires_autostart</span></code></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_for_updates</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><span class="pre">bool</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></em></dt>
+<dd><p>Check the GitHub Releases API for a newer version at most once a day and show a non-blocking notice. Set false to disable all automatic update checks (offline / privacy). Throttle state is kept in ~/.keycast/update-check.json, not in this config. See keycast.updates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">_validate_minimized_requires_autostart</span></code></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">show_startup_status</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><span class="pre">bool</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></em></dt>
+<dd><p>Show a one-line startup summary about keyboard/mouse input capture availability on the overlay. Set false to suppress this launch status message.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">_validate_minimized_requires_autostart</span></code></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">preset</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.15)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'custom'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'presenter'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'minimal'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'debug'</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'custom'</span></em></dt>
+<dd><p>Named settings bundle layered over the config on load. “custom” (default) uses the file verbatim; “presenter”, “minimal” and “debug” override a handful of display/mouse/keyboard fields (and, for “debug”, verbose logging) for common scenarios. A preset wins over the file only for the fields it names; see resolve_preset and _PRESET_OVERRIDES. An unrecognized name falls back to “custom” with a warning rather than rejecting the whole config file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">_coerce_unknown_preset</span></code></p></li>
+<li><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">_validate_minimized_requires_autostart</span></code></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">effective_logging</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/keycast/settings.html#Settings.effective_logging"><span class="viewcode-link"><span class="pre">[source]</span></span></a></dt>
+<dd><p>Return the logging settings to actually apply, accounting for <code class="docutils literal notranslate"><span class="pre">debug</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">debug</span></code> is an app-wide switch for verbose diagnostics; <code class="docutils literal notranslate"><span class="pre">logging.level</span></code>
+is the user’s explicit level. This method is the single place that decides
+how the two combine into the one <code class="docutils literal notranslate"><span class="pre">LoggingSettings</span></code> that
+<a class="reference internal" href="modules.html#keycast.logging_setup.setup_logging" title="keycast.logging_setup.setup_logging"><code class="xref py py-func docutils literal notranslate"><span class="pre">keycast.logging_setup.setup_logging()</span></code></a> receives, so the policy lives
+in exactly one testable spot rather than being smeared across the wiring.</p>
+<p><code class="docutils literal notranslate"><span class="pre">LoggingSettings</span></code> is <code class="docutils literal notranslate"><span class="pre">frozen</span></code>, so a new instance must be derived with
+<code class="docutils literal notranslate"><span class="pre">self.logging.model_copy(update={...})</span></code> rather than mutating it.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The logging settings to apply.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="modules.html#keycast.settings.LoggingSettings" title="keycast.settings.LoggingSettings"><em>LoggingSettings</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">resolve_preset</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/keycast/settings.html#Settings.resolve_preset"><span class="viewcode-link"><span class="pre">[source]</span></span></a></dt>
+<dd><p>Return the settings to apply, with the selected <code class="docutils literal notranslate"><span class="pre">preset</span></code> layered on.</p>
+<p><code class="docutils literal notranslate"><span class="pre">preset</span></code> names a built-in override bundle (see <code class="xref py py-data docutils literal notranslate"><span class="pre">_PRESET_OVERRIDES</span></code>)
+that is merged on top of the loaded config. <code class="docutils literal notranslate"><span class="pre">&quot;custom&quot;</span></code> (the default)
+applies nothing, so the settings are returned unchanged. Called by
+<code class="docutils literal notranslate"><span class="pre">Keycast.__init__</span></code> right after <a class="reference internal" href="modules.html#keycast.settings.Settings.create_settings_file" title="keycast.settings.Settings.create_settings_file"><code class="xref py py-meth docutils literal notranslate"><span class="pre">create_settings_file()</span></code></a>, so every
+component sees the resolved settings while the on-disk config keeps the
+user’s raw values plus the <code class="docutils literal notranslate"><span class="pre">preset</span></code> name.</p>
+<p>Each overridden <strong>section</strong> is re-validated the same way loading the
+config does: its current values are dumped with <code class="docutils literal notranslate"><span class="pre">model_dump(mode=&quot;json&quot;)</span></code>,
+the preset’s fields are merged on top, and the section model’s
+<code class="docutils literal notranslate"><span class="pre">model_validate</span></code> rebuilds it — re-running that section’s field bounds and
+cross-field validators (e.g. <code class="docutils literal notranslate"><span class="pre">MouseSettings</span></code>’ position-requires-clicks
+rule), so a preset can never produce invalid section settings.
+<code class="docutils literal notranslate"><span class="pre">model_copy</span></code> then swaps the rebuilt sections (and any top-level scalar
+flags) into a new <code class="docutils literal notranslate"><span class="pre">Settings</span></code>. Note the sub-models are plain
+<code class="docutils literal notranslate"><span class="pre">BaseModel</span></code>, where <code class="docutils literal notranslate"><span class="pre">model_validate</span></code> honours the passed data; the
+top-level <code class="docutils literal notranslate"><span class="pre">Settings</span></code> is a <code class="docutils literal notranslate"><span class="pre">BaseSettings</span></code> whose <code class="docutils literal notranslate"><span class="pre">model_validate</span></code>
+re-runs the configured sources instead, so it deliberately is <em>not</em> used
+to re-assemble here.</p>
+<p>A preset wins over the file for the fields it names, and only those; every
+other field keeps its configured value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A new <code class="docutils literal notranslate"><span class="pre">Settings</span></code> with the preset applied, or <code class="docutils literal notranslate"><span class="pre">self</span></code> when the
+preset is <code class="docutils literal notranslate"><span class="pre">&quot;custom&quot;</span></code> (which names no overrides).</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="modules.html#keycast.settings.Settings" title="keycast.settings.Settings"><em>Settings</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">create_settings_file</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/keycast/settings.html#Settings.create_settings_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a></dt>
+<dd><p>Load settings, recovering from a corrupt file and persisting defaults.</p>
+<p>On first run (no config file) the defaults are written to disk. If the
+existing file is corrupt, it is backed up and defaults are used so the
+application can still start.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The settings object</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#TypeError" title="(in Python v3.15)"><strong>TypeError</strong></a> – If the JSON file path is unset or is not a Path object</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="modules.html#keycast.settings.Settings" title="keycast.settings.Settings"><em>Settings</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<section id="top-level-flags">
+<h2>Top-level flags<a class="headerlink" href="#top-level-flags" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">debug</span></code>, <code class="docutils literal notranslate"><span class="pre">start_minimized</span></code>, <code class="docutils literal notranslate"><span class="pre">auto_start</span></code>, <code class="docutils literal notranslate"><span class="pre">check_for_updates</span></code>,
+<code class="docutils literal notranslate"><span class="pre">show_startup_status</span></code>, and <code class="docutils literal notranslate"><span class="pre">preset</span></code> live at the top level of the file (not
+in a section). <code class="docutils literal notranslate"><span class="pre">preset</span></code> names a settings bundle — <code class="docutils literal notranslate"><span class="pre">&quot;custom&quot;</span></code> (default)
+uses the file verbatim, while <code class="docutils literal notranslate"><span class="pre">&quot;presenter&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;minimal&quot;</span></code>, and <code class="docutils literal notranslate"><span class="pre">&quot;debug&quot;</span></code>
+override a handful of display/mouse/keyboard fields for common scenarios. A
+preset only changes the fields it names; the on-disk config is never rewritten
+with the preset’s values.</p>
+</section>
+</section>
+
+        </article><button class="back-to-top" type="button">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+  </svg>
+  <span>Back to top</span>
+</button><div class="navigation flex print:hidden"><div class="navigation-prev">
+    <a href="modules.html">
+      <i class="i-lucide chevron-left"></i>
+      <div class="page-info">
+        <span>Previous</span><div class="title">Modules</div></div>
+    </a>
+  </div><div class="navigation-next">
+    <a href="maintaining/setup.html">
+      <div class="page-info">
+        <span>Next</span>
+        <div class="title">Repository setup</div>
+      </div>
+      <i class="i-lucide chevron-right"></i>
+    </a>
+  </div></div></div>
+    </div>
+  </main>
+</div>
+<footer class="sy-foot">
+  <div class="sy-foot-inner sy-container mx-auto">
+    <div class="sy-foot-reserved md:flex justify-between items-center">
+      <div class="sy-foot-copyright"><p>2026, Hasan Sezer Taşan</p>
+  
+  <p>
+    Made with
+    
+    <a href="https://www.sphinx-doc.org/">Sphinx</a> and
+    
+    <a href="https://shibuya.lepture.com">Shibuya theme</a>.
+  </p>
+</div>
+      <div class="sy-foot-socials">
+  <a href="https://github.com/hasansezertasan/keycast" aria-label="GitHub">
+    <iconify-icon icon="simple-icons:github"></iconify-icon>
+  </a></div>
+    </div>
+  </div>
+</footer>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="_static/copybutton.js?v=f281be69"></script>
+      <script>let toggleHintShow = 'Click to show';</script>
+      <script>let toggleHintHide = 'Click to hide';</script>
+      <script>let toggleOpenOnPrint = 'true';</script>
+      <script src="_static/togglebutton.js?v=b8b12719"></script>
+      <script src="_static/design-tabs.js?v=f930bc37"></script>
+      <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+      <script src="_static/shibuya.js?v=50760d75"></script>
+      <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script></body>
+</html>
