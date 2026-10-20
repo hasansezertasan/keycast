@@ -169,6 +169,7 @@ before it starts work, which installs this same toolchain and syncs dependencies
 in its ephemeral environment. The first sync creates `uv.lock` for a newly
 generated project.
 
+<<<<<<< before updating
 The agent instruction files every AI coding tool reads (`AGENTS.md`,
 `CLAUDE.md`, `.github/copilot-instructions.md`, …) are **generated** from the
 sources in `.ai-rulez/` by [ai-rulez](https://github.com/Goldziher/ai-rulez) —
@@ -195,6 +196,9 @@ keycast needs nothing beyond the toolchain above, with two platform notes:
   captures real input — but on Linux it still imports pynput's X backend, so
   run it under `xvfb-run -a` (plain `tox run` fails without a display). CI
   wraps the Linux jobs the same way.
+=======
+<!-- TODO @hasansezertasan: add any project-specific setup (IDE, services, env vars) -->
+>>>>>>> after updating
 
 ### Debugging
 
@@ -324,8 +328,7 @@ The one-time repository setup — squash-merge policy, branch protection, PyPI
 trusted publishing, coverage and docs-site enablement, dependency and template
 updates, and the optional third-party integrations — is **author/maintainer**
 work, not something a contributor does. It lives in its own home:
-[`docs/maintaining/setup.rst`](../docs/maintaining/setup.rst) (published under
-**Maintainer guide** on the documentation site). Each step there is tagged
+[`REPOSITORY_SETUP.rst`](../REPOSITORY_SETUP.rst) in the repository root. Each step there is tagged
 `[AGENT]` (a scriptable `gh` command) or `[HUMAN]` (browser-only), so it doubles
 as a runnable setup checklist.
 

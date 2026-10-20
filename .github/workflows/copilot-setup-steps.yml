@@ -19,12 +19,20 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Python
+<<<<<<< before updating
         # mise installs its own interpreter too, but the `pipx:cobo` backend
         # below resolves through `uv tool install` only when uv is present
         # (otherwise it falls back to `pipx install` with the runner's older
         # system Python, which cannot satisfy cobo's Requires-Python >=3.14).
         # setup-uv must therefore run before mise-action; setup-python pins the
         # same .python-version interpreter CI uses everywhere else.
+=======
+        # cobo (mise pipx backend) requires Python >=3.14, but the runner's
+        # system Python is older — and without uv on PATH mise falls back from
+        # uvx to pipx, which ignores the mise-managed Python. Provision both
+        # first so `mise install` resolves cobo against the .python-version
+        # interpreter.
+>>>>>>> after updating
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version-file: .python-version

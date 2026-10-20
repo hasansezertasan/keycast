@@ -32,13 +32,8 @@ hooks = [
   # `.gitignore` is a cobo-sealed block (hash-verified); its bytes must stay
   # verbatim, but upstream github/gitignore ships trailing whitespace on some
   # comment lines. Exclude it so the hook does not break the seal (cobo owns
-  # this file — see https://hasansezertasan.github.io/copier-pyproject/context/gitignore-generation/#cobo-generates-the-gitignore-with-a-hash-sealed-fence-and-lockfiles).
-  # `.continue/prompts/` is the same shape: ai-rulez owns those bytes, and its
-  # generated YAML header ships two trailing-space comment lines. Stripping them
-  # here would be undone by the next `ai-rulez generate`, so the hook and the
-  # generator would rewrite each other forever — the non-convergence
-  # that https://hasansezertasan.github.io/copier-pyproject/context/template-testing/#generated-files-must-be-formatter-canonical-not-merely-valid forbids. The path is inert unless the `continue-dev` host is selected.
-  { id = "trailing-whitespace", exclude = '^(\.gitignore|\.continue/prompts/.*)$' },
+  # this file).
+  { id = "trailing-whitespace", exclude = '^\.gitignore$' },
   { id = "check-merge-conflict", args = [
     "--assume-in-merge",
   ] },
@@ -48,11 +43,10 @@ hooks = [
   { id = "check-executables-have-shebangs" },
   { id = "check-symlinks" },
   { id = "check-xml" },
-  # Preserve cobo-owned bytes (https://hasansezertasan.github.io/copier-pyproject/context/gitignore-generation/#cobo-generates-the-gitignore-with-a-hash-sealed-fence-and-lockfiles, https://hasansezertasan.github.io/copier-pyproject/context/template-testing/#generated-files-must-be-formatter-canonical-not-merely-valid).
+  # Preserve cobo-owned bytes.
   # Windows PowerShell 5.1 needs a UTF-8 BOM for non-ASCII source literals.
-  # Also preserve ai-rulez output (https://hasansezertasan.github.io/copier-pyproject/context/agent-instructions/#ai-rulez-is-the-opt-in-single-source-for-agent-instructions-with-the-prose-in-shared-macros).
-  { id = "fix-byte-order-marker", exclude = '^(\.gitignore|\.continue/prompts/.*)$|(?i:\.ps[md]?1)$' },
-  { id = "mixed-line-ending", args = ["--fix=auto"], exclude = '^(\.gitignore|\.continue/prompts/.*)$' },
+  { id = "fix-byte-order-marker", exclude = '^\.gitignore$|(?i:\.ps[md]?1)$' },
+  { id = "mixed-line-ending", args = ["--fix=auto"], exclude = '^\.gitignore$' },
   # auto fixes mixed endings, retaining consistent CRLF for Windows scripts.
 ]
 
@@ -92,7 +86,7 @@ hooks = [
   # mypy needs the installed package + deps to resolve third-party imports, so
   # like basedpyright it is a `local` `system` hook via `uv run` rather than
   # mirrors-mypy's isolated venv, which needed a hand-kept copy of every
-  # component's runtime deps in `additional_dependencies` (see https://hasansezertasan.github.io/copier-pyproject/context/lint-orchestration/#mypys-prek-hook-runs-through-uv-like-basedpyright).
+  # component's runtime deps in `additional_dependencies`.
   # Filenames are not passed: mypy checks the `[tool.mypy] files` set, matching
   # tox's canonical run. Single version source: the `style` group pin.
   { id = "mypy", name = "mypy Type Checker", entry = "uv run --locked --group style mypy", language = "system", types = ["python"], pass_filenames = false },
@@ -101,6 +95,7 @@ hooks = [
   # resolve imports, so it is a `local` `system` hook via `uv run`, not an upstream
   # repo hook. Single version source: the `style` group pin.
   { id = "pylint", name = "Pylint", entry = "uv run --locked --group style pylint src", language = "system", pass_filenames = false, always_run = true },
+<<<<<<< before updating
   # import-linter is intentionally unwired: keycast uses a flat module layout
   # (cli.py, display.py, ...) plus an `updates/` subpackage, so the template's
   # layered cli/gui/core/utils contract in [tool.importlinter] does not apply.
@@ -108,6 +103,19 @@ hooks = [
   # structure means re-adding both together (config + these invocations).
   # slotscheck imports the installed keycast package to verify __slots__
   # definitions, so like basedpyright it is a whole-program analyzer needing the
+=======
+  # import-linter (lint-imports) enforces the [tool.importlinter] architecture
+  # contract. Like basedpyright it is a whole-program analyzer that needs the
+  # installed package + its deps to build the import graph (via grimp), so it is a
+  # `local` `system` hook that shells out through `uv run --locked --group style`
+  # — NOT an upstream repo hook (that pattern runs in an isolated venv without the
+  # project installed, which is why it lived only in the tox `style` env before).
+  # Single version source: the `style` group pin. It builds the
+  # whole graph regardless of which files changed, so filenames are not passed.
+  { id = "import-linter", name = "Import Linter", entry = "uv run --locked --group style lint-imports", language = "system", pass_filenames = false, always_run = true },
+  # slotscheck imports every module under src/ to verify __slots__ definitions, so
+  # like basedpyright/import-linter it is a whole-program analyzer needing the
+>>>>>>> after updating
   # installed package — a `local` `system` hook via `uv run`, not an upstream repo
   # hook. It checks a property (slot correctness) no other tool covers, so it runs
   # on the fast gate too (unlike the redundant type checkers ty/pyrefly/zuban,
@@ -123,7 +131,7 @@ hooks = [
   # version has a single source of truth shared with the tox `style` env — the
   # same drift-free rationale as editorconfig-checker above. It statically lints
   # the reStructuredText docs sources (it does not import the project or Sphinx).
-  { id = "sphinx-lint", name = "Sphinx Lint", entry = "uv run --locked --group style sphinx-lint docs", language = "system", files = '\.rst$', pass_filenames = false },
+  { id = "sphinx-lint", name = "Sphinx Lint", entry = "uv run --locked --group style sphinx-lint docs REPOSITORY_SETUP.rst", language = "system", files = '\.rst$', pass_filenames = false },
   # detect-secrets is a local pre-commit gate against a committed baseline
   # (.secrets.baseline), catching a secret at `git commit` time before it ever
   # enters history. It complements (does not replace) the history-spanning
@@ -134,18 +142,6 @@ hooks = [
   # `style` group pin (its PyPI wrapper has no separate upstream pre-commit repo
   # revision worth tracking here).
   { id = "detect-secrets", name = "detect-secrets (pre-commit secret scan)", entry = "uv run --locked --group style detect-secrets-hook --baseline .secrets.baseline", language = "system", pass_filenames = true },
-  # ai-rulez regenerates the agent instruction files every host reads (AGENTS.md,
-  # CLAUDE.md, ...) from the `.ai-rulez/` sources, which are the only thing anyone
-  # edits. It is a *fixing* hook, so it behaves like the formatters above: it
-  # rewrites what drifted and fails the run when it had to, which is what keeps
-  # the committed output honest — there is no `--check` mode for preset output
-  # (ai-rulez's own `verify` covers plugin bundles only). Upstream ships
-  # pre-commit hooks, but they carry a second version pin; going through the uv
-  # `agents` group keeps one (https://hasansezertasan.github.io/copier-pyproject/context/agent-instructions/#ai-rulez-is-the-opt-in-single-source-for-agent-instructions-with-the-prose-in-shared-macros). It reads the whole `.ai-rulez/` tree and
-  # writes a fixed output set, so filenames are not passed; the `files` gate
-  # keeps it off unrelated commits while CI's `--all-files` run always reaches it
-  # — including when someone hand-edits a generated file the gate does not match.
-  { id = "ai-rulez", name = "ai-rulez (regenerate agent instruction files)", entry = "uv run --locked --group agents ai-rulez generate", language = "system", files = '^\.ai-rulez/', pass_filenames = false },
 ]
 
 [[repos]]
@@ -197,20 +193,15 @@ rev = "v1.31.1"
 hooks = [{ id = "zizmor" }]
 
 [[repos]]
-repo = "https://github.com/adrienverge/yamllint.git"
+repo = "https://github.com/adrienverge/yamllint"
 rev = "v1.38.0"
 # `.copier-answers.yml` is excluded for the same reason the yamlfmt hook below
-# excludes it: copier owns the file ("NEVER EDIT MANUALLY") and writes block
+# excludes it: it is machine-written ("NEVER EDIT MANUALLY") with block
 # sequences unindented, which yamllint's `indentation` rule rejects. The only
-# way to satisfy the linter would be to hand-edit a file the next `copier
-# update` overwrites, so the gate can only ever produce an unfixable failure —
-# it fires the moment any answer is a list (e.g. `ai_rulez_presets`).
-# `.continue/prompts/` is excluded on the same "a generator owns these bytes"
-# grounds: ai-rulez's generated YAML header carries trailing spaces (a
-# `trailing-spaces` *error*, not a warning) and no `---` document start, and
-# hand-fixing either is undone by the next `generate`. Inert unless the
-# `continue-dev` host is selected.
-hooks = [{ id = "yamllint", exclude = "^(\\.copier-answers\\.yml|\\.continue/prompts/.*)$", args = ["-c", ".github/yamllint.yaml"] }]
+# way to satisfy the linter would be to hand-edit a file that is overwritten,
+# so the gate can only ever produce an unfixable failure — it fires the moment
+# any answer is a list.
+hooks = [{ id = "yamllint", exclude = "^\\.copier-answers\\.yml$", args = ["-c", ".github/yamllint.yaml"] }]
 
 [[repos]]
 repo = "https://github.com/DavidAnson/markdownlint-cli2"
@@ -251,12 +242,7 @@ hooks = [{ id = "checkmake" }]
 [[repos]]
 repo = "https://github.com/google/yamlfmt"
 rev = "v0.21.0"
-# `.continue/prompts/` joins the copier-owned answers file for the same reason,
-# one step further along: yamlfmt prepends the `---` document start ai-rulez does
-# not emit, and the next `generate` strips it back off. A *fixing* hook that
-# disagrees with a generator does not fail once — the two rewrite each other
-# forever (https://hasansezertasan.github.io/copier-pyproject/context/template-testing/#generated-files-must-be-formatter-canonical-not-merely-valid, https://hasansezertasan.github.io/copier-pyproject/context/agent-instructions/#ai-rulez-is-the-opt-in-single-source-for-agent-instructions-with-the-prose-in-shared-macros). Inert unless the `continue-dev` host is selected.
-hooks = [{ id = "yamlfmt", exclude = "^(\\.copier-answers\\.yml|\\.continue/prompts/.*)$", args = ["-conf", ".github/yamlfmt.yml"] }]
+hooks = [{ id = "yamlfmt", exclude = "^\\.copier-answers\\.yml$", args = ["-conf", ".github/yamlfmt.yml"] }]
 
 [[repos]]
 repo = "https://github.com/commitizen-tools/commitizen"

@@ -14,15 +14,49 @@ def test_main_runs_application() -> None:
     with patch("keycast.main.Keycast") as keycast_cls:
         main()
 
+<<<<<<< before updating
         keycast_cls.assert_called_once_with()
         keycast_cls.return_value.run.assert_called_once_with()
+=======
+    Every standalone-executable build (launcher / freezer / compiler)
+    targets ``keycast.__main__:main``, so this pins the
+    contract that the symbol exists and is callable for whichever component is
+    enabled, and that the active branch's component import actually resolves.
+    The module is imported (not executed as ``__main__``), so a runnable
+    component's blocking ``main()`` (server loop, mainloop, ...) is never invoked.
+    """
+    main_module = importlib.import_module("keycast.__main__")
+>>>>>>> after updating
 
 
 def test_main_exits_nonzero_on_construction_failure() -> None:
     """A failure building Keycast (e.g. headless tkinter) degrades to exit 1.
 
+<<<<<<< before updating
     Construction runs before run()'s own error handling, so main() must catch it
     rather than let an uncaught traceback escape.
+=======
+@pytest.mark.parametrize("dependency", ["typer", "pydantic", "pydantic_settings"])
+def test_console_root_reports_missing_launcher_dependency(
+    dependency: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A missing root dependency is reported actionably, not as a bare traceback.
+
+    Every module parametrized here is imported at the console root's module
+    scope -- ``typer`` by the root itself, ``pydantic``/``pydantic_settings``
+    transitively through ``core.logging_setup`` -> ``core.config`` -- so each one
+    fails before the component-dependency guard inside ``cli/app.py`` exists.
+
+    Given:
+        - An environment out of sync with the installed package, so one of the
+          root's own dependencies cannot be imported -- what adding the shared
+          launcher (or enabling settings) leaves behind until ``uv sync``.
+    When:
+        - ``__main__`` loads the console root, as bare ``keycast`` does.
+    Then:
+        - It exits 1 with a message naming the module and ``uv sync``, and no
+          traceback.
+>>>>>>> after updating
     """
     with (
         patch("keycast.main.Keycast", side_effect=RuntimeError("boom")),
