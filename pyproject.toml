@@ -47,8 +47,8 @@ requires-python = ">=3.14"
 # everywhere, including the PyInstaller release jobs.
 dependencies = [
   "packaging==26.3",
-  "pydantic==2.13.5",
-  "pydantic-core==2.46.5",
+  "pydantic==2.14.1",
+  "pydantic-core==2.50.1",
   "pydantic-extra-types==2.11.1",
   "pydantic-settings==2.15.0",
   "pynput==1.8.2",
@@ -114,6 +114,14 @@ sast = [
 deps = [
   "creosote==5.2.0",
   "deptry==0.25.1",
+]
+# ai-rulez gets its own group for the same reason `sast` does: `dev` includes
+# `style` wholesale, so folding it in would install it into every developer and
+# CI environment for a tool only the prek `ai-rulez` hook and the tox `style`
+# env invoke. The PyPI package is a small launcher that downloads the matching
+# Go binary into a user cache on first run, so the first invocation needs network.
+agents = [
+  "ai-rulez==4.11.5",
 ]
 test = [
   "coverage-enable-subprocess==1.0",
@@ -771,6 +779,14 @@ commands = [
   [
     "ec",
   ],
+  # Config/source validation only — the prek `ai-rulez` hook is what regenerates
+  # the host files and so what catches drift. Having the check here too means a
+  # malformed `.ai-rulez/` source fails the canonical lint runner even on a clone
+  # whose git hooks were never installed.
+  [
+    "ai-rulez",
+    "validate",
+  ],
   [
     "sphinx-lint",
     "docs",
@@ -786,7 +802,7 @@ commands = [
 ]
 # `test` is included so the type checkers that scope tests (e.g. ty) can
 # resolve pytest and other test-only imports.
-dependency_groups = ["sast", "style", "test"]
+dependency_groups = ["agents", "sast", "style", "test"]
 description = "Run Checkers, Linters and Formatters"
 runner = "uv-venv-lock-runner"
 

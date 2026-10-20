@@ -128,6 +128,12 @@ hooks = [
   # `style` group pin (its PyPI wrapper has no separate upstream pre-commit repo
   # revision worth tracking here).
   { id = "detect-secrets", name = "detect-secrets (pre-commit secret scan)", entry = "uv run --locked --group style detect-secrets-hook --baseline .secrets.baseline", language = "system", pass_filenames = true },
+  # ai-rulez regenerates the agent instruction files every host reads (AGENTS.md,
+  # CLAUDE.md, ...) from the `.ai-rulez/` sources, which are the only thing anyone
+  # edits. It is a *fixing* hook: it rewrites what drifted and fails the run when
+  # it had to. Goes through the uv `agents` group to keep a single version pin; it
+  # reads the whole `.ai-rulez/` tree, so filenames are not passed.
+  { id = "ai-rulez", name = "ai-rulez (regenerate agent instruction files)", entry = "uv run --locked --group agents ai-rulez generate", language = "system", files = '^\.ai-rulez/', pass_filenames = false },
 ]
 
 [[repos]]
