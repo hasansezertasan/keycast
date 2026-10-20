@@ -1233,8 +1233,8 @@ tool = [
 [package.metadata]
 requires-dist = [
     { name = "packaging", specifier = "==26.3" },
-    { name = "pydantic", specifier = "==2.13.5" },
-    { name = "pydantic-core", specifier = "==2.46.5" },
+    { name = "pydantic", specifier = "==2.14.1" },
+    { name = "pydantic-core", specifier = "==2.50.1" },
     { name = "pydantic-extra-types", specifier = "==2.11.1" },
     { name = "pydantic-settings", specifier = "==2.15.0" },
     { name = "pynput", specifier = "==1.8.2" },

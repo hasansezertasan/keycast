@@ -13,12 +13,6 @@ Keycast is a cross-platform keystroke and mouse click visualizer built in Python
    modules
    configuration
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Maintainer guide
-
-   maintaining/setup
-
 Indices and tables
 ==================
 

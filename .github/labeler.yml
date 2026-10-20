@@ -2,9 +2,7 @@
 # Add 'documentation' label to any changes within 'docs' folder or any subfolders
 documentation:
   - changed-files:
-      # The .ai-rulez sources are the agent-facing documentation; the files they
-      # generate are build output nobody edits by hand.
-      - any-glob-to-any-file: ['docs/**', '.ai-rulez/**']
+      - any-glob-to-any-file: docs/**
 # Apply area labels from the component and cross-cutting paths a PR changes.
 # The package layout is flat (src/keycast/*.py, no per-component packages),
 # so each rule names its modules and their mirrored tests explicitly.
@@ -39,7 +37,7 @@ area:gui:
           - 'tests/test_listeners.py'
 area:docs:
   - changed-files:
-      - any-glob-to-any-file: ['docs/**', '.ai-rulez/**', '**/*.md', '**/*.rst']
+      - any-glob-to-any-file: ['docs/**', '**/*.md', '**/*.rst']
 area:ci:
   - changed-files:
       - any-glob-to-any-file: .github/workflows/**

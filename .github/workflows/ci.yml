@@ -330,7 +330,7 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-latest' && env.REPO_IS_PUBLIC == 'true' }}
         continue-on-error: true
         run: uv run --no-project --with smokeshow smokeshow upload htmlcov
-  # Build-only PR guards: build each enabled standalone executable (https://hasansezertasan.github.io/copier-pyproject/context/standalone-executables/#every-executable-toggle-adds-a-pr-time-build-check-job)
+  # Build-only PR guards: build each enabled standalone executable
   # against the PR diff so a dependency or Python bump that breaks packaging fails
   # HERE, against the offending change, instead of silently at release time. The
   # test suite always runs the source tree, never the built binary, so these jobs

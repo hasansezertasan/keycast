@@ -47,8 +47,8 @@ requires-python = ">=3.14"
 # everywhere, including the PyInstaller release jobs.
 dependencies = [
   "packaging==26.3",
-  "pydantic==2.13.5",
-  "pydantic-core==2.46.5",
+  "pydantic==2.14.1",
+  "pydantic-core==2.50.1",
   "pydantic-extra-types==2.11.1",
   "pydantic-settings==2.15.0",
   "pynput==1.8.2",
@@ -119,11 +119,7 @@ deps = [
 # `style` wholesale, so folding it in would install it into every developer and
 # CI environment for a tool only the prek `ai-rulez` hook and the tox `style`
 # env invoke. The PyPI package is a small launcher that downloads the matching
-# Go binary into a user cache on first run, so the install itself is cheap but
-# the first invocation needs network. That download verifies a checksum when it
-# can fetch one and prints a warning and proceeds when it cannot, so treat it as
-# best-effort rather than a guarantee. Still a single version source, same as
-# every other pin (https://hasansezertasan.github.io/copier-pyproject/context/agent-instructions/#ai-rulez-is-the-opt-in-single-source-for-agent-instructions-with-the-prose-in-shared-macros).
+# Go binary into a user cache on first run, so the first invocation needs network.
 agents = [
   "ai-rulez==4.11.5",
 ]
@@ -149,11 +145,11 @@ docs = [
   "sphinx-paramlinks==0.6.0",
   "auto-pytabs[sphinx]==0.5.0",
   "myst-parser==4.0.1",
-  # Per-page "last updated" footer sourced from git commit dates (https://hasansezertasan.github.io/copier-pyproject/context/docs-versioning/#per-page-last-updated-comes-from-git-history);
+  # Per-page "last updated" footer sourced from git commit dates;
   # offline, no network. Works from full history (docs CI checks out depth 0).
   "sphinx-last-updated-by-git==0.3.8",
   # PEP 440 version parsing/sorting used by tools/build_docs.py to order
-  # published versions and pick the `latest` alias (https://hasansezertasan.github.io/copier-pyproject/context/docs-versioning/#docs-publish-only-the-current-version-and-carry-older-built-versions-forward-from-gh-pages). Also a Sphinx
+  # published versions and pick the `latest` alias. Also a Sphinx
   # transitive dependency; pinned here for the explicit direct use.
   "packaging>=24.0",
   # Renders the Configuration reference (docs/configuration.rst) directly from
@@ -166,7 +162,6 @@ tool = [
   "pyinstaller>=6.0.0",
   # "marimo==0.15.2",
   # "inflection==0.5.1",
-  # "copier==9.11.0",
 ]
 prek = [
   "prek==0.4.12",
@@ -237,7 +232,7 @@ name = "cz_conventional_commits"
 addopts = "-v --tb=short --doctest-glob=README.md"
 # One marker per component, auto-applied by tests/conftest.py from each test's
 # top-level tests/<dir>/. Enables `pytest -m web` locally and per-component CI
-# jobs (issue #160, https://hasansezertasan.github.io/copier-pyproject/context/ci-topology/#per-component-markers-path-filtered-jobs-and-one-coverage-gate-per-component); `integration` (https://hasansezertasan.github.io/copier-pyproject/context/testing-strategy/#real-broker-integration-tests-testcontainers-locally-per-broker-ci-mechanism) is one axis of the scheme.
+# jobs; `integration` is one axis of the scheme.
 markers = [
   "core: core/shared component tests",
   "cli: CLI component tests",
@@ -264,7 +259,7 @@ parallel = true
 # Store data-file paths relative to the project root so `.coverage` files produced
 # on different runners/OSes merge in the `coverage-combine` CI job without
 # absolute-path mismatches. Complements the `[tool.coverage.paths]` remap below
-# (which unifies the src/ vs site-packages layouts). See https://hasansezertasan.github.io/copier-pyproject/context/ci-topology/#a-single-union-coverage-gate-across-the-whole-matrix.
+# (which unifies the src/ vs site-packages layouts).
 relative_files = true
 source_pkgs = ["keycast", "tests"]
 
@@ -286,7 +281,7 @@ keycast = ["src/keycast", "*/site-packages/keycast"]
 # patterns here: a regex matching a `def` line excludes the *whole function body*,
 # so a pattern like `def main\(` would silently un-measure any future `main()`
 # with real logic (and did mask the tested GUI/TUI entrypoints). Pragmas carry the
-# exclusion decision next to the code it affects. See https://hasansezertasan.github.io/copier-pyproject/context/testing-strategy/#coverage-exclusions-are-per-site-pragmas-and-the-globs-must-match-the-installed-layout.
+# exclusion decision next to the code it affects.
 exclude_lines = [
   "no cov",
   "if __name__ == .__main__.:",
@@ -462,7 +457,7 @@ convention = "pep257"
 # (INP001 — dmgbuild loads its settings file by path, not import).
 "packaging/*.py" = ["T201", "S404", "S603", "S607", "INP001"]
 # The versioned-docs build orchestrator is a standalone CLI script under tools/,
-# not part of an importable package (https://hasansezertasan.github.io/copier-pyproject/context/docs-versioning/#docs-publish-only-the-current-version-and-carry-older-built-versions-forward-from-gh-pages).
+# not part of an importable package.
 "tools/build_docs.py" = ["INP001"]
 # settings.py deliberately prints to stderr (never the overlay/log) when the
 # config file cannot even be read: logging is not configured yet at that point.
@@ -581,22 +576,17 @@ disable = [
   # are deliberately lazy so import-linter's layering contract holds and a
   # framework is only imported when the code path that needs it actually runs.
   # Textual is the exception: the TUI imports it at module scope so `InfoApp`
-  # can be defined there and driven by the headless pilot (https://hasansezertasan.github.io/copier-pyproject/context/testing-strategy/#interactive-components-expose-injected-driver-seams-so-headless-ci-measures-everything-but-the-blocking-call).
+  # can be defined there and driven by the headless pilot.
   "import-outside-toplevel",
   # W0706 — the generated TUI entry point explicitly re-raises
   # KeyboardInterrupt/SystemExit ahead of a broad `except Exception` to make the
   # "let these propagate" intent obvious to readers, even though BaseException
   # subclasses wouldn't be caught by the Exception clause anyway.
   "try-except-raise",
-  # W0718 — keycast's error policy is degrade-gracefully (a listener/display
-  # failure must never crash the overlay), so broad `except Exception` handlers
-  # are the design, not tech debt. Ruff encodes the same policy per file
-  # ([tool.ruff.lint.per-file-ignores] BLE001 entries); pylint cannot scope by
-  # file, hence this global disable with the policy stated once, here.
-  # R0801 — the updates subpackage re-exports its public names through parallel
-  # `__all__` blocks plus identical TYPE_CHECKING import headers per module.
-  # That structural symmetry is the package's public-API pattern, not copy-paste
-  # debt, and R0801 cannot be suppressed inline at the use site.
+  # R0801 — the component skeletons (gui/tui/mcp/worker) are deliberately
+  # parallel: each fetches package metadata and formats the same info block the
+  # same way. That structural symmetry is a feature of the layout, not
+  # copy-paste debt, and R0801 cannot be suppressed inline at the call site.
   "duplicate-code",
   # W0718 — keycast's error policy is degrade-gracefully (a listener/display
   # failure must never crash the overlay), so broad `except Exception` handlers
@@ -612,10 +602,9 @@ max-positional-arguments = 10
 max-branches = 20
 
 [tool.typos.files]
-# copier records `_commit` as a `git describe` string (`v1.2.3-4-g<hash>`) when
-# the template is rendered from an untagged ref, and a fragment of the hex hash
-# can read as a misspelled word, failing the check on a hash nobody chose. The
-# file is machine-written with no prose to check. The prek hook passes
+# The answers file can record a `git describe` string (`v1.2.3-4-g<hash>`), and
+# a fragment of the hex hash can read as a misspelled word, failing the check on
+# a hash nobody chose. The file is machine-written with no prose to check. The prek hook passes
 # `--force-exclude`, so the exclusion holds there as well as in `tox -e style`.
 extend-exclude = [
   ".copier-answers.yml",
@@ -674,7 +663,8 @@ env_tmp_dir = "{toxworkdir}/tmp/{envname}"
 # `coverage combine` step merges.
 set_env = { COVERAGE_PROCESS_START = "{tox_root}/pyproject.toml" }
 # Non-editable: `uv sync --no-editable` builds the project and installs it into
-# site-packages, the layout `[tool.coverage.paths]` remaps for reporting.
+# site-packages, the layout `[tool.coverage.paths]` remaps and the per-component
+# coverage gates measure.
 package = "wheel"
 # tox scrubs the environment; importing keycast pulls in pynput, whose X backend
 # needs DISPLAY (provided by xvfb-run on Linux CI). Forward it into the commands.
@@ -752,7 +742,7 @@ commands = [
   # would make a registry request on every `git commit`. The ruleset is named
   # explicitly rather than `--config auto` so rule selection does not depend on
   # language auto-detection; it is still fetched from the registry, which is why
-  # this cannot be vendored (see https://hasansezertasan.github.io/copier-pyproject/context/lint-orchestration/#semgrep-runs-in-the-style-env-against-a-named-registry-ruleset-never-vendored). `--error` makes findings blocking;
+  # this cannot be vendored. `--error` makes findings blocking;
   # silence a false positive with a trailing `# nosemgrep: <rule-id>`.
   [
     "semgrep",
@@ -769,7 +759,7 @@ commands = [
     "*.toml",
   ],
   # A strict `--check` gate, not fix mode: a generated file that taplo would
-  # rewrite fails its own CI on first push and drifts on every `copier update`.
+  # rewrite fails its own CI on first push.
   # `.taplo.toml` disables array auto expand/collapse so the shipped layout is
   # the canonical one regardless of which components are enabled. The `*.toml`
   # glob is non-recursive, so it scopes taplo to this project's own root TOML
@@ -791,8 +781,8 @@ commands = [
   ],
   # Config/source validation only — the prek `ai-rulez` hook is what regenerates
   # the host files and so what catches drift. Having the check here too means a
-  # malformed `.ai-rulez/` source fails the canonical lint runner (https://hasansezertasan.github.io/copier-pyproject/context/lint-orchestration/#the-tox-style-env-is-the-sole-authoritative-lint-suite-prek-is-a-fast-gate-not-a-second-suite) even
-  # on a clone whose git hooks were never installed.
+  # malformed `.ai-rulez/` source fails the canonical lint runner even on a clone
+  # whose git hooks were never installed.
   [
     "ai-rulez",
     "validate",
@@ -800,6 +790,7 @@ commands = [
   [
     "sphinx-lint",
     "docs",
+    "REPOSITORY_SETUP.rst",
   ],
   # Collects (does not run) the suite and flags fixtures that are never used --
   # cheap, deterministic, and a natural fit next to the other whole-program
