@@ -169,7 +169,6 @@ before it starts work, which installs this same toolchain and syncs dependencies
 in its ephemeral environment. The first sync creates `uv.lock` for a newly
 generated project.
 
-<<<<<<< before updating
 The agent instruction files every AI coding tool reads (`AGENTS.md`,
 `CLAUDE.md`, `.github/copilot-instructions.md`, …) are **generated** from the
 sources in `.ai-rulez/` by [ai-rulez](https://github.com/Goldziher/ai-rulez) —
@@ -196,9 +195,6 @@ keycast needs nothing beyond the toolchain above, with two platform notes:
   captures real input — but on Linux it still imports pynput's X backend, so
   run it under `xvfb-run -a` (plain `tox run` fails without a display). CI
   wraps the Linux jobs the same way.
-=======
-<!-- TODO @hasansezertasan: add any project-specific setup (IDE, services, env vars) -->
->>>>>>> after updating
 
 ### Debugging
 

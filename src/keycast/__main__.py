@@ -1,6 +1,3 @@
-<<<<<<< before updating
-"""Keycast module entrypoint (``python -m keycast``)."""
-=======
 """Module entrypoint for the project.
 
 This is the single runnable entrypoint used by ``python -m keycast``
@@ -29,7 +26,10 @@ root to fall back on and no obvious way to read a Python stack trace.
 
 import importlib
 import sys
-from collections.abc import Callable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # Each of these ships as a core dependency of this package, so a missing one
 # never means "install an extra" -- it means this environment is out of sync with
@@ -94,9 +94,7 @@ def main() -> None:  # pragma: no cover
 
 
 __all__ = ["main"]
->>>>>>> after updating
 
-from keycast.main import main
 
 if __name__ == "__main__":
     main()

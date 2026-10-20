@@ -95,27 +95,13 @@ hooks = [
   # resolve imports, so it is a `local` `system` hook via `uv run`, not an upstream
   # repo hook. Single version source: the `style` group pin.
   { id = "pylint", name = "Pylint", entry = "uv run --locked --group style pylint src", language = "system", pass_filenames = false, always_run = true },
-<<<<<<< before updating
   # import-linter is intentionally unwired: keycast uses a flat module layout
   # (cli.py, display.py, ...) plus an `updates/` subpackage, so the template's
   # layered cli/gui/core/utils contract in [tool.importlinter] does not apply.
   # The contract block was removed from pyproject.toml; re-adding a component
   # structure means re-adding both together (config + these invocations).
-  # slotscheck imports the installed keycast package to verify __slots__
-  # definitions, so like basedpyright it is a whole-program analyzer needing the
-=======
-  # import-linter (lint-imports) enforces the [tool.importlinter] architecture
-  # contract. Like basedpyright it is a whole-program analyzer that needs the
-  # installed package + its deps to build the import graph (via grimp), so it is a
-  # `local` `system` hook that shells out through `uv run --locked --group style`
-  # — NOT an upstream repo hook (that pattern runs in an isolated venv without the
-  # project installed, which is why it lived only in the tox `style` env before).
-  # Single version source: the `style` group pin. It builds the
-  # whole graph regardless of which files changed, so filenames are not passed.
-  { id = "import-linter", name = "Import Linter", entry = "uv run --locked --group style lint-imports", language = "system", pass_filenames = false, always_run = true },
   # slotscheck imports every module under src/ to verify __slots__ definitions, so
   # like basedpyright/import-linter it is a whole-program analyzer needing the
->>>>>>> after updating
   # installed package — a `local` `system` hook via `uv run`, not an upstream repo
   # hook. It checks a property (slot correctness) no other tool covers, so it runs
   # on the fast gate too (unlike the redundant type checkers ty/pyrefly/zuban,

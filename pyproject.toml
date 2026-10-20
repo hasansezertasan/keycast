@@ -351,46 +351,6 @@ DEP004 = ["packaging"]
 strict-imports = false
 
 
-<<<<<<< before updating
-=======
-[tool.importlinter]
-root_package = "keycast"
-
-
-[[tool.importlinter.contracts]]
-name = "Layered architecture with independent components"
-type = "layers"
-# Layers are listed high -> low: a layer may import lower layers but never a
-# higher one. Modules joined by ` | ` on one line are independent SIBLINGS that
-# may not import each other. `cli` is the orchestrator layer — the
-# `keycast` console root, whose subcommands launch the other
-# components (web/gui/tui/mcp/worker) via lazy imports — so it sits ABOVE the
-# independent component group, which sits above `core`, which sits above the leaf
-# `utils`.
-#
-# `exhaustive` makes the contract fail when a subpackage of
-# `keycast` is not named in `layers` — so a new top-level
-# subpackage is a deliberate architecture decision (add it to a layer here)
-# rather than something that silently accretes at the package root. Feature code
-# belongs inside an existing layer; see "Package structure" in `AGENTS.md`. The
-# `exhaustive_ignores` entries are the non-layer foundations: the metadata and
-# hatch-vcs version modules and the `python -m` dispatcher.
-containers = ["keycast"]
-exhaustive = true
-exhaustive_ignores = [
-  "__main__",
-  "__metadata__",
-  "_version",
-]
-layers = [
-  "cli",
-  "gui",
-  "core",
-  "utils",
-]
-
-
->>>>>>> after updating
 [tool.ruff]
 fix = true
 output-format = "full"
@@ -615,22 +575,10 @@ disable = [
   # "let these propagate" intent obvious to readers, even though BaseException
   # subclasses wouldn't be caught by the Exception clause anyway.
   "try-except-raise",
-<<<<<<< before updating
-  # W0718 — keycast's error policy is degrade-gracefully (a listener/display
-  # failure must never crash the overlay), so broad `except Exception` handlers
-  # are the design, not tech debt. Ruff encodes the same policy per file
-  # ([tool.ruff.lint.per-file-ignores] BLE001 entries); pylint cannot scope by
-  # file, hence this global disable with the policy stated once, here.
-  # R0801 — the updates subpackage re-exports its public names through parallel
-  # `__all__` blocks plus identical TYPE_CHECKING import headers per module.
-  # That structural symmetry is the package's public-API pattern, not copy-paste
-  # debt, and R0801 cannot be suppressed inline at the use site.
-=======
   # R0801 — the component skeletons (gui/tui/mcp/worker) are deliberately
   # parallel: each fetches package metadata and formats the same info block the
   # same way. That structural symmetry is a feature of the layout, not
   # copy-paste debt, and R0801 cannot be suppressed inline at the call site.
->>>>>>> after updating
   "duplicate-code",
   # W0718 — keycast's error policy is degrade-gracefully (a listener/display
   # failure must never crash the overlay), so broad `except Exception` handlers
@@ -707,12 +655,8 @@ env_tmp_dir = "{toxworkdir}/tmp/{envname}"
 # `coverage combine` step merges.
 set_env = { COVERAGE_PROCESS_START = "{tox_root}/pyproject.toml" }
 # Non-editable: `uv sync --no-editable` builds the project and installs it into
-<<<<<<< before updating
-# site-packages, the layout `[tool.coverage.paths]` remaps for reporting.
-=======
 # site-packages, the layout `[tool.coverage.paths]` remaps and the per-component
 # coverage gates measure.
->>>>>>> after updating
 package = "wheel"
 # tox scrubs the environment; importing keycast pulls in pynput, whose X backend
 # needs DISPLAY (provided by xvfb-run on Linux CI). Forward it into the commands.
