@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en" data-accent-color="amber" data-content_root="../../../">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>keycast.updates.sources - keycast</title><link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" /><script>
+    function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
+    setColorMode(localStorage._theme||"auto");
+  </script><link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=e1a1ceaf" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/shibuya.css?v=2ceb65ce" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/togglebutton.css?v=9c3e77be" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinx_paramlinks.css" />
+    <link media="print" rel="stylesheet" type="text/css" href="../../../_static/print.css?v=20ff2c19" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sy-f-text: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+  --sy-f-heading: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+}
+</style>
+    
+  <meta property="og:type" content="website"/><meta property="og:title" content="keycast.updates.sources"/>
+    <meta name="twitter:card" content="summary"/>
+  </head>
+<body><div class="sy-head">
+  <div class="sy-head-blur"></div>
+  <div class="sy-head-inner sy-container mx-auto">
+    <a class="sy-head-brand" href="../../../index.html">
+      
+      
+      <strong>keycast</strong>
+    </a>
+    <div class="sy-head-nav" id="head-nav">
+      <nav class="sy-head-links"></nav>
+      <div class="sy-head-extra flex items-center print:hidden"><form class="searchbox flex items-center" action="../../../search.html" method="get">
+  <input type="text" name="q" placeholder="Search" />
+  <kbd>/</kbd>
+</form><div class="sy-head-socials">
+  <a href="https://github.com/hasansezertasan/keycast" aria-label="GitHub">
+    <iconify-icon icon="simple-icons:github"></iconify-icon>
+  </a></div></div>
+    </div>
+    <div class="sy-head-actions flex items-center shrink-0 print:hidden"><button class="js-theme theme-switch flex items-center"
+data-aria-auto="Switch to light color mode"
+data-aria-light="Switch to dark color mode"
+data-aria-dark="Switch to auto color mode">
+<i class="i-lucide theme-icon"></i>
+</button><button class="md:hidden flex items-center js-menu" aria-label="Menu" type="button" aria-controls="head-nav" aria-expanded="false">
+        <div class="hamburger">
+          <span class="hamburger_1"></span>
+          <span class="hamburger_2"></span>
+          <span class="hamburger_3"></span>
+        </div>
+      </button>
+    </div>
+  </div>
+</div>
+<div class="sy-page sy-container flex mx-auto">
+  <aside id="lside" class="sy-lside md:w-72 md:shrink-0 print:hidden">
+    <div class="sy-lside-inner md:sticky">
+      <div class="sy-scrollbar p-6">
+        <div class="globaltoc" data-expand-depth="0"><p class="caption" role="heading" aria-level="3"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../cli-reference.html">CLI reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="lside-overlay js-menu" role="button" aria-label="Close left sidebar" aria-controls="lside" aria-expanded="false"></div>
+  <aside id="rside" class="sy-rside pb-3 w-64 shrink-0 order-last">
+    <button class="rside-close js-menu xl:hidden" aria-label="Close Table of Contents" type="button" aria-controls="rside" aria-expanded="false">
+      <i class="i-lucide close"></i>
+    </button>
+    <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div></div>
+  </aside>
+  <div class="rside-overlay js-menu" role="button" aria-label="Close Table of Contents" aria-controls="rside" aria-expanded="false"></div>
+  <main class="sy-main w-full max-sm:max-w-full print:pt-6">
+<div class="sy-breadcrumbs" role="navigation">
+  <div class="sy-breadcrumbs-inner flex items-center">
+    <div class="md:hidden mr-3">
+      <button class="js-menu" aria-label="Menu" type="button" aria-controls="lside" aria-expanded="false">
+        <i class="i-lucide menu"></i>
+      </button>
+    </div>
+    <ol class="flex-1" itemscope itemtype="https://schema.org/BreadcrumbList"><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="../../../index.html"><span itemprop="name">keycast</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="1" />
+      </li><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="../../index.html"><span itemprop="name">Module code</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="2" />
+      </li><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="../updates.html"><span itemprop="name">keycast.updates</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="3" />
+      </li><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <strong itemprop="name">keycast.updates.sources</strong>
+        <meta itemprop="position" content="4" />
+      </li></ol>
+    <div class="xl:hidden ml-1">
+      <button class="js-menu" aria-label="Show table of contents" type="button" aria-controls="rside"
+        aria-expanded="false">
+        <i class="i-lucide outdent"></i>
+      </button>
+    </div>
+  </div>
+</div><div class="flex flex-col break-words justify-between">
+      <div class="relative min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
+  <article class="yue" role="main">
+          <h1>Source code for keycast.updates.sources</h1><div class="highlight"><pre>
+<span></span><span data-line="1"><span class="sd">"""How this keycast process was installed (install-source detection).</span>
+</span><span data-line="2">
+</span><span data-line="3"><span class="sd">The detected :class:`InstallSource` drives the *right* update advice — a cask</span>
+</span><span data-line="4"><span class="sd">user is told ``brew upgrade --cask``, a pipx user ``pipx upgrade``, and so on</span>
+</span><span data-line="5"><span class="sd">(see ADR-002). The frozen-vs-not split is reliable; everything past it is a</span>
+</span><span data-line="6"><span class="sd">heuristic, with an ``UNKNOWN`` fallback that points at the Releases page rather</span>
+</span><span data-line="7"><span class="sd">than guessing a wrong command. Per ADR-005 the non-frozen path is anchored where</span>
+</span><span data-line="8"><span class="sd">it can be on the stdlib ``INSTALLER`` record, falling back to path markers for</span>
+</span><span data-line="9"><span class="sd">the cases that record cannot distinguish (pipx and Homebrew-formula both install</span>
+</span><span data-line="10"><span class="sd">via pip, so both record ``"pip"``).</span>
+</span><span data-line="11"><span class="sd">"""</span>
+</span><span data-line="12">
+</span><span data-line="13"><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+</span><span data-line="14">
+</span><span data-line="15"><span class="kn">import</span><span class="w"> </span><span class="nn">enum</span>
+</span><span data-line="16"><span class="kn">import</span><span class="w"> </span><span class="nn">importlib.metadata</span>
+</span><span data-line="17"><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+</span><span data-line="18"><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+</span><span data-line="19"><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+</span><span data-line="20"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+</span><span data-line="21">
+</span><span data-line="22"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+</span><span data-line="23">    <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
+</span><span data-line="24">
+</span><span data-line="25"><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+</span><span data-line="26">    <span class="s2">"InstallSource"</span><span class="p">,</span>
+</span><span data-line="27">    <span class="s2">"detect_install_source"</span><span class="p">,</span>
+</span><span data-line="28">    <span class="s2">"install_source_label"</span><span class="p">,</span>
+</span><span data-line="29">    <span class="s2">"recommended_action"</span><span class="p">,</span>
+</span><span data-line="30"><span class="p">]</span>
+</span><span data-line="31">
+</span><span data-line="32">
+</span><span data-line="33"><span class="n">RELEASES_URL</span> <span class="o">=</span> <span class="s2">"https://github.com/hasansezertasan/keycast/releases"</span>
+</span><span data-line="34"><span class="sd">"""User-facing page the notice points at when no upgrade command fits."""</span>
+</span><span data-line="35">
+</span><span data-line="36">
+<div class="viewcode-block" id="InstallSource">
+<a class="viewcode-back" href="../../../modules.html#keycast.updates.InstallSource">[docs]</a>
+</span><span data-line="37"><span class="k">class</span><span class="w"> </span><span class="nc">InstallSource</span><span class="p">(</span><span class="n">enum</span><span class="o">.</span><span class="n">Enum</span><span class="p">):</span>
+</span><span data-line="38"><span class="w">    </span><span class="sd">"""How this keycast process was installed.</span>
+</span><span data-line="39">
+</span><span data-line="40"><span class="sd">    The value is the stable token used in logs; user-facing strings come from</span>
+</span><span data-line="41"><span class="sd">    :func:`install_source_label` and :func:`recommended_action`.</span>
+</span><span data-line="42"><span class="sd">    """</span>
+</span><span data-line="43">
+</span><span data-line="44">    <span class="n">PIP</span> <span class="o">=</span> <span class="s2">"pip"</span>
+</span><span data-line="45">    <span class="n">PIPX</span> <span class="o">=</span> <span class="s2">"pipx"</span>
+</span><span data-line="46">    <span class="n">UV_TOOL</span> <span class="o">=</span> <span class="s2">"uv-tool"</span>
+</span><span data-line="47">    <span class="n">HOMEBREW_FORMULA</span> <span class="o">=</span> <span class="s2">"homebrew-formula"</span>
+</span><span data-line="48">    <span class="n">HOMEBREW_CASK</span> <span class="o">=</span> <span class="s2">"homebrew-cask"</span>
+</span><span data-line="49">    <span class="n">GITHUB_RELEASE</span> <span class="o">=</span> <span class="s2">"github-release"</span>
+</span><span data-line="50">    <span class="n">WINDOWS_INSTALLER</span> <span class="o">=</span> <span class="s2">"windows-installer"</span>
+</span><span data-line="51">    <span class="n">SCOOP</span> <span class="o">=</span> <span class="s2">"scoop"</span>
+</span><span data-line="52">    <span class="n">SCOOP_GLOBAL</span> <span class="o">=</span> <span class="s2">"scoop-global"</span>
+</span><span data-line="53">    <span class="n">MICROSOFT_STORE</span> <span class="o">=</span> <span class="s2">"microsoft-store"</span>
+</span><span data-line="54">    <span class="n">MAC_APP_STORE</span> <span class="o">=</span> <span class="s2">"mac-app-store"</span>
+</span><span data-line="55">    <span class="n">UNKNOWN</span> <span class="o">=</span> <span class="s2">"unknown"</span></div>
+
+</span><span data-line="56">
+</span><span data-line="57">
+</span><span data-line="58"><span class="n">_HOMEBREW_PATH_MARKERS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"/cellar/"</span><span class="p">,</span> <span class="s2">"/caskroom/"</span><span class="p">,</span> <span class="s2">"/homebrew/"</span><span class="p">,</span> <span class="s2">"/linuxbrew/"</span><span class="p">)</span>
+</span><span data-line="59"><span class="sd">"""Lower-cased path fragments that mark a Homebrew-managed location."""</span>
+</span><span data-line="60">
+</span><span data-line="61"><span class="n">_HOMEBREW_PREFIXES</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"/opt/homebrew/"</span><span class="p">,</span> <span class="s2">"/usr/local/cellar/"</span><span class="p">)</span>
+</span><span data-line="62"><span class="sd">"""Lower-cased absolute prefixes that mark a Homebrew-managed location."""</span>
+</span><span data-line="63">
+</span><span data-line="64"><span class="n">_HOMEBREW_CASK_PREFIXES</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"/opt/homebrew"</span><span class="p">,</span> <span class="s2">"/usr/local"</span><span class="p">)</span>
+</span><span data-line="65"><span class="sd">"""Default Homebrew prefixes (Apple Silicon, Intel) checked for a cask receipt."""</span>
+</span><span data-line="66">
+</span><span data-line="67">
+</span><span data-line="68"><span class="k">def</span><span class="w"> </span><span class="nf">_looks_homebrew</span><span class="p">(</span><span class="n">location_posix</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span data-line="69"><span class="w">    </span><span class="sd">"""Return whether a lower-cased POSIX path looks Homebrew-managed.</span>
+</span><span data-line="70">
+</span><span data-line="71"><span class="sd">    Args:</span>
+</span><span data-line="72"><span class="sd">        location_posix: ``str(path).lower()`` with forward slashes.</span>
+</span><span data-line="73">
+</span><span data-line="74"><span class="sd">    Returns:</span>
+</span><span data-line="75"><span class="sd">        True if any Homebrew marker or prefix is present.</span>
+</span><span data-line="76"><span class="sd">    """</span>
+</span><span data-line="77">    <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">marker</span> <span class="ow">in</span> <span class="n">location_posix</span> <span class="k">for</span> <span class="n">marker</span> <span class="ow">in</span> <span class="n">_HOMEBREW_PATH_MARKERS</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span>
+</span><span data-line="78">        <span class="n">location_posix</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span> <span class="k">for</span> <span class="n">prefix</span> <span class="ow">in</span> <span class="n">_HOMEBREW_PREFIXES</span>
+</span><span data-line="79">    <span class="p">)</span>
+</span><span data-line="80">
+</span><span data-line="81">
+</span><span data-line="82"><span class="n">_HOMEBREW_FORMULA_KEG_MARKER</span> <span class="o">=</span> <span class="s2">"/cellar/keycast/"</span>
+</span><span data-line="83"><span class="sd">"""Lower-cased POSIX fragment marking a Homebrew **formula** keg for keycast.</span>
+</span><span data-line="84">
+</span><span data-line="85"><span class="sd">A formula builds keycast into its own Cellar keg</span>
+</span><span data-line="86"><span class="sd">(``&lt;brew-prefix&gt;/Cellar/keycast/&lt;version&gt;/...``), so this keycast-named fragment</span>
+</span><span data-line="87"><span class="sd">is the reliable formula signal (see ADR-005). The broad :func:`_looks_homebrew`</span>
+</span><span data-line="88"><span class="sd">prefix check is deliberately *not* reused for the formula case — see</span>
+</span><span data-line="89"><span class="sd">:func:`_looks_homebrew_formula`.</span>
+</span><span data-line="90"><span class="sd">"""</span>
+</span><span data-line="91">
+</span><span data-line="92">
+</span><span data-line="93"><span class="k">def</span><span class="w"> </span><span class="nf">_looks_homebrew_formula</span><span class="p">(</span><span class="n">location_posix</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span data-line="94"><span class="w">    </span><span class="sd">"""Return whether a non-frozen package location is a Homebrew *formula* keg.</span>
+</span><span data-line="95">
+</span><span data-line="96"><span class="sd">    Deliberately narrower than :func:`_looks_homebrew`. That helper also matches</span>
+</span><span data-line="97"><span class="sd">    the bare ``/opt/homebrew/`` (or ``/usr/local/cellar/``) prefix, which is</span>
+</span><span data-line="98"><span class="sd">    correct for the frozen cask branch but wrong here: it also matches the</span>
+</span><span data-line="99"><span class="sd">    ``site-packages`` of a *Homebrew-provided CPython*, so an ordinary</span>
+</span><span data-line="100"><span class="sd">    ``pip install keycast`` into ``brew``'s Python</span>
+</span><span data-line="101"><span class="sd">    (``/opt/homebrew/lib/pythonX/site-packages/keycast/``) would be misclassified</span>
+</span><span data-line="102"><span class="sd">    as a formula and handed a ``brew upgrade keycast`` command that does not apply</span>
+</span><span data-line="103"><span class="sd">    to a pip install. A genuine formula instead lives under a keycast-named Cellar</span>
+</span><span data-line="104"><span class="sd">    keg, so key off that fragment alone (see ADR-005).</span>
+</span><span data-line="105">
+</span><span data-line="106"><span class="sd">    Args:</span>
+</span><span data-line="107"><span class="sd">        location_posix: ``location.as_posix().lower()`` of this package.</span>
+</span><span data-line="108">
+</span><span data-line="109"><span class="sd">    Returns:</span>
+</span><span data-line="110"><span class="sd">        True only if the location sits inside a keycast Homebrew Cellar keg.</span>
+</span><span data-line="111"><span class="sd">    """</span>
+</span><span data-line="112">    <span class="k">return</span> <span class="n">_HOMEBREW_FORMULA_KEG_MARKER</span> <span class="ow">in</span> <span class="n">location_posix</span>
+</span><span data-line="113">
+</span><span data-line="114">
+</span><span data-line="115"><span class="k">def</span><span class="w"> </span><span class="nf">_is_under</span><span class="p">(</span><span class="n">location_posix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">raw_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span data-line="116"><span class="w">    </span><span class="sa">r</span><span class="sd">"""Return whether a POSIX path lives under a (possibly native) directory.</span>
+</span><span data-line="117">
+</span><span data-line="118"><span class="sd">    The directory comes from an env var, so it may be a native Windows path with</span>
+</span><span data-line="119"><span class="sd">    backslashes; it is normalized to lower-cased POSIX before comparison so the</span>
+</span><span data-line="120"><span class="sd">    check works the same on every platform. An empty directory never matches —</span>
+</span><span data-line="121"><span class="sd">    an env var being *set* is not by itself evidence of where the package lives.</span>
+</span><span data-line="122">
+</span><span data-line="123"><span class="sd">    Args:</span>
+</span><span data-line="124"><span class="sd">        location_posix: ``location.as_posix().lower()`` of the package.</span>
+</span><span data-line="125"><span class="sd">        raw_dir: The candidate parent directory (env-supplied, any separator).</span>
+</span><span data-line="126">
+</span><span data-line="127"><span class="sd">    Matching is at a path boundary, not a bare prefix: a sibling whose name</span>
+</span><span data-line="128"><span class="sd">    merely *starts with* ``raw_dir`` (``D:\\toolsX`` vs root ``D:\\tools``) is not</span>
+</span><span data-line="129"><span class="sd">    "under" it, so the location must equal the root or sit beneath its trailing</span>
+</span><span data-line="130"><span class="sd">    separator.</span>
+</span><span data-line="131">
+</span><span data-line="132"><span class="sd">    Returns:</span>
+</span><span data-line="133"><span class="sd">        True only when ``raw_dir`` is non-empty and contains ``location_posix``.</span>
+</span><span data-line="134"><span class="sd">    """</span>
+</span><span data-line="135">    <span class="k">if</span> <span class="ow">not</span> <span class="n">raw_dir</span><span class="p">:</span>
+</span><span data-line="136">        <span class="k">return</span> <span class="kc">False</span>
+</span><span data-line="137">    <span class="n">root</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">raw_dir</span><span class="p">)</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">"/"</span><span class="p">)</span>
+</span><span data-line="138">    <span class="k">return</span> <span class="n">location_posix</span> <span class="o">==</span> <span class="n">root</span> <span class="ow">or</span> <span class="n">location_posix</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">root</span> <span class="o">+</span> <span class="s2">"/"</span><span class="p">)</span>
+</span><span data-line="139">
+</span><span data-line="140">
+</span><span data-line="141"><span class="k">def</span><span class="w"> </span><span class="nf">_homebrew_cask_receipt_exists</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span data-line="142"><span class="w">    </span><span class="sd">"""Return whether a Homebrew **cask** receipt for keycast is on disk.</span>
+</span><span data-line="143">
+</span><span data-line="144"><span class="sd">    A cask moves ``keycast.app`` into ``/Applications`` — the same location a</span>
+</span><span data-line="145"><span class="sd">    manual drag-install lands — but leaves a receipt under</span>
+</span><span data-line="146"><span class="sd">    ``&lt;brew-prefix&gt;/Caskroom/keycast``. That receipt is the only thing that</span>
+</span><span data-line="147"><span class="sd">    distinguishes the two, so it is the signal used to recommend</span>
+</span><span data-line="148"><span class="sd">    ``brew upgrade --cask`` rather than the Releases page. ``HOMEBREW_PREFIX`` is</span>
+</span><span data-line="149"><span class="sd">    honored for non-standard prefixes.</span>
+</span><span data-line="150">
+</span><span data-line="151"><span class="sd">    Returns:</span>
+</span><span data-line="152"><span class="sd">        True if a Caskroom receipt directory for keycast exists.</span>
+</span><span data-line="153"><span class="sd">    """</span>
+</span><span data-line="154">    <span class="n">prefixes</span> <span class="o">=</span> <span class="p">[</span><span class="o">*</span><span class="n">_HOMEBREW_CASK_PREFIXES</span><span class="p">]</span>
+</span><span data-line="155">    <span class="n">custom</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"HOMEBREW_PREFIX"</span><span class="p">)</span>
+</span><span data-line="156">    <span class="k">if</span> <span class="n">custom</span><span class="p">:</span>
+</span><span data-line="157">        <span class="n">prefixes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">custom</span><span class="p">)</span>
+</span><span data-line="158">    <span class="k">return</span> <span class="nb">any</span><span class="p">((</span><span class="n">Path</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"Caskroom"</span> <span class="o">/</span> <span class="s2">"keycast"</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="k">for</span> <span class="n">prefix</span> <span class="ow">in</span> <span class="n">prefixes</span><span class="p">)</span>
+</span><span data-line="159">
+</span><span data-line="160">
+</span><span data-line="161"><span class="k">def</span><span class="w"> </span><span class="nf">_mas_receipt_exists</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span data-line="162"><span class="w">    </span><span class="sd">"""Return whether a Mac App Store receipt sits in the running bundle.</span>
+</span><span data-line="163">
+</span><span data-line="164"><span class="sd">    A MAS-distributed ``.app`` carries ``Contents/_MASReceipt/receipt``. App</span>
+</span><span data-line="165"><span class="sd">    Store apps install into ``/Applications`` — the same place as a cask or a</span>
+</span><span data-line="166"><span class="sd">    manual drag-install — so this receipt is the only reliable signal that</span>
+</span><span data-line="167"><span class="sd">    distinguishes it from a cask / drag-install (ADR-014), the macOS-store</span>
+</span><span data-line="168"><span class="sd">    analogue of the Caskroom receipt. ``sys.executable`` is</span>
+</span><span data-line="169"><span class="sd">    ``&lt;bundle&gt;/Contents/MacOS/keycast``, so the receipt is one level up from</span>
+</span><span data-line="170"><span class="sd">    ``MacOS`` under ``Contents``.</span>
+</span><span data-line="171">
+</span><span data-line="172"><span class="sd">    Guarded by a macOS platform check: only a MAS build carries this receipt, so</span>
+</span><span data-line="173"><span class="sd">    a stray ``_MASReceipt`` on another OS must never classify as</span>
+</span><span data-line="174"><span class="sd">    :data:`InstallSource.MAC_APP_STORE`.</span>
+</span><span data-line="175">
+</span><span data-line="176"><span class="sd">    Any ``OSError`` from the probe degrades to ``False`` — detection is</span>
+</span><span data-line="177"><span class="sd">    best-effort, so an unreadable path falls through to the next branch rather</span>
+</span><span data-line="178"><span class="sd">    than crashing the caller (mirrors :func:`_read_installer`).</span>
+</span><span data-line="179">
+</span><span data-line="180"><span class="sd">    Returns:</span>
+</span><span data-line="181"><span class="sd">        True if running on macOS and the receipt exists inside the bundle.</span>
+</span><span data-line="182"><span class="sd">    """</span>
+</span><span data-line="183">    <span class="c1"># Read the platform into a plainly-typed local before branching (same</span>
+</span><span data-line="184">    <span class="c1"># literal-narrowing defeat as _installer_marker_exists below): checkers</span>
+</span><span data-line="185">    <span class="c1"># with platform pruning treat `sys.platform != "darwin"` as</span>
+</span><span data-line="186">    <span class="c1"># compile-time-known and flag the macOS-only body as unreachable on other</span>
+</span><span data-line="187">    <span class="c1"># targets.</span>
+</span><span data-line="188">    <span class="n">host_platform</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span>
+</span><span data-line="189">    <span class="k">if</span> <span class="n">host_platform</span> <span class="o">!=</span> <span class="s2">"darwin"</span><span class="p">:</span>
+</span><span data-line="190">        <span class="k">return</span> <span class="kc">False</span>
+</span><span data-line="191">    <span class="k">try</span><span class="p">:</span>
+</span><span data-line="192">        <span class="k">return</span> <span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">"_MASReceipt"</span> <span class="o">/</span> <span class="s2">"receipt"</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+</span><span data-line="193">    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+</span><span data-line="194">        <span class="k">return</span> <span class="kc">False</span>
+</span><span data-line="195">
+</span><span data-line="196">
+</span><span data-line="197"><span class="n">_INSTALLER_MARKER_NAME</span> <span class="o">=</span> <span class="s2">".install-source"</span>
+</span><span data-line="198"><span class="sd">"""Sentinel file the Windows installer drops beside ``keycast.exe``.</span>
+</span><span data-line="199">
+</span><span data-line="200"><span class="sd">The Inno Setup installer and the plain ``.zip`` ship the *same* frozen</span>
+</span><span data-line="201"><span class="sd">PyInstaller bundle, so the only thing that tells an installed copy from an</span>
+</span><span data-line="202"><span class="sd">extracted one is this extra file — the Windows analogue of the macOS Caskroom</span>
+</span><span data-line="203"><span class="sd">receipt. Inno writes it (it is not part of ``dist/keycast/``, so the zip never</span>
+</span><span data-line="204"><span class="sd">contains it); its presence — checked only on Windows, see</span>
+</span><span data-line="205"><span class="sd">:func:`_installer_marker_exists` — flips ``GITHUB_RELEASE`` to</span>
+</span><span data-line="206"><span class="sd">``WINDOWS_INSTALLER``.</span>
+</span><span data-line="207"><span class="sd">"""</span>
+</span><span data-line="208">
+</span><span data-line="209">
+</span><span data-line="210"><span class="k">def</span><span class="w"> </span><span class="nf">_installer_marker_exists</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span data-line="211"><span class="w">    </span><span class="sd">"""Return whether the Windows-installer marker sits beside the executable.</span>
+</span><span data-line="212">
+</span><span data-line="213"><span class="sd">    Checks for :data:`_INSTALLER_MARKER_NAME` next to ``sys.executable`` (the</span>
+</span><span data-line="214"><span class="sd">    frozen ``keycast.exe``). The zip extraction has no such file, so this is the</span>
+</span><span data-line="215"><span class="sd">    signal used to recommend the installer/uninstall path over a zip re-download.</span>
+</span><span data-line="216">
+</span><span data-line="217"><span class="sd">    Guarded by a Windows platform check: only the Inno installer writes this</span>
+</span><span data-line="218"><span class="sd">    marker, so a stray ``.install-source`` beside a frozen macOS/Linux build must</span>
+</span><span data-line="219"><span class="sd">    never classify as :data:`InstallSource.WINDOWS_INSTALLER`.</span>
+</span><span data-line="220">
+</span><span data-line="221"><span class="sd">    Returns:</span>
+</span><span data-line="222"><span class="sd">        True if running on Windows and the marker file exists alongside the</span>
+</span><span data-line="223"><span class="sd">        running executable.</span>
+</span><span data-line="224"><span class="sd">    """</span>
+</span><span data-line="225">    <span class="c1"># Read the platform into a plainly-typed local before branching (same</span>
+</span><span data-line="226">    <span class="c1"># literal-narrowing defeat as secure_input.py): zuban/pyrefly prune the</span>
+</span><span data-line="227">    <span class="c1"># Windows-only body as dead code on some targets and then flag the</span>
+</span><span data-line="228">    <span class="c1"># "unreachable" path below.</span>
+</span><span data-line="229">    <span class="n">host_platform</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span>
+</span><span data-line="230">    <span class="k">if</span> <span class="n">host_platform</span> <span class="o">!=</span> <span class="s2">"win32"</span><span class="p">:</span>
+</span><span data-line="231">        <span class="k">return</span> <span class="kc">False</span>
+</span><span data-line="232">    <span class="k">return</span> <span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="n">_INSTALLER_MARKER_NAME</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+</span><span data-line="233">
+</span><span data-line="234">
+</span><span data-line="235"><span class="n">_SCOOP_PATH_MARKER</span> <span class="o">=</span> <span class="s2">"/scoop/apps/keycast/"</span>
+</span><span data-line="236"><span class="sd">"""Lower-cased POSIX fragment marking a per-user Scoop-managed keycast install.</span>
+</span><span data-line="237">
+</span><span data-line="238"><span class="sd">Scoop extracts the *same* ``keycast-windows.zip`` bundle as a manual download —</span>
+</span><span data-line="239"><span class="sd">no ``.install-source`` marker, no Caskroom-style receipt — under</span>
+</span><span data-line="240"><span class="sd">``~/scoop/apps/keycast/current/``. The Scoop signal is therefore the *location*</span>
+</span><span data-line="241"><span class="sd">itself: this fragment for the default per-user root, plus the ``SCOOP`` env var</span>
+</span><span data-line="242"><span class="sd">for a custom one (see :func:`_scoop_source`).</span>
+</span><span data-line="243"><span class="sd">"""</span>
+</span><span data-line="244">
+</span><span data-line="245"><span class="n">_SCOOP_GLOBAL_PATH_MARKER</span> <span class="o">=</span> <span class="s2">"/programdata/scoop/apps/keycast/"</span>
+</span><span data-line="246"><span class="sd">"""Lower-cased POSIX fragment marking a **global** Scoop install.</span>
+</span><span data-line="247">
+</span><span data-line="248"><span class="sd">``scoop install -g`` lands under ``C:\\ProgramData\\scoop`` (or a custom</span>
+</span><span data-line="249"><span class="sd">``SCOOP_GLOBAL`` root). A global install updates with ``-g`` and elevation</span>
+</span><span data-line="250"><span class="sd">(``sudo scoop update keycast -g``), so it is a *distinct* source from the</span>
+</span><span data-line="251"><span class="sd">per-user one — plain ``scoop update keycast`` would not touch it. Checked first,</span>
+</span><span data-line="252"><span class="sd">since a global path also contains :data:`_SCOOP_PATH_MARKER`.</span>
+</span><span data-line="253"><span class="sd">"""</span>
+</span><span data-line="254">
+</span><span data-line="255">
+</span><span data-line="256"><span class="n">_MS_STORE_PATH_MARKER</span> <span class="o">=</span> <span class="s2">"/windowsapps/"</span>
+</span><span data-line="257"><span class="sd">"""Lower-cased POSIX fragment marking a Microsoft Store (MSIX) install.</span>
+</span><span data-line="258">
+</span><span data-line="259"><span class="sd">The Store-signed MSIX (ADR-009) deploys the *same* frozen bundle as every other</span>
+</span><span data-line="260"><span class="sd">Windows channel — no ``.install-source`` marker, no receipt — under</span>
+</span><span data-line="261"><span class="sd">``C:\\Program Files\\WindowsApps\\&lt;PackageFamilyName&gt;…``, so, as with Scoop, the</span>
+</span><span data-line="262"><span class="sd">*location* is the signal. The ``WindowsApps`` tree is ACL-locked and owned by</span>
+</span><span data-line="263"><span class="sd">the Store's deployment stack; nothing else installs there, which makes the</span>
+</span><span data-line="264"><span class="sd">fragment a safe location-only predicate.</span>
+</span><span data-line="265"><span class="sd">"""</span>
+</span><span data-line="266">
+</span><span data-line="267">
+</span><span data-line="268"><span class="k">def</span><span class="w"> </span><span class="nf">_scoop_source</span><span class="p">(</span><span class="n">location_posix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">env</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">InstallSource</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="269"><span class="w">    </span><span class="sa">r</span><span class="sd">"""Classify a frozen bundle as a global / per-user Scoop install, or neither.</span>
+</span><span data-line="270">
+</span><span data-line="271"><span class="sd">    Global is tested first (its default path also contains the per-user marker):</span>
+</span><span data-line="272"><span class="sd">    the ``C:\\ProgramData\\scoop`` fragment or a custom ``SCOOP_GLOBAL`` root.</span>
+</span><span data-line="273"><span class="sd">    Per-user is then the default-root fragment or a custom ``SCOOP`` root. Env</span>
+</span><span data-line="274"><span class="sd">    roots are matched via :func:`_is_under`, so a var that is merely *set* (empty,</span>
+</span><span data-line="275"><span class="sd">    or pointing elsewhere) never matches — only a bundle that truly lives under it.</span>
+</span><span data-line="276">
+</span><span data-line="277"><span class="sd">    Args:</span>
+</span><span data-line="278"><span class="sd">        location_posix: ``location.as_posix().lower()`` of the bundle executable.</span>
+</span><span data-line="279"><span class="sd">        env: The process environment to consult for the Scoop root vars.</span>
+</span><span data-line="280">
+</span><span data-line="281"><span class="sd">    Returns:</span>
+</span><span data-line="282"><span class="sd">        :attr:`InstallSource.SCOOP_GLOBAL`, :attr:`InstallSource.SCOOP`, or</span>
+</span><span data-line="283"><span class="sd">        ``None`` when the location is not Scoop-managed.</span>
+</span><span data-line="284"><span class="sd">    """</span>
+</span><span data-line="285">    <span class="k">if</span> <span class="n">_SCOOP_GLOBAL_PATH_MARKER</span> <span class="ow">in</span> <span class="n">location_posix</span> <span class="ow">or</span> <span class="n">_is_under</span><span class="p">(</span>
+</span><span data-line="286">        <span class="n">location_posix</span><span class="p">,</span> <span class="n">env</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"SCOOP_GLOBAL"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
+</span><span data-line="287">    <span class="p">):</span>
+</span><span data-line="288">        <span class="k">return</span> <span class="n">InstallSource</span><span class="o">.</span><span class="n">SCOOP_GLOBAL</span>
+</span><span data-line="289">    <span class="k">if</span> <span class="n">_SCOOP_PATH_MARKER</span> <span class="ow">in</span> <span class="n">location_posix</span> <span class="ow">or</span> <span class="n">_is_under</span><span class="p">(</span>
+</span><span data-line="290">        <span class="n">location_posix</span><span class="p">,</span> <span class="n">env</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"SCOOP"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
+</span><span data-line="291">    <span class="p">):</span>
+</span><span data-line="292">        <span class="k">return</span> <span class="n">InstallSource</span><span class="o">.</span><span class="n">SCOOP</span>
+</span><span data-line="293">    <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="294">
+</span><span data-line="295">
+</span><span data-line="296"><span class="k">def</span><span class="w"> </span><span class="nf">_read_installer</span><span class="p">(</span><span class="n">dist_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"keycast"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="297"><span class="w">    </span><span class="sd">"""Return the recorded ``INSTALLER`` for the distribution, lower-cased.</span>
+</span><span data-line="298">
+</span><span data-line="299"><span class="sd">    pip and uv stamp an ``INSTALLER`` file in the ``.dist-info`` (``"pip"`` /</span>
+</span><span data-line="300"><span class="sd">    ``"uv"``); it is the most authoritative signal for the pip-vs-uv split. It is</span>
+</span><span data-line="301"><span class="sd">    absent for a frozen bundle and cannot tell pipx or Homebrew-formula apart from</span>
+</span><span data-line="302"><span class="sd">    pip (both install via pip), so callers still need path heuristics for those.</span>
+</span><span data-line="303">
+</span><span data-line="304"><span class="sd">    Args:</span>
+</span><span data-line="305"><span class="sd">        dist_name: Distribution to inspect.</span>
+</span><span data-line="306">
+</span><span data-line="307"><span class="sd">    Returns:</span>
+</span><span data-line="308"><span class="sd">        The lower-cased installer token, or ``None`` if unknown/unreadable.</span>
+</span><span data-line="309"><span class="sd">    """</span>
+</span><span data-line="310">    <span class="k">try</span><span class="p">:</span>
+</span><span data-line="311">        <span class="n">text</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">distribution</span><span class="p">(</span><span class="n">dist_name</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="s2">"INSTALLER"</span><span class="p">)</span>
+</span><span data-line="312">    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+</span><span data-line="313">        <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="314">    <span class="k">return</span> <span class="n">text</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">if</span> <span class="n">text</span> <span class="k">else</span> <span class="kc">None</span>
+</span><span data-line="315">
+</span><span data-line="316">
+</span><span data-line="317"><span class="c1"># The install-source decision tree is inherently branchy.</span>
+</span><span data-line="318"><span class="c1"># pylint: disable=too-many-return-statements</span>
+<div class="viewcode-block" id="detect_install_source">
+<a class="viewcode-back" href="../../../modules.html#keycast.updates.detect_install_source">[docs]</a>
+</span><span data-line="319"><span class="k">def</span><span class="w"> </span><span class="nf">detect_install_source</span><span class="p">(</span>  <span class="c1"># noqa: C901 — install-source decision tree</span>
+</span><span data-line="320">    <span class="o">*</span><span class="p">,</span>
+</span><span data-line="321">    <span class="n">frozen</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="322">    <span class="n">location</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="323">    <span class="n">env</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="324">    <span class="n">cask_receipt_exists</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="n">_homebrew_cask_receipt_exists</span><span class="p">,</span>
+</span><span data-line="325">    <span class="n">mas_receipt_exists</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="n">_mas_receipt_exists</span><span class="p">,</span>
+</span><span data-line="326">    <span class="n">installer_marker_exists</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="n">_installer_marker_exists</span><span class="p">,</span>
+</span><span data-line="327">    <span class="n">read_installer</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">_read_installer</span><span class="p">,</span>
+</span><span data-line="328"><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">InstallSource</span><span class="p">:</span>
+</span><span data-line="329"><span class="w">    </span><span class="sd">"""Classify how the running keycast was installed.</span>
+</span><span data-line="330">
+</span><span data-line="331"><span class="sd">    Resolution is a first-match-wins tree (see ADR-002 / ADR-005). ``sys.frozen``</span>
+</span><span data-line="332"><span class="sd">    splits "Python import" from "PyInstaller bundle"; past that the signals are</span>
+</span><span data-line="333"><span class="sd">    heuristic. A Homebrew **cask** ships the *same* frozen bundle as a manual</span>
+</span><span data-line="334"><span class="sd">    Release download, so it is disambiguated by a Caskroom receipt; a **Mac App</span>
+</span><span data-line="335"><span class="sd">    Store** build shares the ``/Applications`` location too and is disambiguated</span>
+</span><span data-line="336"><span class="sd">    by its ``_MASReceipt`` (checked first).</span>
+</span><span data-line="337">
+</span><span data-line="338"><span class="sd">    Args:</span>
+</span><span data-line="339"><span class="sd">        frozen: Override for ``sys.frozen`` (defaults to the real value).</span>
+</span><span data-line="340"><span class="sd">        location: Override for the path classified — the bundle executable when</span>
+</span><span data-line="341"><span class="sd">            frozen, otherwise this package's location (defaults accordingly).</span>
+</span><span data-line="342"><span class="sd">        env: Override for the process environment (defaults to ``os.environ``).</span>
+</span><span data-line="343"><span class="sd">        cask_receipt_exists: Predicate for a Homebrew cask receipt (injectable;</span>
+</span><span data-line="344"><span class="sd">            defaults to a filesystem check).</span>
+</span><span data-line="345"><span class="sd">        mas_receipt_exists: Predicate for a Mac App Store receipt (injectable;</span>
+</span><span data-line="346"><span class="sd">            defaults to a filesystem check inside the running bundle).</span>
+</span><span data-line="347"><span class="sd">        installer_marker_exists: Predicate for the Windows-installer marker</span>
+</span><span data-line="348"><span class="sd">            (injectable; defaults to a filesystem check beside the executable).</span>
+</span><span data-line="349"><span class="sd">        read_installer: Reader for the ``INSTALLER`` record (injectable; defaults</span>
+</span><span data-line="350"><span class="sd">            to the stdlib metadata lookup).</span>
+</span><span data-line="351">
+</span><span data-line="352"><span class="sd">    Returns:</span>
+</span><span data-line="353"><span class="sd">        The detected :class:`InstallSource`; :attr:`InstallSource.UNKNOWN` when</span>
+</span><span data-line="354"><span class="sd">        no rule matches (the notice then falls back to the Releases page).</span>
+</span><span data-line="355"><span class="sd">    """</span>
+</span><span data-line="356">    <span class="n">frozen</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">sys</span><span class="p">,</span> <span class="s2">"frozen"</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span> <span class="k">if</span> <span class="n">frozen</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">frozen</span>
+</span><span data-line="357">    <span class="n">env</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">)</span> <span class="k">if</span> <span class="n">env</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">env</span>
+</span><span data-line="358">
+</span><span data-line="359">    <span class="k">if</span> <span class="n">frozen</span><span class="p">:</span>
+</span><span data-line="360">        <span class="n">location</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">)</span> <span class="k">if</span> <span class="n">location</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">location</span>
+</span><span data-line="361">        <span class="n">posix</span> <span class="o">=</span> <span class="n">location</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+</span><span data-line="362">        <span class="c1"># A Mac App Store .app installs into /Applications just like a cask or a</span>
+</span><span data-line="363">        <span class="c1"># manual drag-install; the bundle's _MASReceipt is the only signal, and</span>
+</span><span data-line="364">        <span class="c1"># it is checked first — before the cask branch (which also keys on</span>
+</span><span data-line="365">        <span class="c1"># /Applications) — so a MAS install never misclassifies as a cask</span>
+</span><span data-line="366">        <span class="c1"># (ADR-014).</span>
+</span><span data-line="367">        <span class="k">if</span> <span class="n">mas_receipt_exists</span><span class="p">():</span>
+</span><span data-line="368">            <span class="k">return</span> <span class="n">InstallSource</span><span class="o">.</span><span class="n">MAC_APP_STORE</span>
+</span><span data-line="369">        <span class="c1"># Either a Caskroom-path bundle, or the app moved to /Applications by a</span>
+</span><span data-line="370">        <span class="c1"># cask (same path as a manual drag — disambiguated by the cask receipt).</span>
+</span><span data-line="371">        <span class="k">if</span> <span class="n">_looks_homebrew</span><span class="p">(</span><span class="n">posix</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span>
+</span><span data-line="372">            <span class="s2">"/applications/"</span> <span class="ow">in</span> <span class="n">posix</span> <span class="ow">and</span> <span class="n">cask_receipt_exists</span><span class="p">()</span>
+</span><span data-line="373">        <span class="p">):</span>
+</span><span data-line="374">            <span class="k">return</span> <span class="n">InstallSource</span><span class="o">.</span><span class="n">HOMEBREW_CASK</span>
+</span><span data-line="375">        <span class="c1"># A Windows installer ships the same frozen bundle as the zip; the marker</span>
+</span><span data-line="376">        <span class="c1"># Inno drops beside the exe is the only thing that tells them apart.</span>
+</span><span data-line="377">        <span class="k">if</span> <span class="n">installer_marker_exists</span><span class="p">():</span>
+</span><span data-line="378">            <span class="k">return</span> <span class="n">InstallSource</span><span class="o">.</span><span class="n">WINDOWS_INSTALLER</span>
+</span><span data-line="379">        <span class="c1"># Scoop extracts the same bundle as a manual download (no marker); its</span>
+</span><span data-line="380">        <span class="c1"># location — ~/scoop or C:\ProgramData\scoop, or a custom SCOOP /</span>
+</span><span data-line="381">        <span class="c1"># SCOOP_GLOBAL root — is the only signal, and per-user vs global get</span>
+</span><span data-line="382">        <span class="c1"># different update commands. Checked before the GitHub-release fallback.</span>
+</span><span data-line="383">        <span class="n">scoop</span> <span class="o">=</span> <span class="n">_scoop_source</span><span class="p">(</span><span class="n">posix</span><span class="p">,</span> <span class="n">env</span><span class="p">)</span>
+</span><span data-line="384">        <span class="k">if</span> <span class="n">scoop</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="385">            <span class="k">return</span> <span class="n">scoop</span>
+</span><span data-line="386">        <span class="c1"># A Store-delivered MSIX (ADR-009) also ships the same bundle; it</span>
+</span><span data-line="387">        <span class="c1"># deploys under the ACL-locked WindowsApps tree, so — like Scoop — the</span>
+</span><span data-line="388">        <span class="c1"># location alone classifies it. Checked before the GitHub-release</span>
+</span><span data-line="389">        <span class="c1"># fallback: the Store updates apps itself, and this source is what</span>
+</span><span data-line="390">        <span class="c1"># keeps the notice from wrongly pointing Store users at the Releases</span>
+</span><span data-line="391">        <span class="c1"># page.</span>
+</span><span data-line="392">        <span class="k">if</span> <span class="n">_MS_STORE_PATH_MARKER</span> <span class="ow">in</span> <span class="n">posix</span><span class="p">:</span>
+</span><span data-line="393">            <span class="k">return</span> <span class="n">InstallSource</span><span class="o">.</span><span class="n">MICROSOFT_STORE</span>
+</span><span data-line="394">        <span class="k">return</span> <span class="n">InstallSource</span><span class="o">.</span><span class="n">GITHUB_RELEASE</span>
+</span><span data-line="395">
+</span><span data-line="396">    <span class="n">location</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span> <span class="k">if</span> <span class="n">location</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">location</span>
+</span><span data-line="397">    <span class="n">posix</span> <span class="o">=</span> <span class="n">location</span><span class="o">.</span><span class="n">as_posix</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+</span><span data-line="398">
+</span><span data-line="399">    <span class="c1"># pipx installs via pip (INSTALLER="pip") into a dedicated venv — the path is</span>
+</span><span data-line="400">    <span class="c1"># the only signal, so it is checked before the INSTALLER-based uv split.</span>
+</span><span data-line="401">    <span class="k">if</span> <span class="s2">"/pipx/"</span> <span class="ow">in</span> <span class="n">posix</span> <span class="ow">or</span> <span class="n">_is_under</span><span class="p">(</span><span class="n">posix</span><span class="p">,</span> <span class="n">env</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"PIPX_HOME"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)):</span>
+</span><span data-line="402">        <span class="k">return</span> <span class="n">InstallSource</span><span class="o">.</span><span class="n">PIPX</span>
+</span><span data-line="403">    <span class="c1"># uv stamps INSTALLER="uv"; path markers / env dir are the fallback.</span>
+</span><span data-line="404">    <span class="k">if</span> <span class="p">(</span>
+</span><span data-line="405">        <span class="n">read_installer</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"uv"</span>
+</span><span data-line="406">        <span class="ow">or</span> <span class="s2">"/uv/tools/"</span> <span class="ow">in</span> <span class="n">posix</span>
+</span><span data-line="407">        <span class="ow">or</span> <span class="s2">"/share/uv/"</span> <span class="ow">in</span> <span class="n">posix</span>
+</span><span data-line="408">        <span class="ow">or</span> <span class="n">_is_under</span><span class="p">(</span><span class="n">posix</span><span class="p">,</span> <span class="n">env</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"UV_TOOL_DIR"</span><span class="p">,</span> <span class="s2">""</span><span class="p">))</span>
+</span><span data-line="409">    <span class="p">):</span>
+</span><span data-line="410">        <span class="k">return</span> <span class="n">InstallSource</span><span class="o">.</span><span class="n">UV_TOOL</span>
+</span><span data-line="411">    <span class="c1"># Formula detection keys off the keycast-named Cellar keg, NOT the broad</span>
+</span><span data-line="412">    <span class="c1"># _looks_homebrew prefix: the latter also matches the site-packages of a</span>
+</span><span data-line="413">    <span class="c1"># Homebrew-provided CPython, misclassifying a plain `pip install` into brew's</span>
+</span><span data-line="414">    <span class="c1"># Python as a formula (see _looks_homebrew_formula / ADR-005).</span>
+</span><span data-line="415">    <span class="k">if</span> <span class="n">_looks_homebrew_formula</span><span class="p">(</span><span class="n">posix</span><span class="p">):</span>
+</span><span data-line="416">        <span class="k">return</span> <span class="n">InstallSource</span><span class="o">.</span><span class="n">HOMEBREW_FORMULA</span>
+</span><span data-line="417">    <span class="k">return</span> <span class="n">InstallSource</span><span class="o">.</span><span class="n">PIP</span></div>
+
+</span><span data-line="418">
+</span><span data-line="419">
+</span><span data-line="420"><span class="n">_UPGRADE_COMMANDS</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">InstallSource</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+</span><span data-line="421">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">PIP</span><span class="p">:</span> <span class="s2">"pip install -U keycast"</span><span class="p">,</span>
+</span><span data-line="422">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">PIPX</span><span class="p">:</span> <span class="s2">"pipx upgrade keycast"</span><span class="p">,</span>
+</span><span data-line="423">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">UV_TOOL</span><span class="p">:</span> <span class="s2">"uv tool upgrade keycast"</span><span class="p">,</span>
+</span><span data-line="424">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">HOMEBREW_FORMULA</span><span class="p">:</span> <span class="s2">"brew upgrade keycast"</span><span class="p">,</span>
+</span><span data-line="425">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">HOMEBREW_CASK</span><span class="p">:</span> <span class="s2">"brew upgrade --cask keycast"</span><span class="p">,</span>
+</span><span data-line="426">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">SCOOP</span><span class="p">:</span> <span class="s2">"scoop update keycast"</span><span class="p">,</span>
+</span><span data-line="427">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">SCOOP_GLOBAL</span><span class="p">:</span> <span class="s2">"sudo scoop update keycast -g"</span><span class="p">,</span>
+</span><span data-line="428">    <span class="c1"># Not a command: the Store updates its apps itself, so the recommended</span>
+</span><span data-line="429">    <span class="c1"># action is a statement of that fact rather than something to run — and</span>
+</span><span data-line="430">    <span class="c1"># pointing a Store user at the Releases page would be wrong (ADR-009).</span>
+</span><span data-line="431">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">MICROSOFT_STORE</span><span class="p">:</span> <span class="p">(</span>
+</span><span data-line="432">        <span class="s2">"updates are delivered automatically by the Microsoft Store"</span>
+</span><span data-line="433">    <span class="p">),</span>
+</span><span data-line="434">    <span class="c1"># Same statement-not-a-command shape as the Microsoft Store: the Mac App</span>
+</span><span data-line="435">    <span class="c1"># Store updates its apps itself, and pointing a MAS user at the Releases</span>
+</span><span data-line="436">    <span class="c1"># page would be wrong (ADR-014).</span>
+</span><span data-line="437">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">MAC_APP_STORE</span><span class="p">:</span> <span class="p">(</span>
+</span><span data-line="438">        <span class="s2">"updates are delivered automatically by the Mac App Store"</span>
+</span><span data-line="439">    <span class="p">),</span>
+</span><span data-line="440"><span class="p">}</span>
+</span><span data-line="441">
+</span><span data-line="442"><span class="n">_SOURCE_LABELS</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">InstallSource</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+</span><span data-line="443">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">PIP</span><span class="p">:</span> <span class="s2">"pip"</span><span class="p">,</span>
+</span><span data-line="444">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">PIPX</span><span class="p">:</span> <span class="s2">"pipx"</span><span class="p">,</span>
+</span><span data-line="445">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">UV_TOOL</span><span class="p">:</span> <span class="s2">"uv tool"</span><span class="p">,</span>
+</span><span data-line="446">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">HOMEBREW_FORMULA</span><span class="p">:</span> <span class="s2">"Homebrew formula"</span><span class="p">,</span>
+</span><span data-line="447">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">HOMEBREW_CASK</span><span class="p">:</span> <span class="s2">"Homebrew cask"</span><span class="p">,</span>
+</span><span data-line="448">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">GITHUB_RELEASE</span><span class="p">:</span> <span class="s2">"GitHub release download"</span><span class="p">,</span>
+</span><span data-line="449">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">WINDOWS_INSTALLER</span><span class="p">:</span> <span class="s2">"Windows installer"</span><span class="p">,</span>
+</span><span data-line="450">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">SCOOP</span><span class="p">:</span> <span class="s2">"Scoop"</span><span class="p">,</span>
+</span><span data-line="451">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">SCOOP_GLOBAL</span><span class="p">:</span> <span class="s2">"Scoop (global)"</span><span class="p">,</span>
+</span><span data-line="452">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">MICROSOFT_STORE</span><span class="p">:</span> <span class="s2">"Microsoft Store"</span><span class="p">,</span>
+</span><span data-line="453">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">MAC_APP_STORE</span><span class="p">:</span> <span class="s2">"Mac App Store"</span><span class="p">,</span>
+</span><span data-line="454">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">UNKNOWN</span><span class="p">:</span> <span class="s2">"unknown"</span><span class="p">,</span>
+</span><span data-line="455"><span class="p">}</span>
+</span><span data-line="456">
+</span><span data-line="457"><span class="c1"># Fail fast at import if a new InstallSource is added without wiring it up: every</span>
+</span><span data-line="458"><span class="c1"># member needs a label, and every member except the URL-fallback sources (GitHub</span>
+</span><span data-line="459"><span class="c1"># download / Windows installer / unknown — where guessing a command would be</span>
+</span><span data-line="460"><span class="c1"># wrong, so the notice points at the Releases page to re-download) needs an</span>
+</span><span data-line="461"><span class="c1"># upgrade command. Converts an otherwise-latent runtime KeyError into a loud</span>
+</span><span data-line="462"><span class="c1"># developer error at module load.</span>
+</span><span data-line="463"><span class="k">assert</span> <span class="nb">set</span><span class="p">(</span><span class="n">_SOURCE_LABELS</span><span class="p">)</span> <span class="o">==</span> <span class="nb">set</span><span class="p">(</span><span class="n">InstallSource</span><span class="p">),</span> <span class="s2">"every InstallSource needs a label"</span>
+</span><span data-line="464"><span class="k">assert</span> <span class="nb">set</span><span class="p">(</span><span class="n">_UPGRADE_COMMANDS</span><span class="p">)</span> <span class="o">|</span> <span class="p">{</span>
+</span><span data-line="465">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">GITHUB_RELEASE</span><span class="p">,</span>
+</span><span data-line="466">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">WINDOWS_INSTALLER</span><span class="p">,</span>
+</span><span data-line="467">    <span class="n">InstallSource</span><span class="o">.</span><span class="n">UNKNOWN</span><span class="p">,</span>
+</span><span data-line="468"><span class="p">}</span> <span class="o">==</span> <span class="nb">set</span><span class="p">(</span><span class="n">InstallSource</span><span class="p">),</span> <span class="s2">"every non-URL-fallback InstallSource needs an upgrade command"</span>
+</span><span data-line="469">
+</span><span data-line="470">
+<div class="viewcode-block" id="recommended_action">
+<a class="viewcode-back" href="../../../modules.html#keycast.updates.recommended_action">[docs]</a>
+</span><span data-line="471"><span class="k">def</span><span class="w"> </span><span class="nf">recommended_action</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="n">InstallSource</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span data-line="472"><span class="w">    </span><span class="sd">"""Return the upgrade command for ``source``, or the Releases URL.</span>
+</span><span data-line="473">
+</span><span data-line="474"><span class="sd">    Args:</span>
+</span><span data-line="475"><span class="sd">        source: The detected install source.</span>
+</span><span data-line="476">
+</span><span data-line="477"><span class="sd">    Returns:</span>
+</span><span data-line="478"><span class="sd">        A package-manager command when one fits (for the Microsoft Store or Mac</span>
+</span><span data-line="479"><span class="sd">        App Store, a statement that the store updates the app itself); otherwise</span>
+</span><span data-line="480"><span class="sd">        :data:`RELEASES_URL` (for a manual Release download, a</span>
+</span><span data-line="481"><span class="sd">        Windows-installer copy, or an undetermined source, where guessing a</span>
+</span><span data-line="482"><span class="sd">        command would be wrong — the user re-downloads the asset / installer</span>
+</span><span data-line="483"><span class="sd">        from the Releases page).</span>
+</span><span data-line="484"><span class="sd">    """</span>
+</span><span data-line="485">    <span class="k">return</span> <span class="n">_UPGRADE_COMMANDS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">RELEASES_URL</span><span class="p">)</span></div>
+
+</span><span data-line="486">
+</span><span data-line="487">
+<div class="viewcode-block" id="install_source_label">
+<a class="viewcode-back" href="../../../modules.html#keycast.updates.install_source_label">[docs]</a>
+</span><span data-line="488"><span class="k">def</span><span class="w"> </span><span class="nf">install_source_label</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="n">InstallSource</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span data-line="489"><span class="w">    </span><span class="sd">"""Return the human-readable label for ``source`` (used by ``keycast info``).</span>
+</span><span data-line="490">
+</span><span data-line="491"><span class="sd">    Args:</span>
+</span><span data-line="492"><span class="sd">        source: The detected install source.</span>
+</span><span data-line="493">
+</span><span data-line="494"><span class="sd">    Returns:</span>
+</span><span data-line="495"><span class="sd">        A short label such as ``"Homebrew cask"``.</span>
+</span><span data-line="496"><span class="sd">    """</span>
+</span><span data-line="497">    <span class="k">return</span> <span class="n">_SOURCE_LABELS</span><span class="p">[</span><span class="n">source</span><span class="p">]</span></div>
+
+</span></pre></div>
+        </article><button class="back-to-top" type="button">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+  </svg>
+  <span>Back to top</span>
+</button><div class="navigation flex print:hidden"></div></div>
+    </div>
+  </main>
+</div>
+<footer class="sy-foot">
+  <div class="sy-foot-inner sy-container mx-auto">
+    <div class="sy-foot-reserved md:flex justify-between items-center">
+      <div class="sy-foot-copyright"><p>2026, Hasan Sezer Taşan</p>
+  
+  <p>
+    Made with
+    
+    <a href="https://www.sphinx-doc.org/">Sphinx</a> and
+    
+    <a href="https://shibuya.lepture.com">Shibuya theme</a>.
+  </p>
+</div>
+      <div class="sy-foot-socials">
+  <a href="https://github.com/hasansezertasan/keycast" aria-label="GitHub">
+    <iconify-icon icon="simple-icons:github"></iconify-icon>
+  </a></div>
+    </div>
+  </div>
+</footer>
+      <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+      <script>let toggleHintShow = 'Click to show';</script>
+      <script>let toggleHintHide = 'Click to hide';</script>
+      <script>let toggleOpenOnPrint = 'true';</script>
+      <script src="../../../_static/togglebutton.js?v=b8b12719"></script>
+      <script src="../../../_static/design-tabs.js?v=f930bc37"></script>
+      <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+      <script src="../../../_static/shibuya.js?v=50760d75"></script>
+      <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script></body>
+</html>
