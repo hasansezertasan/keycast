@@ -31,12 +31,20 @@ classifiers = [
   "Operating System :: Microsoft :: Windows",
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3 :: Only",
+<<<<<<< before updating
+=======
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+>>>>>>> after updating
   "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: Implementation :: CPython",
   "Topic :: Multimedia :: Graphics :: Presentation",
   "Topic :: Utilities",
   "Typing :: Typed",
 ]
+<<<<<<< before updating
 # Keycast needs Python 3.14 (Tk 9 via the Astral builds pinned in the release
 # workflow; 3.14.3 ships broken Tk, see docs/adr/001). The template default
 # (>=3.10 with a 3.10-3.14 CI sweep) does not apply: only the 3.14 tox env and
@@ -45,6 +53,15 @@ requires-python = ">=3.14"
 # Runtime deps are exact-pinned (uv add-bounds = "exact" below): the overlay,
 # its settings validation, and the frozen bundles must resolve identically
 # everywhere, including the PyInstaller release jobs.
+=======
+requires-python = ">=3.11"
+# The enabled component's runtime deps live here, not in an optional extra: a
+# selected component is chosen at generation time and ``__main__`` imports it
+# unconditionally (see the CLI > GUI > TUI > web > MCP > worker precedence
+# there), so ``pip install keycast`` must pull them or the binary
+# fails at launch. Same for pydantic-settings, which ``core.config`` imports
+# unconditionally when enabled.
+>>>>>>> after updating
 dependencies = [
   "packaging==26.3",
   "pydantic==2.14.1",
@@ -138,9 +155,9 @@ test = [
 docs = [
   "sphinx==8.1.3",
   "shibuya==2026.7.12",
-  "sphinx-autobuild==2024.10.3", # 2025.x drops Python 3.10 (requires-python >= 3.11)
+  "sphinx-autobuild==2025.8.25",
   "sphinx-copybutton==0.5.2",
-  "sphinx-design==0.6.1", # 0.7.0 drops Python 3.10 (requires-python >= 3.11)
+  "sphinx-design==0.7.0",
   "sphinx-togglebutton==0.4.5",
   "sphinx-paramlinks==0.6.0",
   "auto-pytabs[sphinx]==0.5.0",
@@ -364,8 +381,13 @@ fix = true
 output-format = "full"
 preview = true
 show-fixes = true
+<<<<<<< before updating
 src = ["src", "tests"]
 target-version = "py314"
+=======
+src = ["src", "tests", "docs/examples"]
+target-version = "py311"
+>>>>>>> after updating
 unsafe-fixes = true
 
 
@@ -502,14 +524,23 @@ parenthesize-tuple-in-subscript = false
 [tool.mypy]
 files = ["src"]
 pretty = true
+<<<<<<< before updating
 python_version = "3.14"
+=======
+python_version = "3.11"
+>>>>>>> after updating
 strict = true
 
 
 [tool.basedpyright]
 exclude = [".venv"]
+<<<<<<< before updating
 include = ["src/keycast"]
 pythonVersion = "3.14"
+=======
+include = ["src/keycast", "docs/examples"]
+pythonVersion = "3.11"
+>>>>>>> after updating
 venv = ".venv"
 # venvPath is the directory *containing* the venv, not the venv itself; ".venv"
 # here would make basedpyright look for ".venv/.venv". Use "." so both the venv
@@ -539,7 +570,11 @@ respect-ignore-files = false
 
 
 [tool.ty.environment]
+<<<<<<< before updating
 python-version = "3.14"
+=======
+python-version = "3.11"
+>>>>>>> after updating
 
 
 [tool.ty.terminal]
@@ -547,8 +582,13 @@ error-on-warning = true
 
 
 [tool.pyrefly]
+<<<<<<< before updating
 python-version = "3.14"
 project-includes = ["src"]
+=======
+python-version = "3.11"
+project-includes = ["src", "docs/examples"]
+>>>>>>> after updating
 
 [tool.pylint.main]
 # pylint runs as an always-on gate that deliberately overlaps ruff's PL* rules.
@@ -637,6 +677,12 @@ env_list = [
   "docs-doctest",
   "cli",
   "3.14",
+<<<<<<< before updating
+=======
+  "3.13",
+  "3.12",
+  "3.11",
+>>>>>>> after updating
 ]
 requires = ["tox>=4"]
 
@@ -678,7 +724,11 @@ runner = "uv-venv-lock-runner"
 
 
 [tool.tox.env.style]
+<<<<<<< before updating
 base_python = ["3.14"]
+=======
+base_python = ["3.11"]
+>>>>>>> after updating
 commands = [
   [
     "ruff",
@@ -691,8 +741,16 @@ commands = [
     "--check",
     "--diff",
   ],
+<<<<<<< before updating
   # Keycast is 3.14-only, so a single-version mypy run suffices (the template's
   # 3.10 sweep targets its 3.10 floor, which does not apply here).
+=======
+  [
+    "mypy",
+    "--python-version",
+    "3.11",
+  ],
+>>>>>>> after updating
   [
     "mypy",
     "--python-version",

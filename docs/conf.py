@@ -104,9 +104,15 @@ autodoc_pydantic_field_show_default = True
 
 # -- auto-pytabs -------------------------------------------------------------
 # Keep the version tabs in sync with this project's supported Python range
+<<<<<<< before updating
 # (requires-python >= 3.14). auto-pytabs otherwise defaults to (3, 7), which
 # would mislabel the rendered examples.
 auto_pytabs_min_version = (3, 14)
+=======
+# (requires-python >= 3.11, classifiers/CI up to 3.14). auto-pytabs otherwise
+# defaults to (3, 7), which would mislabel the rendered examples.
+auto_pytabs_min_version = (3, 11)
+>>>>>>> after updating
 auto_pytabs_max_version = (3, 14)
 
 # -- Intersphinx -------------------------------------------------------------
