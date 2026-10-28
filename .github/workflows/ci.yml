@@ -206,6 +206,28 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb
       - name: Run the installed CLI
+<<<<<<< before updating
+=======
+        run: uv run --locked tox run -e cli
+
+  test-core:
+    name: Test core on ${{ matrix.os }}
+    needs: changes
+    if: ${{ github.event.pull_request.draft != true }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, tox_args: "-e 3.14,3.13,3.12,3.11"}
+          - {os: macos-latest, tox_args: "-e py"}
+          - {os: windows-latest, tox_args: "-e py"}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: System Info
+>>>>>>> after updating
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
@@ -218,7 +240,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+<<<<<<< before updating
         os: [windows-latest, ubuntu-latest, macos-latest]
+=======
+        include:
+          - {os: ubuntu-latest, tox_args: "-e 3.14,3.13,3.12,3.11"}
+          - {os: macos-latest, tox_args: "-e py"}
+          - {os: windows-latest, tox_args: "-e py"}
+>>>>>>> after updating
     runs-on: ${{ matrix.os }}
     name: Run Tests on ${{ matrix.os }}
     if: ${{ github.event.pull_request.draft != true }}
@@ -278,9 +307,42 @@ jobs:
         # test/lint collection fails before anything runs. Xvfb provides one.
         if: runner.os == 'Linux'
         run: |
+<<<<<<< before updating
           sudo apt-get update
           sudo apt-get install -y xvfb
       - name: Run the tests
+=======
+          uv run coverage combine
+          uv run coverage report --show-missing --fail-under=0
+          mv .coverage ".coverage.cli.${{ matrix.os }}"
+      - name: Upload coverage data
+        # `include-hidden-files` is required for upload-artifact to pick up the
+        # dotfile `.coverage.*`. Downloaded and merged by `coverage-cli`.
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: coverage-cli-${{ matrix.os }}
+          path: .coverage.cli.${{ matrix.os }}
+          include-hidden-files: true
+
+  test-gui:
+    name: Test gui on ${{ matrix.os }}
+    needs: changes
+    if: >-
+      ${{ github.event.pull_request.draft != true && (needs.changes.outputs.gui == 'true' || needs.changes.outputs.core == 'true') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, tox_args: "-e 3.14,3.13,3.12,3.11"}
+          - {os: macos-latest, tox_args: "-e py"}
+          - {os: windows-latest, tox_args: "-e py"}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: System Info
+>>>>>>> after updating
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then

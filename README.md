@@ -551,7 +551,7 @@ settings and release steps in the same file.
 
 ## Credits
 
-This package was created with [Copier](https://github.com/copier-org/copier) and the [hasansezertasan/copier-pyproject](https://github.com/hasansezertasan/copier-pyproject) project template.
+Generated from [copier-pyproject](https://github.com/hasansezertasan/copier-pyproject).
 
 ## License :scroll:
 
