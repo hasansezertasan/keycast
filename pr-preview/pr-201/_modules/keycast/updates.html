@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en" data-accent-color="amber" data-content_root="../../">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>keycast.updates - keycast</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+    function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
+    setColorMode(localStorage._theme||"auto");
+  </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=e1a1ceaf" />
+    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=2ceb65ce" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/togglebutton.css?v=9c3e77be" />
+    <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx_paramlinks.css" />
+    <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=20ff2c19" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sy-f-text: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+  --sy-f-heading: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+}
+</style>
+    
+  <meta property="og:type" content="website"/><meta property="og:title" content="keycast.updates"/>
+    <meta name="twitter:card" content="summary"/>
+  </head>
+<body><div class="sy-head">
+  <div class="sy-head-blur"></div>
+  <div class="sy-head-inner sy-container mx-auto">
+    <a class="sy-head-brand" href="../../index.html">
+      
+      
+      <strong>keycast</strong>
+    </a>
+    <div class="sy-head-nav" id="head-nav">
+      <nav class="sy-head-links"></nav>
+      <div class="sy-head-extra flex items-center print:hidden"><form class="searchbox flex items-center" action="../../search.html" method="get">
+  <input type="text" name="q" placeholder="Search" />
+  <kbd>/</kbd>
+</form><div class="sy-head-socials">
+  <a href="https://github.com/hasansezertasan/keycast" aria-label="GitHub">
+    <iconify-icon icon="simple-icons:github"></iconify-icon>
+  </a></div></div>
+    </div>
+    <div class="sy-head-actions flex items-center shrink-0 print:hidden"><button class="js-theme theme-switch flex items-center"
+data-aria-auto="Switch to light color mode"
+data-aria-light="Switch to dark color mode"
+data-aria-dark="Switch to auto color mode">
+<i class="i-lucide theme-icon"></i>
+</button><button class="md:hidden flex items-center js-menu" aria-label="Menu" type="button" aria-controls="head-nav" aria-expanded="false">
+        <div class="hamburger">
+          <span class="hamburger_1"></span>
+          <span class="hamburger_2"></span>
+          <span class="hamburger_3"></span>
+        </div>
+      </button>
+    </div>
+  </div>
+</div>
+<div class="sy-page sy-container flex mx-auto">
+  <aside id="lside" class="sy-lside md:w-72 md:shrink-0 print:hidden">
+    <div class="sy-lside-inner md:sticky">
+      <div class="sy-scrollbar p-6">
+        <div class="globaltoc" data-expand-depth="0"><p class="caption" role="heading" aria-level="3"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../cli-reference.html">CLI reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../configuration.html">Configuration</a></li>
+</ul>
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="lside-overlay js-menu" role="button" aria-label="Close left sidebar" aria-controls="lside" aria-expanded="false"></div>
+  <aside id="rside" class="sy-rside pb-3 w-64 shrink-0 order-last">
+    <button class="rside-close js-menu xl:hidden" aria-label="Close Table of Contents" type="button" aria-controls="rside" aria-expanded="false">
+      <i class="i-lucide close"></i>
+    </button>
+    <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div></div>
+  </aside>
+  <div class="rside-overlay js-menu" role="button" aria-label="Close Table of Contents" aria-controls="rside" aria-expanded="false"></div>
+  <main class="sy-main w-full max-sm:max-w-full print:pt-6">
+<div class="sy-breadcrumbs" role="navigation">
+  <div class="sy-breadcrumbs-inner flex items-center">
+    <div class="md:hidden mr-3">
+      <button class="js-menu" aria-label="Menu" type="button" aria-controls="lside" aria-expanded="false">
+        <i class="i-lucide menu"></i>
+      </button>
+    </div>
+    <ol class="flex-1" itemscope itemtype="https://schema.org/BreadcrumbList"><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="../../index.html"><span itemprop="name">keycast</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="1" />
+      </li><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="../index.html"><span itemprop="name">Module code</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="2" />
+      </li><li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <strong itemprop="name">keycast.updates</strong>
+        <meta itemprop="position" content="3" />
+      </li></ol>
+    <div class="xl:hidden ml-1">
+      <button class="js-menu" aria-label="Show table of contents" type="button" aria-controls="rside"
+        aria-expanded="false">
+        <i class="i-lucide outdent"></i>
+      </button>
+    </div>
+  </div>
+</div><div class="flex flex-col break-words justify-between">
+      <div class="relative min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
+  <article class="yue" role="main">
+          <h1>Source code for keycast.updates</h1><div class="highlight"><pre>
+<span></span><span data-line="1"><span class="sd">"""Install-source-aware update check (Phase 1: notify only).</span>
+</span><span data-line="2">
+</span><span data-line="3"><span class="sd">The package is split by concern (ADR-005):</span>
+</span><span data-line="4">
+</span><span data-line="5"><span class="sd">- :mod:`keycast.updates.sources` — how keycast was installed → the right action.</span>
+</span><span data-line="6"><span class="sd">- :mod:`keycast.updates.versions` — GitHub fetch + PEP 440 compare.</span>
+</span><span data-line="7"><span class="sd">- :mod:`keycast.updates.state` — the once-a-day throttle state file.</span>
+</span><span data-line="8"><span class="sd">- this module — orchestration (:func:`notify_pending_update`) and the public API.</span>
+</span><span data-line="9">
+</span><span data-line="10"><span class="sd">:func:`notify_pending_update` follows the npm pattern: show any *cached*</span>
+</span><span data-line="11"><span class="sd">newer-version notice instantly (no network on the hot path), then refresh the</span>
+</span><span data-line="12"><span class="sd">cache on a background daemon thread for a later run. Every network/file operation</span>
+</span><span data-line="13"><span class="sd">is best-effort — a failure is logged at ``DEBUG`` and swallowed, never blocking</span>
+</span><span data-line="14"><span class="sd">or crashing the caller. See ``docs/adr/002-update-check.md`` for the full design.</span>
+</span><span data-line="15"><span class="sd">"""</span>
+</span><span data-line="16">
+</span><span data-line="17"><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+</span><span data-line="18">
+</span><span data-line="19"><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+</span><span data-line="20"><span class="kn">import</span><span class="w"> </span><span class="nn">threading</span>
+</span><span data-line="21"><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+</span><span data-line="22"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+</span><span data-line="23">
+</span><span data-line="24"><span class="kn">from</span><span class="w"> </span><span class="nn">keycast</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
+</span><span data-line="25"><span class="kn">from</span><span class="w"> </span><span class="nn">keycast.settings</span><span class="w"> </span><span class="kn">import</span> <span class="n">UPDATE_CHECK_FILE_PATH</span>
+</span><span data-line="26"><span class="kn">from</span><span class="w"> </span><span class="nn">keycast.updates.sources</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="27">    <span class="n">InstallSource</span><span class="p">,</span>
+</span><span data-line="28">    <span class="n">detect_install_source</span><span class="p">,</span>
+</span><span data-line="29">    <span class="n">install_source_label</span><span class="p">,</span>
+</span><span data-line="30">    <span class="n">recommended_action</span><span class="p">,</span>
+</span><span data-line="31"><span class="p">)</span>
+</span><span data-line="32"><span class="kn">from</span><span class="w"> </span><span class="nn">keycast.updates.state</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="33">    <span class="n">CHECK_INTERVAL_SECONDS</span><span class="p">,</span>
+</span><span data-line="34">    <span class="n">UpdateState</span><span class="p">,</span>
+</span><span data-line="35">    <span class="n">due_for_check</span><span class="p">,</span>
+</span><span data-line="36">    <span class="n">read_state</span><span class="p">,</span>
+</span><span data-line="37">    <span class="n">write_state</span><span class="p">,</span>
+</span><span data-line="38"><span class="p">)</span>
+</span><span data-line="39"><span class="kn">from</span><span class="w"> </span><span class="nn">keycast.updates.versions</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch_latest_release_tag</span><span class="p">,</span> <span class="n">is_newer</span><span class="p">,</span> <span class="n">strip_v</span>
+</span><span data-line="40">
+</span><span data-line="41"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+</span><span data-line="42">    <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
+</span><span data-line="43">    <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+</span><span data-line="44">
+</span><span data-line="45"><span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+</span><span data-line="46">    <span class="s2">"InstallSource"</span><span class="p">,</span>
+</span><span data-line="47">    <span class="s2">"detect_install_source"</span><span class="p">,</span>
+</span><span data-line="48">    <span class="s2">"install_source_label"</span><span class="p">,</span>
+</span><span data-line="49">    <span class="s2">"notify_pending_update"</span><span class="p">,</span>
+</span><span data-line="50"><span class="p">]</span>
+</span><span data-line="51">
+</span><span data-line="52"><span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+</span><span data-line="53">
+</span><span data-line="54">
+</span><span data-line="55"><span class="k">def</span><span class="w"> </span><span class="nf">format_notice</span><span class="p">(</span><span class="n">latest</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">source</span><span class="p">:</span> <span class="n">InstallSource</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span data-line="56"><span class="w">    </span><span class="sd">"""Build the user-facing "update available" line.</span>
+</span><span data-line="57">
+</span><span data-line="58"><span class="sd">    Args:</span>
+</span><span data-line="59"><span class="sd">        latest: The newer release tag (a leading ``v`` is dropped for display).</span>
+</span><span data-line="60"><span class="sd">        source: The detected install source, selecting the recommended action.</span>
+</span><span data-line="61">
+</span><span data-line="62"><span class="sd">    Returns:</span>
+</span><span data-line="63"><span class="sd">        e.g. ``"keycast 0.5.0 available — brew upgrade --cask keycast"``.</span>
+</span><span data-line="64"><span class="sd">    """</span>
+</span><span data-line="65">    <span class="k">return</span> <span class="sa">f</span><span class="s2">"keycast </span><span class="si">{</span><span class="n">strip_v</span><span class="p">(</span><span class="n">latest</span><span class="p">)</span><span class="si">}</span><span class="s2"> available — </span><span class="si">{</span><span class="n">recommended_action</span><span class="p">(</span><span class="n">source</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+</span><span data-line="66">
+</span><span data-line="67">
+</span><span data-line="68"><span class="k">def</span><span class="w"> </span><span class="nf">refresh_state</span><span class="p">(</span>
+</span><span data-line="69">    <span class="n">now</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+</span><span data-line="70">    <span class="o">*</span><span class="p">,</span>
+</span><span data-line="71">    <span class="n">path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="n">UPDATE_CHECK_FILE_PATH</span><span class="p">,</span>
+</span><span data-line="72">    <span class="n">fetch</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">fetch_latest_release_tag</span><span class="p">,</span>
+</span><span data-line="73"><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="74"><span class="w">    </span><span class="sd">"""Fetch the latest tag and persist updated throttle state.</span>
+</span><span data-line="75">
+</span><span data-line="76"><span class="sd">    ``last_checked`` is recorded even when the fetch fails, so a persistently</span>
+</span><span data-line="77"><span class="sd">    offline machine is not re-probed on every invocation; ``last_seen_tag`` is</span>
+</span><span data-line="78"><span class="sd">    only advanced on a successful fetch (otherwise the previous value is kept).</span>
+</span><span data-line="79">
+</span><span data-line="80"><span class="sd">    Args:</span>
+</span><span data-line="81"><span class="sd">        now: Epoch seconds to record as the check time.</span>
+</span><span data-line="82"><span class="sd">        path: The state file path.</span>
+</span><span data-line="83"><span class="sd">        fetch: The tag fetcher (injectable for tests).</span>
+</span><span data-line="84"><span class="sd">    """</span>
+</span><span data-line="85">    <span class="n">tag</span> <span class="o">=</span> <span class="n">fetch</span><span class="p">()</span>
+</span><span data-line="86">    <span class="n">previous</span> <span class="o">=</span> <span class="n">read_state</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+</span><span data-line="87">    <span class="n">write_state</span><span class="p">(</span>
+</span><span data-line="88">        <span class="n">UpdateState</span><span class="p">(</span><span class="n">last_checked</span><span class="o">=</span><span class="n">now</span><span class="p">,</span> <span class="n">last_seen_tag</span><span class="o">=</span><span class="n">tag</span> <span class="ow">or</span> <span class="n">previous</span><span class="o">.</span><span class="n">last_seen_tag</span><span class="p">),</span> <span class="n">path</span>
+</span><span data-line="89">    <span class="p">)</span>
+</span><span data-line="90">
+</span><span data-line="91">
+</span><span data-line="92"><span class="k">def</span><span class="w"> </span><span class="nf">_spawn_daemon</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">:</span>
+</span><span data-line="93"><span class="w">    </span><span class="sd">"""Run ``target`` on a daemon thread so it never blocks process exit.</span>
+</span><span data-line="94">
+</span><span data-line="95"><span class="sd">    Args:</span>
+</span><span data-line="96"><span class="sd">        target: The zero-arg callable to run.</span>
+</span><span data-line="97">
+</span><span data-line="98"><span class="sd">    Returns:</span>
+</span><span data-line="99"><span class="sd">        The started thread (returned for tests to join on).</span>
+</span><span data-line="100"><span class="sd">    """</span>
+</span><span data-line="101">    <span class="n">thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"keycast-update-check"</span><span class="p">,</span> <span class="n">daemon</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span data-line="102">    <span class="n">thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+</span><span data-line="103">    <span class="k">return</span> <span class="n">thread</span>
+</span><span data-line="104">
+</span><span data-line="105">
+</span><span data-line="106"><span class="k">def</span><span class="w"> </span><span class="nf">_update_enabled</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span data-line="107"><span class="w">    </span><span class="sd">"""Read the ``check_for_updates`` flag from config without side effects.</span>
+</span><span data-line="108">
+</span><span data-line="109"><span class="sd">    Loads settings via the JSON source (no first-run write, unlike</span>
+</span><span data-line="110"><span class="sd">    ``create_settings_file``). A missing or corrupt config degrades to the</span>
+</span><span data-line="111"><span class="sd">    default (enabled); real corrupt-config recovery happens on the app path.</span>
+</span><span data-line="112">
+</span><span data-line="113"><span class="sd">    Returns:</span>
+</span><span data-line="114"><span class="sd">        Whether automatic update checks are enabled.</span>
+</span><span data-line="115"><span class="sd">    """</span>
+</span><span data-line="116">    <span class="k">try</span><span class="p">:</span>
+</span><span data-line="117">        <span class="kn">from</span><span class="w"> </span><span class="nn">keycast.settings</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>
+</span><span data-line="118">
+</span><span data-line="119">        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">Settings</span><span class="p">()</span><span class="o">.</span><span class="n">check_for_updates</span><span class="p">)</span>
+</span><span data-line="120">    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+</span><span data-line="121">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+</span><span data-line="122">            <span class="s2">"Could not read check_for_updates; defaulting to enabled"</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span>
+</span><span data-line="123">        <span class="p">)</span>
+</span><span data-line="124">        <span class="k">return</span> <span class="kc">True</span>
+</span><span data-line="125">
+</span><span data-line="126">
+<div class="viewcode-block" id="notify_pending_update">
+<a class="viewcode-back" href="../../modules.html#keycast.updates.notify_pending_update">[docs]</a>
+</span><span data-line="127"><span class="k">def</span><span class="w"> </span><span class="nf">notify_pending_update</span><span class="p">(</span>  <span class="c1"># noqa: C901 — cached-notice/fast-path branches</span>
+</span><span data-line="128">    <span class="o">*</span><span class="p">,</span>
+</span><span data-line="129">    <span class="n">notify</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">],</span>
+</span><span data-line="130">    <span class="n">current</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">__version__</span><span class="p">,</span>
+</span><span data-line="131">    <span class="n">enabled</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="132">    <span class="n">state_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="n">UPDATE_CHECK_FILE_PATH</span><span class="p">,</span>
+</span><span data-line="133">    <span class="n">now</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="134">    <span class="n">interval</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">CHECK_INTERVAL_SECONDS</span><span class="p">,</span>
+</span><span data-line="135">    <span class="n">fetch</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">fetch_latest_release_tag</span><span class="p">,</span>
+</span><span data-line="136">    <span class="n">spawn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]],</span> <span class="nb">object</span><span class="p">]</span> <span class="o">=</span> <span class="n">_spawn_daemon</span><span class="p">,</span>
+</span><span data-line="137"><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="138"><span class="w">    </span><span class="sd">"""Surface a cached update notice and refresh the cache in the background.</span>
+</span><span data-line="139">
+</span><span data-line="140"><span class="sd">    The hot path does **no** network I/O: it reads the cached state and, if a</span>
+</span><span data-line="141"><span class="sd">    newer version than ``current`` is already known, calls ``notify`` once. When</span>
+</span><span data-line="142"><span class="sd">    the throttle window has elapsed it then schedules a background refresh whose</span>
+</span><span data-line="143"><span class="sd">    result surfaces on a *later* invocation.</span>
+</span><span data-line="144">
+</span><span data-line="145"><span class="sd">    Args:</span>
+</span><span data-line="146"><span class="sd">        notify: Sink for the notice string (overlay ``show_text`` for the GUI,</span>
+</span><span data-line="147"><span class="sd">            an stderr writer for the CLI). Called at most once.</span>
+</span><span data-line="148"><span class="sd">        current: The installed version to compare against.</span>
+</span><span data-line="149"><span class="sd">        enabled: The opt-out flag; when ``None`` it is read from config.</span>
+</span><span data-line="150"><span class="sd">        state_path: The throttle state file path.</span>
+</span><span data-line="151"><span class="sd">        now: Current epoch seconds (defaults to ``time.time()``).</span>
+</span><span data-line="152"><span class="sd">        interval: Minimum seconds between background refreshes.</span>
+</span><span data-line="153"><span class="sd">        fetch: The tag fetcher (injectable for tests).</span>
+</span><span data-line="154"><span class="sd">        spawn: Runs the refresh callable (a daemon thread by default; tests pass</span>
+</span><span data-line="155"><span class="sd">            a synchronous runner).</span>
+</span><span data-line="156"><span class="sd">    """</span>
+</span><span data-line="157">    <span class="k">if</span> <span class="n">enabled</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="158">        <span class="n">enabled</span> <span class="o">=</span> <span class="n">_update_enabled</span><span class="p">()</span>
+</span><span data-line="159">    <span class="k">if</span> <span class="ow">not</span> <span class="n">enabled</span><span class="p">:</span>
+</span><span data-line="160">        <span class="k">return</span>
+</span><span data-line="161">
+</span><span data-line="162">    <span class="c1"># Outer guard: this runs on a *foreground* path (Keycast.start on the main</span>
+</span><span data-line="163">    <span class="c1"># thread; the Typer root callback for the CLI), so an unexpected raise here</span>
+</span><span data-line="164">    <span class="c1"># would abort app startup or crash `version`/`info`. detect_install_source()</span>
+</span><span data-line="165">    <span class="c1"># touches the filesystem and `notify` is a caller-supplied sink — neither is</span>
+</span><span data-line="166">    <span class="c1"># contractually raise-free — so the whole hot path degrades silently at DEBUG</span>
+</span><span data-line="167">    <span class="c1"># to honor the "never crash the caller" promise (ADR-002 offline-safety).</span>
+</span><span data-line="168">    <span class="k">try</span><span class="p">:</span>
+</span><span data-line="169">        <span class="n">now</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="k">if</span> <span class="n">now</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">now</span>
+</span><span data-line="170">        <span class="n">state</span> <span class="o">=</span> <span class="n">read_state</span><span class="p">(</span><span class="n">state_path</span><span class="p">)</span>
+</span><span data-line="171">
+</span><span data-line="172">        <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">last_seen_tag</span> <span class="ow">and</span> <span class="n">is_newer</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">last_seen_tag</span><span class="p">,</span> <span class="n">current</span><span class="p">):</span>
+</span><span data-line="173">            <span class="n">notify</span><span class="p">(</span><span class="n">format_notice</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">last_seen_tag</span><span class="p">,</span> <span class="n">detect_install_source</span><span class="p">()))</span>
+</span><span data-line="174">
+</span><span data-line="175">        <span class="k">if</span> <span class="n">due_for_check</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">now</span><span class="p">,</span> <span class="n">interval</span><span class="p">):</span>
+</span><span data-line="176">            <span class="n">_</span> <span class="o">=</span> <span class="n">spawn</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">refresh_state</span><span class="p">(</span><span class="n">now</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="n">state_path</span><span class="p">,</span> <span class="n">fetch</span><span class="o">=</span><span class="n">fetch</span><span class="p">))</span>
+</span><span data-line="177">    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+</span><span data-line="178">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Update notice hot path failed"</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+
+</span></pre></div>
+        </article><button class="back-to-top" type="button">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+  </svg>
+  <span>Back to top</span>
+</button><div class="navigation flex print:hidden"></div></div>
+    </div>
+  </main>
+</div>
+<footer class="sy-foot">
+  <div class="sy-foot-inner sy-container mx-auto">
+    <div class="sy-foot-reserved md:flex justify-between items-center">
+      <div class="sy-foot-copyright"><p>2026, Hasan Sezer Taşan</p>
+  
+  <p>
+    Made with
+    
+    <a href="https://www.sphinx-doc.org/">Sphinx</a> and
+    
+    <a href="https://shibuya.lepture.com">Shibuya theme</a>.
+  </p>
+</div>
+      <div class="sy-foot-socials">
+  <a href="https://github.com/hasansezertasan/keycast" aria-label="GitHub">
+    <iconify-icon icon="simple-icons:github"></iconify-icon>
+  </a></div>
+    </div>
+  </div>
+</footer>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+      <script>let toggleHintShow = 'Click to show';</script>
+      <script>let toggleHintHide = 'Click to hide';</script>
+      <script>let toggleOpenOnPrint = 'true';</script>
+      <script src="../../_static/togglebutton.js?v=b8b12719"></script>
+      <script src="../../_static/design-tabs.js?v=f930bc37"></script>
+      <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+      <script src="../../_static/shibuya.js?v=50760d75"></script>
+      <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script></body>
+</html>
