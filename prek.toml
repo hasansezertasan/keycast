@@ -62,7 +62,7 @@ hooks = [
 
 [[repos]]
 repo = "https://github.com/astral-sh/uv-pre-commit"
-rev = "0.13.1"
+rev = "0.13.8"
 hooks = [{ id = "uv-lock" }]
 
 # Runs before ruff so any `__all__` it inserts is sorted/formatted in the same pass.
@@ -73,7 +73,7 @@ hooks = [{ id = "ensure-dunder-all", files = "^src/" }]
 
 [[repos]]
 repo = "https://github.com/astral-sh/ruff-pre-commit"
-rev = "v0.17.1"
+rev = "v0.17.5"
 hooks = [
   { id = "ruff-check" },
   { id = "ruff-format" },
@@ -143,7 +143,7 @@ hooks = [{ id = "vulture" }]
 
 [[repos]]
 repo = "https://github.com/crate-ci/typos"
-rev = "v1.51.1"
+rev = "v1.52.2"
 hooks = [{ id = "typos" }]
 
 # validate-pyproject checks pyproject.toml against its schema. The upstream hook
@@ -151,12 +151,12 @@ hooks = [{ id = "typos" }]
 # packaging, ...), matching the former `validate-pyproject[all]` style-group pin.
 [[repos]]
 repo = "https://github.com/abravalheri/validate-pyproject"
-rev = "0.26"
+rev = "v0.27"
 hooks = [{ id = "validate-pyproject" }]
 
 [[repos]]
 repo = "https://github.com/python-jsonschema/check-jsonschema"
-rev = "0.38.2"
+rev = "0.39.0"
 hooks = [
   # Action metadata and workflow schemas are distinct. The latter complements
   # actionlint's expression/shell checks and zizmor's security analysis.
@@ -181,7 +181,7 @@ hooks = [{ id = "actionlint" }]
 # Security tab as a non-blocking dashboard. Default (regular) persona.
 [[repos]]
 repo = "https://github.com/zizmorcore/zizmor-pre-commit"
-rev = "v1.31.1"
+rev = "v1.32.0"
 hooks = [{ id = "zizmor" }]
 
 [[repos]]
@@ -197,7 +197,7 @@ hooks = [{ id = "yamllint", exclude = "^\\.copier-answers\\.yml$", args = ["-c",
 
 [[repos]]
 repo = "https://github.com/DavidAnson/markdownlint-cli2"
-rev = "v0.23.3"
+rev = "v0.24.1"
 # The frozen legacy docs under docs/ (API.md, ARCHITECTURE.md, ...) predate the
 # markdownlint style and are GitHub-only reference (excluded from the Sphinx
 # site in conf.py). Reformatting them wholesale would churn hundreds of lines
@@ -238,7 +238,7 @@ hooks = [{ id = "yamlfmt", exclude = "^\\.copier-answers\\.yml$", args = ["-conf
 
 [[repos]]
 repo = "https://github.com/commitizen-tools/commitizen"
-rev = "v4.19.2"
+rev = "v4.19.3"
 hooks = [
   { id = "commitizen" },
   { id = "commitizen-branch", stages = ["pre-push"] },
