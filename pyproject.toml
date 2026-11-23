@@ -32,6 +32,7 @@ classifiers = [
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
   "Programming Language :: Python :: Implementation :: CPython",
   "Topic :: Multimedia :: Graphics :: Presentation",
   "Topic :: Utilities",
@@ -636,6 +637,7 @@ env_list = [
   # so run them in the default CI ``tox run`` invocation.
   "docs-doctest",
   "cli",
+  "3.15",
   "3.14",
 ]
 requires = ["tox>=4"]
@@ -696,7 +698,7 @@ commands = [
   [
     "mypy",
     "--python-version",
-    "3.14",
+    "3.15",
   ],
   # Style runs once on Linux, so explicitly sweep platform-gated branches that
   # mypy would otherwise prune as unreachable on the host platform.
